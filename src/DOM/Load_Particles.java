@@ -83,8 +83,8 @@ public class Load_Particles implements PlugIn{
 				if(FFindex ==0)
 				{
 					sml.ptable.addValue("Iterations_fit",            (float) ip.getf(14,n));
-					sml.ptable.addValue("SD_X_fit, pix",             (float) ip.getf(15,n));
-					sml.ptable.addValue("SD_Y_fit, pix",             (float) ip.getf(16,n));
+					sml.ptable.addValue("SD_X_fit_(px)",             (float) ip.getf(15,n));
+					sml.ptable.addValue("SD_Y_fit_(px)",             (float) ip.getf(16,n));
 					sml.ptable.addValue("Amp_loc_error",             (float) ip.getf(17,n));
 					
 				}

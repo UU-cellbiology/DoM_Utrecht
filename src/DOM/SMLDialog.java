@@ -24,15 +24,22 @@ public class SMLDialog {
 	
 	
 	//reconstructing image
-	double dRecPixelSize;  //pixel size in nm of reconstructed image
-	int nRecWidth;         //width of original image for reconstruction	
-	int nRecHeight;        //height of original image for reconstruction
-	int nIntIndex;         //parameter of intensity reconstruction
-	int nSDIndex;          //parameter of intensity reconstruction
-	double dFixedSD; 	   //value of SD in case of fixed value
-	double dMagnification; //magnification coefficient
-	boolean bCutoff; 	   //whether or not apply cut-off in localization
-	double  dcutoff; 	   //cut-off value in original pixels
+	double dRecPixelSize;    //pixel size in nm of reconstructed image
+	int nRecWidth;           //width of original image for reconstruction	
+	int nRecHeight;          //height of original image for reconstruction
+	int nIntIndex;           //parameter of intensity reconstruction
+	int nSDIndex;            //parameter of intensity reconstruction
+	double dFixedSD; 	     //value of SD in case of fixed value
+	double dMagnification;   //magnification coefficient
+	boolean bCutoff; 	     //whether or not apply cut-off in localization
+	double  dcutoff; 	     //cut-off value in original pixels
+	boolean bTranslation;    //apply translation during reconstruction
+	double dTranslationX;    //translation in X direction 
+	double dTranslationY;    //translation in Y direction 
+	boolean bFramesInterval; //use all frames (false) or some interval defined by nFrameMin and nFrameMax
+	double nFrameMin;
+	double nFrameMax;
+	
 	
 	
 	//drift correction parameters
@@ -72,7 +79,7 @@ public class SMLDialog {
 	}
 	
 	
-	public boolean ReconstructImage(double xlocavg_, double ylocavg_) //dialog showing options for reconstruction image		
+	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe) //dialog showing options for reconstruction image		
 	{
 		GenericDialog dgReconstruct = new GenericDialog("Reconstruct Dataset");
 		String [] RecIntOptions = new String [] {
@@ -87,15 +94,25 @@ public class SMLDialog {
 		dgReconstruct.addChoice("As spot's intensity use:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Integrated spot intensity"));
 		dgReconstruct.addChoice("As spot's SD use:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
 		dgReconstruct.addNumericField("Value of SD in case of constant (in original pixels):", Prefs.get("SiMoLoc.Rec_SDFixed", 2), 2);
-		dgReconstruct.addCheckbox("Apply cut-off for localization precision", Prefs.get("SiMoLoc.applycutoff", false));
+		dgReconstruct.addCheckbox("Apply cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
 		dgReconstruct.addNumericField("Cut-off particles with localization less than (in original pixels): ", Prefs.get("SiMoLoc.cutoff", 0.3), 2);
 		dgReconstruct.addMessage("\n\n");
-		dgReconstruct.addCheckbox("Apply drift correction", Prefs.get("SiMoLoc.drift", false));		
+		dgReconstruct.addCheckbox("Apply drift correction:", Prefs.get("SiMoLoc.drift", false));		
 		dgReconstruct.addNumericField("Number of frames for averaging:", Prefs.get("SiMoLoc.drift_frames", 1000), 0);
-		dgReconstruct.addNumericField("Max shift in pixels:", Prefs.get("SiMoLoc.drift_pixels", 10), 0);
-		dgReconstruct.addCheckbox("Show intermediate reconstructions:", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
-		dgReconstruct.addCheckbox("Show cross-correlation images:", Prefs.get("SiMoLoc.drift_cross_correlation", false));
+		dgReconstruct.addNumericField("Maximum shift in pixels:", Prefs.get("SiMoLoc.drift_pixels", 10), 0);
+		dgReconstruct.addCheckbox("Show intermediate reconstructions (drift)", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
+		dgReconstruct.addCheckbox("Show cross-correlation images (drift)", Prefs.get("SiMoLoc.drift_cross_correlation", false));
 		dgReconstruct.addMessage("\n\n");		
+		dgReconstruct.addCheckbox("Reconstruct with translation (in original pixels):", Prefs.get("SiMoLoc.bTranslate", false));
+		dgReconstruct.addNumericField("X Offset:", Prefs.get("SiMoLoc.dTransX", 0), 4);
+		dgReconstruct.addNumericField("Y Offset:", Prefs.get("SiMoLoc.dTransY", 0), 4);
+		dgReconstruct.addMessage("\n\n");
+		dgReconstruct.addCheckbox("Use frame interval:", Prefs.get("SiMoLoc.bFramesInterval", false));
+		dgReconstruct.addMessage("Current total frame range is from " + new DecimalFormat("#").format(fminframe) + " till " +  new DecimalFormat("#").format(fmaxframe));
+		dgReconstruct.addNumericField("Initial frame:", Prefs.get("SiMoLoc.nFrameMin", fminframe), 0);
+		dgReconstruct.addNumericField("Last frame:", Prefs.get("SiMoLoc.nFrameMax", fmaxframe), 0);
+		dgReconstruct.addMessage("\n\n");
+		
 		dgReconstruct.showDialog();
 		if (dgReconstruct.wasCanceled())
             return false;
@@ -126,7 +143,18 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
 		bShowCrossCorrelation = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
-		
+		bTranslation = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.bTranslate", bTranslation);
+		dTranslationX =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.dTransX", dTranslationX);
+		dTranslationY =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.dTransY", dTranslationY);
+		bFramesInterval = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.bFramesInterval", bFramesInterval);
+		nFrameMin =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.nFrameMin", nFrameMin);
+		nFrameMax =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.nFrameMax", nFrameMax);		
 		return true;
 	}
 	

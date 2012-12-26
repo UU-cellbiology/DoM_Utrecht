@@ -2,6 +2,8 @@ package DOM;
 
 
 
+import java.util.Arrays;
+
 import ij.IJ;
 import ij.plugin.PlugIn;
 
@@ -17,7 +19,9 @@ public class Reconstruct_Image implements PlugIn{
 	{
 		double [] xloc;
 		double [] yloc;
+		double [] frames;
 		double xlocavg, ylocavg, pxsize;
+		double fminframe, fmaxframe;
 		int i, sz;
 		IJ.register(Reconstruct_Image.class);
 
@@ -28,10 +32,9 @@ public class Reconstruct_Image implements PlugIn{
 			return;
 		}
 	
-		//calculate average localization precision 
-		
+		//calculate average localization precision 	
 		xloc = sml.ptable.getColumnAsDoubles(7);
-		yloc = sml.ptable.getColumnAsDoubles(8);
+		yloc = sml.ptable.getColumnAsDoubles(8);		
 		sz = xloc.length; 
 		xlocavg=0; ylocavg = 0;
 		for (i=0; i<sz; i++)
@@ -42,10 +45,40 @@ public class Reconstruct_Image implements PlugIn{
 		pxsize =  sml.ptable.getValueAsDouble(3, 0)/sml.ptable.getValueAsDouble(1, 0);
 		xlocavg = pxsize*xlocavg/(double)sz;
 		ylocavg = pxsize*ylocavg/(double)sz;
-		//show dialog with options
-		if (!dlg.ReconstructImage(xlocavg,ylocavg)) return;
 		
-		smlViewer = new SMLReconstruct("Reconstruction", sml, dlg);
+		//calculate min and max frame number		
+		frames = sml.ptable.getColumnAsDoubles(13);
+		Arrays.sort(frames);
+		fminframe = frames[0];
+		fmaxframe = frames[frames.length-1];
+		
+		//show dialog with options
+		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe)) return;
+		
+		//check some parameters for consistensy 
+		if(dlg.bFramesInterval)
+		{
+			if(dlg.nFrameMax>fmaxframe ||  dlg.nFrameMax<fminframe)
+			{
+				IJ.error("Maximum frame number is out of range!");
+				return;
+			}
+			if(dlg.nFrameMin>fmaxframe ||  dlg.nFrameMin<fminframe)
+			{
+				IJ.error("Minimum frame number is out of range!");
+				return;
+			}
+			if(dlg.nFrameMin>dlg.nFrameMax)
+			{
+				IJ.error("Minimum frame should be less then maximum frame number!");
+				return;
+			}
+
+
+		}
+		
+		//create recunstruction object
+		smlViewer = new SMLReconstruct("Reconstructed Image", sml, dlg);
 		
 		
 		//smlViewer.clear();
@@ -53,16 +86,16 @@ public class Reconstruct_Image implements PlugIn{
 		{			
 			smlViewer.sortbyframe();
 			smlViewer.DriftCorrection();
-			smlViewer.imp.setTitle("Reconstructed Image (DriftCorrection frames="+dlg.nDriftFrames+" pixels="+dlg.nDriftPixels);
+			smlViewer.imp.setTitle("Reconstructed Image (DriftCorrection frames="+dlg.nDriftFrames+" pixels="+dlg.nDriftPixels+")");
 			//smlViewer.correctDriftCOM();
 		}	
-		//for(int i = 1; i<48000; i+=5000)
-		//{
-			smlViewer.draw_unsorted(1, smlViewer.nframes);
-			smlViewer.imp.show();
-			//smlViewer.draw(i, i+5000);
-		//}
-		//new ImagePlus("Results", smlViewer.imp).show();
+
+		if(dlg.bFramesInterval)
+		{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
+		else
+		{	smlViewer.draw_unsorted(1, smlViewer.nframes);}
+		
+		smlViewer.imp.show();
 		
 		
 	}

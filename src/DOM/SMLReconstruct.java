@@ -53,7 +53,7 @@ public class SMLReconstruct {
 	
 
 	
-	//constructor for offline image reconstruction 
+	//constructor for image reconstruction 
 	
 	SMLReconstruct(java.lang.String title, SMLAnalysis sml_, SMLDialog dlg_)
 	{
@@ -76,16 +76,32 @@ public class SMLReconstruct {
 		else 					  //fitted Gaussian peak amplitude as amplitude
 			amp = sml_.ptable.getColumnAsDoubles(0);
 		
+		//frame number
+		f   = sml_.ptable.getColumnAsDoubles(13);
+		nParticlesCount = f.length;
+		//coordinates
 		x   = sml_.ptable.getColumnAsDoubles(1);		
 		y   = sml_.ptable.getColumnAsDoubles(2);
+
+		if (settings.bTranslation)			
+		{
+			for (int i=0; i<nParticlesCount; i++)
+			{
+				x[i] += settings.dTranslationX;
+				y[i] += settings.dTranslationY;
+			}
+		
+		}
+		//false positive mark
 		fp  = sml_.ptable.getColumnAsDoubles(6);
+		//localization precision
 		sdx = sml_.ptable.getColumnAsDoubles(7);
 		sdy = sml_.ptable.getColumnAsDoubles(8);
-		f   = sml_.ptable.getColumnAsDoubles(13);
+		
 		sml_.ptable_lock.unlock();
 		
-		nParticlesCount = f.length;
-		// load max & min values
+		
+		// load min & max values
 		for (int n=0;n<f.length;n++)
 		{
 			if (f[n]>nframes) nframes=(int) f[n];
@@ -272,21 +288,33 @@ public class SMLReconstruct {
 		driftstack = new ImageStack(drift_width, drift_height);
 		crosscorrstack = new ImageStack(2*settings.nDriftPixels+1, 2*settings.nDriftPixels+1);
 		//calculating number of time intervals
-		nIntervalsCount = (int) Math.floor(((double)nframes)/((double)nIntervalFrames));
-		//the rest of the table is truncated for now
-			
+		if(settings.bFramesInterval)
+			nIntervalsCount = (int) Math.floor((settings.nFrameMax-settings.nFrameMin+1.0)/((double)nIntervalFrames));
+		else
+			nIntervalsCount = (int) Math.floor(((double)nframes)/((double)nIntervalFrames));
+		
+		if(nIntervalsCount <= 1)
+		{
+			IJ.error("Drift correction interval is too big. Drift correction is cancelled.");
+			return;
+		}
+	
+		//the rest of the table is truncated for now			
 		driftx = new double [nIntervalsCount];
 		drifty = new double [nIntervalsCount];
-		//reconstructing images for cross-correlation calculation
 		
+		//reconstructing images for cross-correlation calculation		
 		IJ.showStatus("Applying Drift correction (images reconstruction)...");
 		for (i=0; i<nIntervalsCount; i++)
 		{
 			IJ.showProgress(i, nIntervalsCount);
-			draw_sorted(i*nIntervalFrames+1, (i+1)*nIntervalFrames);			
+			if(settings.bFramesInterval)
+				draw_sorted((int)settings.nFrameMin+i*nIntervalFrames, (int)settings.nFrameMin -1 +(i+1)*nIntervalFrames);
+			else
+				draw_sorted(i*nIntervalFrames+1, (i+1)*nIntervalFrames);			
 		}
 		if(settings.bShowIntermediate)
-			new ImagePlus("Intermediate reconstructions (Drift Correction)", driftstack).show();
+			new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", driftstack).show();
 		
 		IJ.showStatus("Applying Drift correction (calculating cross-correlation)...");
 		for (i=1; i<nIntervalsCount; i++)
@@ -295,7 +323,7 @@ public class SMLReconstruct {
 			crosscorrstack.addSlice(null, crosscorrelation(driftstack.getProcessor(i),driftstack.getProcessor(i+1)));
 		}
 		if(settings.bShowCrossCorrelation)
-			new ImagePlus("Cross Correlation (Drift Correction)", crosscorrstack).show();
+			new ImagePlus("Cross Correlation (Drift frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", crosscorrstack).show();
 		
 		driftx[0]=0;
 		drifty[0]=0;
@@ -314,9 +342,17 @@ public class SMLReconstruct {
 		
 		//show results of drift
 		for(i=0;i<nframes;i++)
-			sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(approxx[i])+"\t"+Double.toString(approxy[i])+"\n";
-		
-		Frame frame = WindowManager.getFrame("Drift Correction");
+		{
+			if(settings.bFramesInterval)
+			{
+				sDriftData = sDriftData + Integer.toString(i+(int)settings.nFrameMin)+"\t"+Double.toString(approxx[i])+"\t"+Double.toString(approxy[i])+"\n";
+			}
+			else
+			{
+				sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(approxx[i])+"\t"+Double.toString(approxy[i])+"\n";				
+			}
+		}
+		Frame frame = WindowManager.getFrame("Drift Correction frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")");
 		if (frame!=null && (frame instanceof TextWindow) )
 		{
 			DriftTable = (TextWindow)frame;
@@ -325,7 +361,7 @@ public class SMLReconstruct {
 			DriftTable.getTextPanel().updateDisplay();			
 		}
 			else
-				DriftTable = new TextWindow("Drift Correction", "Frame_Number\tX_drift_(px)\tY_drift_(px)", sDriftData, 450, 300);			
+				DriftTable = new TextWindow("Drift Correction frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", "Frame_Number\tX_drift_(px)\tY_drift_(px)", sDriftData, 450, 300);			
 		
 		return;
 		
@@ -362,7 +398,7 @@ public class SMLReconstruct {
 		
 		//making linear approximation
 		//first half interval
-		for(i=0; i<(int)(nIntervalFrames*0.5); i++)
+		for(i=0; i<nIntervalFrames*0.5; i++)
 		{
 			approxx[i] = 0.;
 			approxy[i] = 0.;			
@@ -385,11 +421,27 @@ public class SMLReconstruct {
 			approxy[i] = drifty[dIndex];		
 		}
 		
-		for(i=0;f[i]<nIntervalsCount*nIntervalFrames;i++)
+		if(settings.bFramesInterval)
 		{
-			dIndex = (int) f[i];
-			x[i]+=approxx[dIndex];
-			y[i]+=approxy[dIndex];
+			i=0;
+			while(f[i]<settings.nFrameMin)
+				i++;
+			for(;f[i]<(settings.nFrameMin+nIntervalsCount*nIntervalFrames-1);i++)
+			{
+				dIndex = (int) f[i]-(int)settings.nFrameMin;
+				x[i]+=approxx[dIndex];
+				y[i]+=approxy[dIndex];
+			}						
+		}
+		else
+		{
+			for(i=0;f[i]<nIntervalsCount*nIntervalFrames;i++)
+			{
+				dIndex = (int) f[i];
+				x[i]+=approxx[dIndex];
+				y[i]+=approxy[dIndex];
+			}
+			
 		}
 		return;
 			
@@ -514,213 +566,4 @@ public class SMLReconstruct {
 }
 
 
-
-
-
-/** Makes drift correction based on center of mass calculation.
- * Using sliding average. Turns out to be not so good idea. */	
-/*void correctDriftCOM()
-{
-	int nBlocks;
-	int nDriftFr;
-	int nCurrFrame;
-	double dTotInt;
-	double dCMx, dCMy;
-	int nFrameTimer;
-	int i,j;
-
-	double max_x = -100;
-	double max_y = -100;
-	double min_x = 1000000000;
-	double min_y = 1000000000;
-	
-	nDriftFr = settings.nDriftFrames;
-	
-	if (((double)nframes)%((double)nDriftFr)!=0)
-		nBlocks = (int) Math.ceil(((double)nframes)/((double)nDriftFr));
-	else
-		nBlocks = nframes/nDriftFr;
-	
-	//center of masses 
-	double [] cmx = new double [nBlocks];
-	double [] cmy = new double [nBlocks];
-	
-	IJ.showStatus("Applying Drift Correction...");	
-	
-	nCurrFrame = (int)f[0];
-	nFrameTimer = nDriftFr;
-	dCMx = 0; dCMy = 0; dTotInt = 0;
-	j=0;
-	for(i=0;i<f.length; i++)
-	{
-		if(nCurrFrame != (int)f[i])
-		{
-			nFrameTimer--;
-			nCurrFrame = (int)f[i];				
-		}
-		if(nFrameTimer == 0)
-		{
-			nFrameTimer = nDriftFr;
-			cmx[j]=dCMx/dTotInt;
-			cmy[j]=dCMy/dTotInt;
-			j++;
-			dCMx = 0; dCMy = 0; dTotInt = 0;				
-		}
-		if(fp[i]<0.3)
-		{
-			//dCMx += (amp[i]-min)*x[i]/nrange;				
-			//dCMy += (amp[i]-min)*y[i]/nrange;
-			//dTotInt += (amp[i]-min)/nrange;
-			dCMx += x[i];				
-			dCMy += y[i];
-			dTotInt ++;
-
-		}
-	}
-
-	cmx[nBlocks-1]=dCMx/dTotInt;
-	cmy[nBlocks-1]=dCMy/dTotInt;
-
-	for( i = 1;i<nBlocks; i++)
-	{
-		dCMx = cmx[i]-cmx[0];
-		dCMy = cmy[i]-cmy[0];
-		cmx[i]=dCMx;
-		cmy[i]=dCMy;
-		if(dCMx>max_x) max_x=dCMx;
-		if(dCMy>max_y) max_y=dCMy;
-		if(dCMx<min_x) min_x=dCMx;
-		if(dCMy<min_y) min_y=dCMy;
-	}
-	cmx[0]=0;
-	cmy[0]=0;
-	
-	//correcting
-	nCurrFrame = (int)f[0];
-	nFrameTimer = nDriftFr;
-	j=0;
-	for(i=0;i<f.length; i++)
-	{
-			if(nCurrFrame != (int)f[i])
-			{
-				nFrameTimer--;
-				nCurrFrame = (int)f[i];				
-			}
-			if(nFrameTimer == 0)
-			{
-				nFrameTimer = nDriftFr;
-				j++;
-			
-			}
-			x[i]+=cmx[j];
-			y[i]+=cmy[j];	
-	}
-		
-}
-*/
-/** Makes drift correction based on center of mass calculation.
- * Using sliding average. Turns out to be not so good idea. */	
-/*void correctDriftCOMSliding()
-{
-
-	int i,j;
-	int nBlocks;
-	int nDriftFr;
-	double dTotInt;
-	double dCMx, dCMy;
-	double max_x = -100;
-	double max_y = -100;
-	double min_x = 1000000000;
-	double min_y = 1000000000;
-	boolean bFirstSwitch = true;
-	int nFirstFrameIndex;
-	int nCurrFrame;
-	int nFrameTimer;
-	 
-	nDriftFr = settings.nDriftFrames;
-	
-	nBlocks = 1 + nframes - nDriftFr;
-	double [] cmx = new double [nBlocks];
-	double [] cmy = new double [nBlocks];
-	IJ.showStatus("Applying Drift Correction...");
-	
-	nFirstFrameIndex = 0;						
-	for(i = 0;i<nBlocks; i++)
-	{
-		IJ.showProgress(i, nBlocks);
-		j = nFirstFrameIndex;
-		nFrameTimer = nDriftFr;
-		nCurrFrame = (int)f[j];
-		bFirstSwitch = true;
-		dCMx =0; dCMy = 0; dTotInt = 0;
-		while(nFrameTimer>0)
-		{
-				if(fp[j]<0.3)
-				{
-					dCMx += (amp[j]-min)*x[j]/nrange;				
-					dCMy += (amp[j]-min)*y[j]/nrange;
-					dTotInt += (amp[j]-min)/nrange;
-					//dCMx += x[j];				
-					//dCMy += y[j];
-					//dTotInt ++;
-
-				}
-				j++;
-				if(j==f.length)
-					nFrameTimer=0;
-				else
-				{
-					if(nCurrFrame != (int)f[j])
-					{
-						nFrameTimer--;
-						nCurrFrame = (int)f[j];
-						if(bFirstSwitch)
-						{
-							bFirstSwitch = false;
-							nFirstFrameIndex = j;
-						}
-					}					
-				}
-		}
-		cmx[i]=dCMx/dTotInt;
-		cmy[i]=dCMy/dTotInt;
-		//if(cmx[i]>max_x) max_x=cmx[i];
-		//if(cmy[i]>max_y) max_y=cmy[i];
-		//if(cmx[i]<min_x) min_x=cmx[i];
-		//if(cmy[i]<min_y) min_y=cmy[i];
-	}
-	
-	for( i = 1;i<nBlocks; i++)
-	{
-		dCMx = cmx[i]-cmx[0];
-		dCMy = cmy[i]-cmy[0];
-		cmx[i]=dCMx;
-		cmy[i]=dCMy;
-		if(dCMx>max_x) max_x=dCMx;
-		if(dCMy>max_y) max_y=dCMy;
-		if(dCMx<min_x) min_x=dCMx;
-		if(dCMy<min_y) min_y=dCMy;
-	}
-	cmx[0]=0;
-	cmy[0]=0;
-	
-	//finding first frame to correct
-	i=0;
-	while((int)f[i]<=nDriftFr)
-		i++;
-	nCurrFrame= (int)f[i];
-	j=1;
-	for( ;i<f.length; i++)
-	{
-		if(nCurrFrame!= (int)f[i])
-		{
-			nCurrFrame = (int)f[i];
-			j++;
-		}
-		
-		x[i]+=cmx[j];
-		y[i]+=cmy[j];			
-	}
-}
-*/
 
