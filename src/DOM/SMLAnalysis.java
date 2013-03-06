@@ -1,6 +1,8 @@
 package DOM;
 
 
+
+
 import jaolho.data.lma.LMA;
 
 import java.awt.Color;
@@ -9,9 +11,11 @@ import java.util.Stack;
 
 
 import ij.IJ;
+import ij.ImagePlus;
 
 import ij.gui.OvalRoi;
 import ij.gui.Overlay;
+import ij.measure.Measurements;
 import ij.measure.ResultsTable;
 import ij.plugin.filter.Analyzer;
 
@@ -71,7 +75,7 @@ public class SMLAnalysis {
 		//new ImagePlus("convoluted", dupip.duplicate()).show();
 		tc = new TypeConverter(dupip, true);
 		dushort =  tc.convertToShort();
-
+		//new ImagePlus("convoluted", dushort.duplicate()).show();
 		  
 		
 		 
@@ -100,7 +104,7 @@ public class SMLAnalysis {
 
 		//dupip.invert();
 		
-		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
+		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
 		//labelParticles(dubyte, duconv, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, fdg.dSymmetry/100);
 		
 
@@ -117,39 +121,41 @@ public class SMLAnalysis {
 		//imp2.show();  		
 	}
 	
-	//function that finds centroid x,y and area
+	//function that finds centroids x,y and area
 	//of spots after thresholding
 	//based on connected components	labeling Java code
 	//implemented by Mariusz Jankowski & Jens-Peer Kuska
 	//and in March 2012 available by link
     //http://www.izbi.uni-leipzig.de/izbi/publikationen/publi_2004/IMS2004_JankowskiKuska.pdf
 	
-	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, double dPixelSize_, int nAreaCut, double dPSFsigma_, Overlay SpotsPositions__, boolean bShow, boolean bIgnore)//, double dSymmetry_)
+	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, double dPixelSize_, int nAreaCut, double dPSFsigma_, Overlay SpotsPositions__, boolean bShow)//, boolean bIgnore)//, double dSymmetry_)
 	{
 		int width = ipBinary.getWidth();
 		int height = ipBinary.getHeight();
-		int nFitRadius = 3; //radius in number of SD around center point to fit Gaussian
+		//int nFitRadius = 3; //radius in number of SD around center point to fit Gaussian
 		int dBorder; // radius in pixels around center point to fit Gaussian
-		int nIntBoxSize = 3; //half length of box for spot integration (in SD around) 
+		//int nIntBoxSize = 3; //half length of box for spot integration (in SD around) 
 		
 		
 		int nArea;
-		double nFalsePositive;
-		int i,j, nCount;
+		//double nFalsePositive;
+		int i,j;
+		//int nCount;
 		double dVal, dInt;
 		double dIMax, dIMin;
-		double [][] spotInt;
+		//double [][] spotInt;
 	
-		double [] dFitParams;
-		double [] dFitErrors;
-		double dErrCoeff;
-		LMA SMLlma;
-		SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
+		//double [] dFitParams;
+		//double [] dFitErrors;
+		//double dErrCoeff;
+		//LMA SMLlma;
+		//SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
 
-		double xCentroid, yCentroid, xSD, ySD;
-		double dIntAmp, dIntNoise;
-		double dNoiseAvrg, dNoiseSD;
-		double dSNR;
+		double xCentroid, yCentroid;
+		//double xSD, ySD;
+		//double dIntAmp, dIntNoise;
+		//double dNoiseAvrg, dNoiseSD;
+		//double dSNR;
 		boolean bBorder;
 
 		int lab = 1;
@@ -161,16 +167,11 @@ public class SMLAnalysis {
 		
 		OvalRoi spotROI;
 
-		dBorder= (int)(dPSFsigma_*nFitRadius);
-		spotInt = new double [(2*dBorder+1)*(2*dBorder+1)][3];
-		dFitParams = new double [6];
-		dFitErrors = new double [6];
-		
-		
-		/*ImageProcessor afterFit; //duplicate of image
-		afterFit = ipRaw.duplicate();
-		double dGValue;
-		double [] dCorrsxy = new double [2];*/
+		dBorder= (int)(dPSFsigma_*DOMConstants.FITRADIUS);
+		//spotInt = new double [(2*dBorder+1)*(2*dBorder+1)][3];
+		//dFitParams = new double [6];
+		//dFitErrors = new double [6];
+				
 		
 		for (int r = 1; r < width-1; r++)
 			for (int c = 1; c < height-1; c++) {
@@ -264,148 +265,37 @@ public class SMLAnalysis {
 
 						if ( (xCentroid>dBorder) && (yCentroid>dBorder) && (xCentroid<(width-1-dBorder)) && (yCentroid<(height-1-dBorder)) )
 						{
-							//fitting of spot
+							//calculating initial parameters for fitting of spot
 							
 							//creating array of intensity values for fitting
 							dIMin = 1000000;
-							nCount = 0;
+							//nCount = 0;
 							for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
 								for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
 								{
 									dVal = ipRaw.getPixel(i,j);
 									if (dVal<dIMin)
-										dIMin = dVal;
-									spotInt[nCount][0] =dVal;
-									spotInt[nCount][1] =(double)i;
-									spotInt[nCount][2] =(double)j;
-									nCount++;
-									
+										dIMin = dVal;																	
 								}
-							dFitParams[0]= dIMin;
-							dFitParams[1]= dIMax - dIMin;
-							dFitParams[2]= xCentroid;
-							dFitParams[3]= yCentroid;
-							dFitParams[4]= dPSFsigma_;
-							dFitParams[5]= dPSFsigma_;
-							SMLlma = new LMA(GFit, dFitParams, spotInt);
-							SMLlma.fit();
 							
-							dFitErrors = SMLlma.getStandardErrorsOfParameters();
-							// scaling coefficient for parameters errors estimation 
-							// (Standard deviation of residuals)
-							dErrCoeff = Math.sqrt(SMLlma.chi2/(nCount-6));
-							for (i=0;i<6;i++)
-								dFitErrors[i] *= dErrCoeff; 
-							nFalsePositive = 0.0;
-							//iterations didn't converge. suspicious point
-							if (SMLlma.iterationCount== 101)
-								nFalsePositive = 0.5;
-							//spot is too big
-							if((SMLlma.parameters[4] > 2.0*dPSFsigma_) || (SMLlma.parameters[4]<0.5*dPSFsigma_)||(SMLlma.parameters[5]<0.5*dPSFsigma_)||(SMLlma.parameters[5] > 2.0*dPSFsigma_))
-								nFalsePositive = 1.0;
-							//localization precision is bigger than PSF size
-							if((dFitErrors[2] > dPSFsigma_) || (dFitErrors[3] > dPSFsigma_))
-								nFalsePositive = 1.0;
-					
-							//calculating integrated spot intensity and estimating SNR
-							dIntAmp =0;
-							dSNR = 0;
-							dIntNoise = 0;
-							dNoiseAvrg = 0;
-							dNoiseSD = 0;
-							if(nFalsePositive<0.5)
-							{
-								xCentroid = Math.round(SMLlma.parameters[2]);
-								yCentroid = Math.round(SMLlma.parameters[3]);
-								xSD = Math.round(SMLlma.parameters[4]*nIntBoxSize);
-								ySD = Math.round(SMLlma.parameters[5]*nIntBoxSize);
-								if( ((xCentroid-xSD-1)>0) && ((yCentroid-ySD-1)>0) && ((xCentroid+xSD+1)<(width-1)) && ((yCentroid+ySD+1)<(height-1)))
-								{
-									//integrated intensity in 3SD * 3SD region
-									for(i=(int) (xCentroid-xSD); i<=(xCentroid+xSD); i++)
-										for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
-											dIntAmp += ipRaw.getPixel(i,j);
-									
-									//averaged noise around spot
-									j = (int)(yCentroid-ySD-1);
-									for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
-										dIntNoise += ipRaw.getPixel(i,j);
-									j = (int)(yCentroid+ySD+1);
-									for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
-										dIntNoise += ipRaw.getPixel(i,j);
-									i=(int) (xCentroid-xSD-1);
-									for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
-										dIntNoise += ipRaw.getPixel(i,j);
-									i=(int) (xCentroid+xSD+1);
-									for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
-										dIntNoise += ipRaw.getPixel(i,j);
-									dNoiseAvrg = dIntNoise/(4*xSD+4*ySD+8);
-									dIntAmp = dIntAmp -  (dNoiseAvrg*((2*xSD+1)*(2*ySD+1))); 
-									
-									//SD of noise
-									j = (int)(yCentroid-ySD-1);
-									for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
-										dNoiseSD += Math.pow(dNoiseAvrg - ipRaw.getPixel(i,j),2);
-									j = (int)(yCentroid+ySD+1);
-									for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
-										dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
-									i=(int) (xCentroid-xSD-1);
-									for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
-										dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
-									i=(int) (xCentroid+xSD+1);
-									for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
-										dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
-									dNoiseSD = Math.sqrt(dNoiseSD/(4*xSD+4*ySD+8));
-									dSNR =  SMLlma.parameters[1]/dNoiseSD;
-								}
-							}
-
-							if(SMLlma.parameters[2]>0 && SMLlma.parameters[2]<width && SMLlma.parameters[3]>0 && SMLlma.parameters[3]<height)
-							{
-								if(!(bIgnore && nFalsePositive>0.3))
-								{
 									ptable_lock.lock();
 									ptable.incrementCounter();
-	
-									ptable.addValue("Amplitude_fit",SMLlma.parameters[1]);
-									
-									ptable.addValue("X_(px)",SMLlma.parameters[2]);							
-									ptable.addValue("Y_(px)",SMLlma.parameters[3]);
-									ptable.addValue("X_(nm)",SMLlma.parameters[2]*dPixelSize_);							
-									ptable.addValue("Y_(nm)",SMLlma.parameters[3]*dPixelSize_);
-									ptable.addValue("Z_(nm)",0);
-									ptable.addValue("False positive", nFalsePositive);
-									ptable.addValue("X_loc_error(px)", dFitErrors[2]);
-									ptable.addValue("Y_loc_error(px)", dFitErrors[3]);
-	
-									ptable.addValue("BGfit",SMLlma.parameters[0]);							
-									ptable.addValue("IntegratedInt",dIntAmp);
-									ptable.addValue("SNR", dSNR);
-	
-									ptable.addValue("chi2_fit",SMLlma.chi2);
-									ptable.addValue("Frame Number", nFrame+1);					
-									ptable.addValue("Iterations_fit",SMLlma.iterationCount);
-									ptable.addValue("SD_X_fit_(px)",SMLlma.parameters[4]);
-									ptable.addValue("SD_Y_fit_(px)",SMLlma.parameters[5]);
-									ptable.addValue("Amp_loc_error",dFitErrors[1]);
+									ptable.addValue("Frame Number", nFrame+1);
+									ptable.addValue("X_centroid_(px)",xCentroid);	
+									ptable.addValue("Y_centroid_(px)",yCentroid);
+									ptable.addValue("MaxInt",dIMax);
+									ptable.addValue("MinInt",dIMin);
 									
 									ptable_lock.unlock();
 									if(bShow)
 									{
-										spotROI = new OvalRoi((int)(xCentroid-2*dPSFsigma_),(int)(yCentroid-2*dPSFsigma_),(int)(4.0*dPSFsigma_),(int)(4.0*dPSFsigma_));
-										if(nFalsePositive<0.5)
-											spotROI.setStrokeColor(Color.green);
-										else
-											if(nFalsePositive<1)
-												spotROI.setStrokeColor(Color.yellow);
-											else
-												spotROI.setStrokeColor(Color.red);
-												
+										spotROI = new OvalRoi((int)(0.5+xCentroid-2*dPSFsigma_),(int)(0.5+yCentroid-2*dPSFsigma_),(int)(4.0*dPSFsigma_),(int)(4.0*dPSFsigma_));
+										spotROI.setStrokeColor(Color.yellow);	
 										spotROI.setPosition(nFrame+1);
 										SpotsPositions__.add(spotROI);
+										
 									}
-								}
-						}
+
 					}
 				
 				}
@@ -419,7 +309,183 @@ public class SMLAnalysis {
 		
 	}
 	
+	//function fitting particles in specific frame
+	void fitParticles(ImageProcessor ipRaw, SMLDialog fdg, double[][] particles_, int nFrame, Overlay SpotsPositions__)
+	{
+		int width = ipRaw.getWidth();
+		int height = ipRaw.getHeight();
+		int i,j, nCount, nParticlesCount, nParticlesNumber;		
+		double xCentroid, yCentroid, xSD, ySD;
+		double dIntAmp, dIntNoise;
+		double dNoiseAvrg, dNoiseSD;
+		double dSNR;
+		int dBorder; // radius in pixels around center point to fit Gaussian
+		double nFalsePositive;		
+		
+		double [][] spotInt;		
+		double [] dFitParams;
+		double [] dFitErrors;
+		double dErrCoeff;
+		LMA SMLlma;
+		SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
+		OvalRoi spotROI;
+		
+		//initialization
+		dBorder= (int)(fdg.dPSFsigma*DOMConstants.FITRADIUS);
+		spotInt = new double [(2*dBorder+1)*(2*dBorder+1)][3];
+		dFitParams = new double [6];
+		dFitErrors = new double [6];
+		nParticlesNumber = particles_[0].length;
+				
+		for(nParticlesCount=0;nParticlesCount<nParticlesNumber;nParticlesCount++)
+		{
+					
+			//creating array of intensity values for fitting
+			nCount = 0;
+			for(i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; i++)
+				for(j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; j++)
+				{					
+					spotInt[nCount][0] =ipRaw.getPixel(i,j);
+					spotInt[nCount][1] =(double)i;
+					spotInt[nCount][2] =(double)j;
+					nCount++;					
+				}
+			
+			
+				//initial values of fitting parameters				
+				dFitParams[0]= particles_[3][nParticlesCount]; //minimum, background level
+				dFitParams[1]= particles_[2][nParticlesCount] - particles_[3][nParticlesCount]; // intensity amplitude, max-min
+				dFitParams[2]= particles_[0][nParticlesCount];//x center
+				dFitParams[3]= particles_[1][nParticlesCount];//y center
+				dFitParams[4]= fdg.dPSFsigma;
+				dFitParams[5]= fdg.dPSFsigma;
+				SMLlma = new LMA(GFit, dFitParams, spotInt);
+				SMLlma.fit();
+				
+				dFitErrors = SMLlma.getStandardErrorsOfParameters();
+				// scaling coefficient for parameters errors estimation 
+				// (Standard deviation of residuals)
+				dErrCoeff = Math.sqrt(SMLlma.chi2/(nCount-6));
+				for (i=0;i<6;i++)
+					dFitErrors[i] *= dErrCoeff; 
+				nFalsePositive = 0.0;
+				//iterations didn't converge. suspicious point
+				if (SMLlma.iterationCount== 101)
+					nFalsePositive = 0.5;
+				//spot is too big
+				if((SMLlma.parameters[4] > 1.3*fdg.dPSFsigma) || (SMLlma.parameters[4]<0.70*fdg.dPSFsigma)||(SMLlma.parameters[5]<0.70*fdg.dPSFsigma)||(SMLlma.parameters[5] > 1.3*fdg.dPSFsigma))
+					nFalsePositive = 1.0;
+				//localization precision is bigger than PSF size
+				if((dFitErrors[2] > fdg.dPSFsigma) || (dFitErrors[3] > fdg.dPSFsigma))
+					nFalsePositive = 1.0;
 
+				dIntAmp =0; dIntNoise = 0;			
+				dNoiseAvrg = 0;	dNoiseSD = 0;
+				dSNR = 0;
+				xCentroid = Math.round(SMLlma.parameters[2]+0.5);// 0.5 is for correction of pixel shift
+				yCentroid = Math.round(SMLlma.parameters[3]+0.5);
+				//calculating integrated spot intensity and estimating SNR
+				if(nFalsePositive<0.5)
+				{
+					//xCentroid = Math.round(SMLlma.parameters[2]);
+					//yCentroid = Math.round(SMLlma.parameters[3]);
+					xSD = Math.round(SMLlma.parameters[4]*DOMConstants.FITRADIUS);
+					ySD = Math.round(SMLlma.parameters[5]*DOMConstants.FITRADIUS);
+					if( ((xCentroid-xSD-1)>0) && ((yCentroid-ySD-1)>0) && ((xCentroid+xSD+1)<(width-1)) && ((yCentroid+ySD+1)<(height-1)))
+					{
+						//integrated intensity in 3SD * 3SD region
+						for(i=(int) (xCentroid-xSD); i<=(xCentroid+xSD); i++)
+							for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
+								dIntAmp += ipRaw.getPixel(i,j);
+						
+						//averaged noise around spot
+						j = (int)(yCentroid-ySD-1);
+						for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
+							dIntNoise += ipRaw.getPixel(i,j);
+						j = (int)(yCentroid+ySD+1);
+						for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
+							dIntNoise += ipRaw.getPixel(i,j);
+						i=(int) (xCentroid-xSD-1);
+						for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
+							dIntNoise += ipRaw.getPixel(i,j);
+						i=(int) (xCentroid+xSD+1);
+						for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
+							dIntNoise += ipRaw.getPixel(i,j);
+						dNoiseAvrg = dIntNoise/(4*xSD+4*ySD+8);
+						dIntAmp = dIntAmp -  (dNoiseAvrg*((2*xSD+1)*(2*ySD+1))); 
+						
+						//SD of noise
+						j = (int)(yCentroid-ySD-1);
+						for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
+							dNoiseSD += Math.pow(dNoiseAvrg - ipRaw.getPixel(i,j),2);
+						j = (int)(yCentroid+ySD+1);
+						for(i=(int) (xCentroid-xSD-1); i<=(xCentroid+xSD+1); i++)							
+							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
+						i=(int) (xCentroid-xSD-1);
+						for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
+							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
+						i=(int) (xCentroid+xSD+1);
+						for(j=(int) (yCentroid-ySD); j<=(yCentroid+ySD); j++)
+							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
+						dNoiseSD = Math.sqrt(dNoiseSD/(4*xSD+4*ySD+8));
+						dSNR =  SMLlma.parameters[1]/dNoiseSD;
+					}
+				}
+				if(SMLlma.parameters[2]>0 && SMLlma.parameters[2]<width && SMLlma.parameters[3]>0 && SMLlma.parameters[3]<height && SMLlma.parameters[1]>0)
+					{
+						if(!(fdg.bIgnoreFP && nFalsePositive>0.3))
+						{
+							ptable_lock.lock();
+							ptable.incrementCounter();
+							
+							ptable.addValue("Amplitude_fit",SMLlma.parameters[1]);
+							
+							ptable.addValue("X_(px)",SMLlma.parameters[2]);							
+							ptable.addValue("Y_(px)",SMLlma.parameters[3]);
+							ptable.addValue("X_(nm)",SMLlma.parameters[2]*fdg.dPixelSize);							
+							ptable.addValue("Y_(nm)",SMLlma.parameters[3]*fdg.dPixelSize);
+							ptable.addValue("Z_(nm)",0);
+							ptable.addValue("False positive", nFalsePositive);
+							ptable.addValue("X_loc_error(px)", dFitErrors[2]);
+							ptable.addValue("Y_loc_error(px)", dFitErrors[3]);
+	
+							ptable.addValue("BGfit",SMLlma.parameters[0]);							
+							ptable.addValue("IntegratedInt",dIntAmp);
+							ptable.addValue("SNR", dSNR);
+	
+							ptable.addValue("chi2_fit",SMLlma.chi2);
+							ptable.addValue("Frame Number", nFrame+1);					
+							ptable.addValue("Iterations_fit",SMLlma.iterationCount);
+							ptable.addValue("SD_X_fit_(px)",SMLlma.parameters[4]);
+							ptable.addValue("SD_Y_fit_(px)",SMLlma.parameters[5]);
+							ptable.addValue("Amp_loc_error",dFitErrors[1]);
+				
+							
+							ptable_lock.unlock();
+							if(fdg.bShowParticles)
+							{
+								spotROI = new OvalRoi((int)(xCentroid-2*fdg.dPSFsigma),(int)(yCentroid-2*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma));
+								if(nFalsePositive<0.5)
+									spotROI.setStrokeColor(Color.green);
+								else
+									if(nFalsePositive<1)
+										spotROI.setStrokeColor(Color.yellow);
+									else
+										spotROI.setStrokeColor(Color.red);
+										
+								spotROI.setPosition(nFrame+1);
+								SpotsPositions__.add(spotROI);
+								
+							}
+					}
+			}
+				
+
+			
+		}//particles iteration
+		//for(nParticlesCount=0;nParticlesCount<nParticlesNumber;nParticlesCount++)
+		
+	}
 
 	// function calculating convolution kernel of 2D Gaussian shape
 	// with background subtraction for spots enhancement
@@ -508,53 +574,99 @@ public class SMLAnalysis {
 	int getThreshold(ImageProcessor thImage)
 	{
 		ImageStatistics imgstat;
-		double  [][] dHistogram;		
-		int nUpCount, nDownCount;
-		double dUpRef, dDownRef;
+		double  [][] dHistogram;
+		double  [][] dNoiseFit;
+		int nHistSize;
 		int nCount, nMaxCount;
-		int i,j;
+		int nDownCount, nUpCount;
+		int i,nPeakPos; 
+		double dRightWidth, dLeftWidth, dWidth;
 		double dMean, dSD;
+		double [] dFitErrors;
+		double dErrCoeff;
 		LMA fitlma;
 		
+		
+		
 		//mean, sd, min, max
-		imgstat = ImageStatistics.getStatistics(thImage, 38, null);
-		
-		dUpRef   = (imgstat.mean + 3.0*imgstat.stdDev);
-		dDownRef = (imgstat.mean - 3.0*imgstat.stdDev);
-		if(dUpRef>imgstat.max)
-			dUpRef=imgstat.max;
-		if(dDownRef<imgstat.min)
-			dDownRef=imgstat.min;
-		
-		nDownCount =   (int) ((dDownRef - imgstat.min)/imgstat.binSize);
-		nUpCount =   (int) ((dUpRef - imgstat.min)/imgstat.binSize);
-		if(nUpCount>255)
-			nUpCount = 255;
-
-		dHistogram = new double [2][nUpCount-nDownCount +1];
-		j=0;
-		nMaxCount = 0;
+		//imgstat = ImageStatistics.getStatistics(thImage, 38, null);
+		imgstat = ImageStatistics.getStatistics(thImage, Measurements.MEAN+Measurements.STD_DEV+Measurements.MIN_MAX, null);
 		dMean = imgstat.mean;
-		for (i=nDownCount; i<=nUpCount; i++)
+		nPeakPos = 0;
+		
+		nHistSize = imgstat.histogram.length;		
+		dHistogram = new double [2][nHistSize];
+		nMaxCount = 0;
+	
+		//determine position and height of maximum count in histogram (mode)
+		//and height at maximum
+		for (i=0; i<nHistSize; i++)
 		{
 			
 			nCount=imgstat.histogram[i];
-			
-			dHistogram[0][j] = dDownRef + j*imgstat.binSize;
-			dHistogram[1][j] = (double)nCount;
+			dHistogram[0][i]=imgstat.min + i*imgstat.binSize;			
+			dHistogram[1][i] = (double)nCount;
 			if(nMaxCount < nCount)
 			{
 				nMaxCount= nCount;
-				dMean = dDownRef + j*imgstat.binSize;
-			}
-			j++;
+				dMean = imgstat.min + i*imgstat.binSize;
+				nPeakPos = i;
+			}			
 		}
-		fitlma = new LMA(new SMLOneDGaussian(), new double[] {(double)nMaxCount, dMean, imgstat.stdDev}, dHistogram);
+		//estimating width of a peak
+		//going to the left
+		i=nPeakPos;
+		while (i>0 && imgstat.histogram[i]>0.5*nMaxCount)
+		{
+			i--;			
+		}
+		if(i<0)
+			i=0;
+		dLeftWidth = i;
+		//going to the right
+		i=nPeakPos;
+		while (i<nHistSize && imgstat.histogram[i]>0.5*nMaxCount)
+		{
+			i++;			
+		}
+		if(i==nHistSize)
+			i=nHistSize-1;
+		dRightWidth = i;
+		//FWHM in bins
+		dWidth = (dRightWidth-dLeftWidth);
+		dSD = dWidth*imgstat.binSize/2.35;
+		//fitting range +/- 3*SD
+		dLeftWidth = nPeakPos - 3*dWidth/2.35;
+		if(dLeftWidth<0)
+			dLeftWidth=0;
+		dRightWidth = nPeakPos + 3*dWidth/2.35;
+		if(dRightWidth>nHistSize)
+			dRightWidth=nHistSize;
+		nUpCount = (int)dRightWidth;
+		nDownCount = (int)dLeftWidth;
+		//preparing histogram range for fitting
+		dNoiseFit = new double [2][nUpCount-nDownCount+1];
+		for(i=nDownCount;i<=nUpCount;i++)
+		{
+			dNoiseFit[0][i-nDownCount] = dHistogram[0][i];
+			dNoiseFit[1][i-nDownCount] = dHistogram[1][i];
+		}
+		
+		fitlma = new LMA(new SMLOneDGaussian(), new double[] {(double)nMaxCount, dMean, dSD}, dNoiseFit);
 		fitlma.fit();
 		dMean = fitlma.parameters[1];
 		dSD = fitlma.parameters[2];
 		
-		if (fitlma.iterationCount== 101 || dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
+		dFitErrors = fitlma.getStandardErrorsOfParameters();
+		// scaling coefficient for parameters errors estimation 
+		// (Standard deviation of residuals)
+		dErrCoeff = Math.sqrt(fitlma.chi2/(nUpCount-nDownCount+1-3));
+		for (i=0;i<3;i++)
+			dFitErrors[i] *= dErrCoeff;
+		for (i=0;i<3;i++)
+			dFitErrors[i] *= 100/fitlma.parameters[i]; 
+		
+		if (dFitErrors[1]> 20 || dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
 			//fit somehow failed
 			return (int)(imgstat.mean + 3.0*imgstat.stdDev);
 		else
@@ -639,7 +751,7 @@ public class SMLAnalysis {
 		return pixels[x+y*width];
 	}
 	
-	 void SMLblur1Direction( final FloatProcessor ippp, final double sigma, final double accuracy,
+	void SMLblur1Direction( final FloatProcessor ippp, final double sigma, final double accuracy,
             final boolean xDirection, final int extraLines) {
         
 		final float[] pixels = (float[])ippp.getPixels();
@@ -682,7 +794,7 @@ public class SMLAnalysis {
         return;
     }
 	 
-	    void SMLconvolveLine( final float[] input, final float[] pixels, final float[][] kernel, final int readFrom,
+	void SMLconvolveLine( final float[] input, final float[] pixels, final float[][] kernel, final int readFrom,
 	            final int readTo, final int writeFrom, final int writeTo, final int point0, final int pointInc) {
 	        final int length = input.length;
 	        final float first = input[0];                 //out-of-edge pixels are replaced by nearest edge pixels

@@ -17,7 +17,9 @@ public class Reconstruct_Image implements PlugIn{
 	
 	public void run(String arg) 
 	{
-		double [] xloc;
+		
+		String imagename; 
+		double [] xloc;		
 		double [] yloc;
 		double [] frames;
 		double xlocavg, ylocavg, pxsize;
@@ -32,6 +34,8 @@ public class Reconstruct_Image implements PlugIn{
 			return;
 		}
 	
+		imagename = "Reconstructed Image";
+		
 		//calculate average localization precision 	
 		xloc = sml.ptable.getColumnAsDoubles(7);
 		yloc = sml.ptable.getColumnAsDoubles(8);		
@@ -73,12 +77,12 @@ public class Reconstruct_Image implements PlugIn{
 				IJ.error("Minimum frame should be less then maximum frame number!");
 				return;
 			}
-
+			imagename += " (frames " +dlg.nFrameMin+" till "+dlg.nFrameMax+")";
 
 		}
 		
-		//create recunstruction object
-		smlViewer = new SMLReconstruct("Reconstructed Image", sml, dlg);
+		//create reconstruction object
+		smlViewer = new SMLReconstruct(imagename, sml, dlg);
 		
 		
 		//smlViewer.clear();
@@ -86,15 +90,28 @@ public class Reconstruct_Image implements PlugIn{
 		{			
 			smlViewer.sortbyframe();
 			smlViewer.DriftCorrection();
-			smlViewer.imp.setTitle("Reconstructed Image (DriftCorrection frames="+dlg.nDriftFrames+" pixels="+dlg.nDriftPixels+")");
+			imagename += " (DriftCorrection frames="+dlg.nDriftFrames+" pixels="+dlg.nDriftPixels+")";
+			//
 			//smlViewer.correctDriftCOM();
 		}	
 
+		if(dlg.bAveragePositions)
+		{
+			smlViewer.averagelocalizations();
+			
+		}
 		if(dlg.bFramesInterval)
 		{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
 		else
 		{	smlViewer.draw_unsorted(1, smlViewer.nframes);}
 		
+		if(dlg.bCutoff)
+		{
+			imagename += " (Cutoff localization=" + dlg.dcutoff +"px)";
+		}
+		
+		
+		smlViewer.imp.setTitle(imagename);
 		smlViewer.imp.show();
 		
 		

@@ -118,4 +118,35 @@ public class Sort_Results implements PlugIn {
 		
 	}
 	
+	//sorting function for external calls
+	public static void sorting_external_silent(SMLAnalysis smlext, int nSortingColumn, boolean ascending) 
+	{
+		int colNumber;
+		int len;
+		int i,j;
+		
+		colNumber = smlext.ptable.getLastColumn()+1;
+
+		double [] s = smlext.ptable.getColumnAsDoubles(0);
+		len = s.length;
+		double [][] data = new double[len][colNumber];
+		
+		//IJ.showStatus("Sorting Results Table: Preparation...");
+		for (i=0; i<colNumber;i++)
+		{
+			s = smlext.ptable.getColumnAsDoubles(i);
+			for(j=0; j<len;j++)
+			data[j][i]= s[j];
+		}
+		//IJ.showStatus("Sorting Results Table: Sorting...");
+		Arrays.sort(data, new tableComparator(nSortingColumn, ascending));
+		
+		//IJ.showStatus("Sorting Results Table: Updating Table..."); 		
+		for (i=0;i<colNumber;i++)
+			for(j=0;j<len;j++)
+				smlext.ptable.setValue(i, j, data[j][i]);		
+		//smlext.showTable();
+		
+	}
+	
 }
