@@ -19,12 +19,14 @@ public class Reconstruct_Image implements PlugIn{
 	{
 		
 		String imagename; 
-		double [] xloc;		
+		double [] xloc;
+		double [] falsepos;	
 		double [] yloc;
 		double [] frames;
 		double xlocavg, ylocavg, pxsize;
 		double fminframe, fmaxframe;
 		int i, sz;
+		double dPatCount;
 		IJ.register(Reconstruct_Image.class);
 
 		//check that the table is present
@@ -37,18 +39,24 @@ public class Reconstruct_Image implements PlugIn{
 		imagename = "Reconstructed Image";
 		
 		//calculate average localization precision 	
+		falsepos = sml.ptable.getColumnAsDoubles(6);
 		xloc = sml.ptable.getColumnAsDoubles(7);
 		yloc = sml.ptable.getColumnAsDoubles(8);		
 		sz = xloc.length; 
 		xlocavg=0; ylocavg = 0;
+		dPatCount=0;
 		for (i=0; i<sz; i++)
 		{
-			xlocavg+=xloc[i];
-			ylocavg+=yloc[i];
+			if(falsepos[i]<0.2)
+			{
+				xlocavg+=xloc[i];
+				ylocavg+=yloc[i];
+				dPatCount++;
+			}
 		}
 		pxsize =  sml.ptable.getValueAsDouble(3, 0)/sml.ptable.getValueAsDouble(1, 0);
-		xlocavg = pxsize*xlocavg/(double)sz;
-		ylocavg = pxsize*ylocavg/(double)sz;
+		xlocavg = pxsize*xlocavg/dPatCount;
+		ylocavg = pxsize*ylocavg/dPatCount;
 		
 		//calculate min and max frame number		
 		frames = sml.ptable.getColumnAsDoubles(13);

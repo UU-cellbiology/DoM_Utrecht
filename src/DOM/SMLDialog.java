@@ -52,6 +52,15 @@ public class SMLDialog {
 	boolean bShowIntermediate;     //show intermediate reconstructions
 	boolean bShowCrossCorrelation; //show cross-correlation 
 	
+	
+	//particle linking parameters
+	int nLinkFP;  //what kind of particles use for linking
+	double dLinkDistance; //distance between particles to link then
+	int nLinkTrace; //whether measure distance from initial spot or 'moving'
+	int nLinkFrameGap; //maximum linking gap in frames
+	boolean bShowTracks; //whether to show linked tracks or not
+	int nLastDetections; //number of last detected spots at trace to mark
+	
 	//dialog showing options for particle search algorithm		
 	public boolean findParticles() {
 		String [] DetectionType = new String [] {
@@ -178,5 +187,37 @@ public class SMLDialog {
 		return true;
 	}
 	
+	public boolean LinkParticles() //dialog showing options for linking particles after detection
+	{
+		GenericDialog dgLink = new GenericDialog("Link Particles");
+		String [] Link_Dist = new String [] {
+				"Initial position", "Next detected position"};
+		String [] LinkFPOptions = new String [] {
+				"Only true positives","True and half positives", "All particles"};
+		
+		dgLink.addChoice("For linking use:", LinkFPOptions, Prefs.get("SiMoLoc.Link_FP", "Only true positives"));
+		dgLink.addNumericField("Linking distance between particles, px", Prefs.get("SiMoLoc.LinkDist", 1), 2);
+		dgLink.addChoice("Measure distance from:", Link_Dist, Prefs.get("SiMoLoc.LinkTrace", "Initial position"));
+		dgLink.addNumericField("Maximum linking closing gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
+		dgLink.addNumericField("Mark this number of last detections:", Prefs.get("SiMoLoc.nLastDetections", 0), 0);
+		dgLink.addCheckbox("Show tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
+		dgLink.showDialog();
+		if (dgLink.wasCanceled())
+            return false;
+		
+		nLinkFP = dgLink.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.Link_FP", LinkFPOptions[nLinkFP]);
+		dLinkDistance= dgLink.getNextNumber();
+		Prefs.set("SiMoLoc.LinkDist", dLinkDistance);
+		nLinkTrace = dgLink.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.LinkTrace", Link_Dist[nLinkTrace]);
+		nLinkFrameGap= (int)dgLink.getNextNumber();
+		Prefs.set("SiMoLoc.LinkFrames", nLinkFrameGap);
+		nLastDetections= (int)dgLink.getNextNumber();
+		Prefs.set("SiMoLoc.nLastDetections", nLastDetections);
+		bShowTracks = dgLink.getNextBoolean();
+		Prefs.set("SiMoLoc.bShowTracks", bShowTracks);
+		return true;		
+	}
 
 }

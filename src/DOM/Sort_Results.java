@@ -46,18 +46,32 @@ public class Sort_Results implements PlugIn {
 	@Override
 	public void run(String arg) {
 		
-		int nColN=0;
+		int i;
+		int nTotalColumns;
 		boolean bOrder;
 		//asking user for sorting criteria
 		GenericDialog dgSortParticles = new GenericDialog("Sort Particles");
-		String [] SortColumn = new String [] {
-				"Amplitude_fit","X_(px)","Y_(px)","False_positive","X_loc_error_(px)","Y_loc_error_(px)","IntegratedInt","SNR","Frame Number"};
+		String [] SortColumn;// = new String [] {
+				//"Amplitude_fit","X_(px)","Y_(px)","False_positive","X_loc_error_(px)","Y_loc_error_(px)","IntegratedInt","SNR","Frame Number"};
 		int Colindex;
 		String [] SortOrder = new String [] {
 				"Ascending","Descending"};
 		int Sortindex;
 		
-		dgSortParticles.addChoice("Sort by column:", SortColumn, Prefs.get("SiMoLoc.SortColumn", "SNR"));
+		nTotalColumns = sml.ptable.getLastColumn()+1;
+		if (nTotalColumns == -1)
+		{
+			IJ.error("There is no Results table open. Sorry.");
+			return;						
+		}
+		SortColumn = new String [nTotalColumns];
+		//filling
+		for(i=0;i<nTotalColumns;i++)
+		{
+			SortColumn[i] = sml.ptable.getColumnHeading(i);
+		}
+		
+		dgSortParticles.addChoice("Sort by column:", SortColumn, Prefs.get("SiMoLoc.SortColumn", SortColumn[0]));
 		dgSortParticles.addChoice("Sorting order:", SortOrder, Prefs.get("SiMoLoc.SortOrder", "Ascending"));
 		
 		dgSortParticles.showDialog();
@@ -68,23 +82,11 @@ public class Sort_Results implements PlugIn {
 		Prefs.set("SiMoLoc.SortColumn", SortColumn[Colindex]);
 		Prefs.set("SiMoLoc.SortOrder", SortOrder[Sortindex]);
 
-		switch (Colindex)
-		{
-			case 0:nColN=0; break;
-			case 1:nColN=1; break;
-			case 2:nColN=2; break;
-			case 3:nColN=6; break;
-			case 4:nColN=7; break;
-			case 5:nColN=8; break;
-			case 6:nColN=10; break;
-			case 7:nColN=11; break;
-			case 8:nColN=13; break;		
-		}
 		if (Sortindex == 0)
 			bOrder = true;
 		else 
 			bOrder = false;
-		sorting(nColN,bOrder);
+		sorting(Colindex,bOrder);
 		
 	}
 	
