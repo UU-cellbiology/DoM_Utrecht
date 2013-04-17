@@ -94,6 +94,7 @@ public class Link_Particles implements PlugIn {
 		if(dlg.bShowTracks)
 		{
 			smlLink.addTracksToOverlay();
+			imp.setOverlay(smlLink.ovTracks);
 			imp.updateAndRepaintWindow();
 			imp.show();
 		}
