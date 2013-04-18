@@ -507,7 +507,7 @@ public class SMLLinker {
 		//go through all table
 		while (nCount<nPatNumber)
 		{
-			if(nLength[nCount]==1)
+			if(nLength[nCount]<2)
 				//do not show not connected particles
 				nCount++;
 			else
