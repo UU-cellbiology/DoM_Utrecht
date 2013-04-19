@@ -82,6 +82,8 @@ public class SMLLinker {
 		int [][] framesstat;
 		int nCurrFrame, nCount, nFrameCount, nCurrentParticle, nCompareFrame, nCompareParticle,nFrameCompareCount;
 		double dDistance;
+		double dCandDistance;
+		int nCompareAbsCountCand;
 		int i;
 		int nCurrentTrack;
 		int nCurrentParticleinTrack;
@@ -192,6 +194,9 @@ public class SMLLinker {
 				nCompareParticle = -1;
 				nLinksNumber = 0;
 				nPenalty = 0;
+				nCompareAbsCountCand = 0;
+				dCandDistance = 2*settings.dLinkDistance;
+				//looking down the list for linked particles
 				while(bContinue) 
 				{
 					nCompareParticle++;
@@ -200,8 +205,9 @@ public class SMLLinker {
 						if (nFrameCompareCount == nUniqFrames - 1)	//reached the end of total particle list, stop						
 							{bContinue = false;}
 						else
-						{//jumping to next frame
-						 // but let's check whether we found something while scanning previous one?
+						{  
+							//jumping to next frame
+						    //but let's check whether we found something while scanning previous one?
 							//no, we didn't let's increase penalty
 							if(nCompareFrame-nCurrFrame>nLinksNumber+nPenalty)
 							{
@@ -220,11 +226,23 @@ public class SMLLinker {
 							//yes, we did, let's jump then
 							else
 							{
+								//mark it as already used 
+								trackid[nCompareAbsCountCand] = nCurrentTrack;
+								nCurrentParticleinTrack++;
+								patid[nCompareAbsCountCand] = nCurrentParticleinTrack;
+								if(settings.nLinkTrace != 0) //change reference position
+								{
+										x_compare = x[nCompareAbsCountCand];
+										y_compare = y[nCompareAbsCountCand];
+								}
+								TrackCoords.add(new double[] {x[nCompareAbsCountCand],y[nCompareAbsCountCand]});
+								
 								nLinksNumber = nPenalty+nLinksNumber;
 								nPenalty = 0;
 								nFrameCompareCount++;									
 								nCompareFrame = framesstat[nFrameCompareCount][0];
 								nCompareParticle = 0;
+								nCompareAbsCountCand = 0;
 							}													
 						}
 							
@@ -240,22 +258,37 @@ public class SMLLinker {
 						if(dDistance<settings.dLinkDistance)
 						{
 							//found new link!
-							//let's store values							
-							nLinksNumber++;
-							//mark it as already used 
-							trackid[nCompareAbsCount] = nCurrentTrack;
-							nCurrentParticleinTrack++;
-							patid[nCompareAbsCount] = nCurrentParticleinTrack;
-							if(settings.nLinkTrace != 0) //change reference position
+							//let's store values
+							//first particle in frame
+							if (nCompareAbsCountCand == 0)
 							{
-								x_compare = x_un[nFrameCompareCount][nCompareParticle];
-								y_compare = y_un[nFrameCompareCount][nCompareParticle];
+								nLinksNumber++;
+								nCompareAbsCountCand = nCompareAbsCount;
+								dCandDistance = dDistance;
+							}//other particles could be closer
+							else
+							{
+								if(dDistance<dCandDistance)
+								{
+									nCompareAbsCountCand = nCompareAbsCount;
+									dCandDistance = dDistance;
+								}
 							}
+							
+							//mark it as already used 
+							//trackid[nCompareAbsCount] = nCurrentTrack;
+							//nCurrentParticleinTrack++;
+							//patid[nCompareAbsCount] = nCurrentParticleinTrack;
+							//if(settings.nLinkTrace != 0) //change reference position
+							//{
+							//	x_compare = x_un[nFrameCompareCount][nCompareParticle];
+							//	y_compare = y_un[nFrameCompareCount][nCompareParticle];
+							//}
 														
-							TrackCoords.add(new double[] {x_un[nFrameCompareCount][nCompareParticle],y_un[nFrameCompareCount][nCompareParticle]});							
+							//TrackCoords.add(new double[] {x_un[nFrameCompareCount][nCompareParticle],y_un[nFrameCompareCount][nCompareParticle]});							
 
 							//exit from current frame (a bit lame one)
-							nCompareParticle = framesstat[nFrameCompareCount][1] -1;
+							//nCompareParticle = framesstat[nFrameCompareCount][1] -1;
 						}
 					}
 				}//end of "while" cycle looking for next linkers
@@ -541,6 +574,38 @@ public class SMLLinker {
 		}
 		
 		
+	}
+	void addParticlesToOverlay()
+	{
+		int nCount;
+		Roi spotROI;
+		//frame number
+		x   = smllink.ptable.getColumnAsDoubles(1);		
+		y   = smllink.ptable.getColumnAsDoubles(2);
+		//coordinates
+		f   = smllink.ptable.getColumnAsDoubles(13);
+		//false positive mark
+		fp  = smllink.ptable.getColumnAsDoubles(6);
+		for(nCount = 0; nCount<nPatNumber; nCount++)
+		{
+			if(fp[nCount]<dFPThreshold)
+			{
+				spotROI = new OvalRoi((int)(x[nCount]-4),(int)(y[nCount]-4),8,8);
+				if(fp[nCount]<0.5)
+					spotROI.setStrokeColor(Color.green);
+				else
+					if(fp[nCount]<1)
+						spotROI.setStrokeColor(Color.yellow);
+					else
+						spotROI.setStrokeColor(Color.red);
+						
+				spotROI.setPosition((int)f[nCount]);
+				ovTracks.add(spotROI);
+				
+			}
+			
+		}
+	
 	}
 }
 

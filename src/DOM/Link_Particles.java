@@ -88,16 +88,21 @@ public class Link_Particles implements PlugIn {
 		{
 			smlLink.addTracksToOverlay();
 		}
+		if(dlg.bShowParticlesLink)
+		{
+			smlLink.addParticlesToOverlay();		
+		}
 		
 		IJ.showStatus("Linking trajectories... Done.");
 		
-		if(dlg.bShowTracks)
+		if(dlg.bShowTracks || dlg.bShowParticlesLink)
 		{
-			smlLink.addTracksToOverlay();
+					
 			imp.setOverlay(smlLink.ovTracks);
 			imp.updateAndRepaintWindow();
 			imp.show();
 		}
+		
 		sml.showTable();
 		
 	}

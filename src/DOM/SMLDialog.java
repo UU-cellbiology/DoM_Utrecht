@@ -59,6 +59,7 @@ public class SMLDialog {
 	int nLinkTrace; //whether measure distance from initial spot or 'moving'
 	int nLinkFrameGap; //maximum linking gap in frames
 	boolean bShowTracks; //whether to show linked tracks or not
+	boolean bShowParticlesLink; //show detected particles
 	int nLastDetections; //number of last detected spots at trace to mark
 	
 	//dialog showing options for particle search algorithm		
@@ -201,6 +202,7 @@ public class SMLDialog {
 		dgLink.addNumericField("Maximum linking closing gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
 		dgLink.addNumericField("Mark this number of last detections:", Prefs.get("SiMoLoc.nLastDetections", 0), 0);
 		dgLink.addCheckbox("Show tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
+		dgLink.addCheckbox("Show detected particles?", Prefs.get("SiMoLoc.bShowParticlesLink", false));
 		dgLink.showDialog();
 		if (dgLink.wasCanceled())
             return false;
@@ -217,6 +219,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.nLastDetections", nLastDetections);
 		bShowTracks = dgLink.getNextBoolean();
 		Prefs.set("SiMoLoc.bShowTracks", bShowTracks);
+		bShowParticlesLink = dgLink.getNextBoolean();
+		Prefs.set("SiMoLoc.bShowParticlesLink", bShowParticlesLink);
 		return true;		
 	}
 
