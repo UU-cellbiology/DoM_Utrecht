@@ -163,6 +163,10 @@ public class Detect_Molecules implements PlugIn {
 				imp.show();
 			}			
 			
+			//add width and height of original image to table
+			sml.ptable.addValue("Original_image_size",imp.getWidth());
+			sml.ptable.addValue("Original_image_size",imp.getHeight());
+			
 			sml.showTable();
 		}
 		//detection and fitting

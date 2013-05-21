@@ -52,6 +52,10 @@ public class SMLDialog {
 	boolean bShowIntermediate;     //show intermediate reconstructions
 	boolean bShowCrossCorrelation; //show cross-correlation 
 	
+	//3D reconstruction parameters
+	boolean b3D;				//whether or not to make 3D stack
+	double dDistBetweenZSlices;	//z-distance between the slices in the stack
+	boolean bCalculateZValues;	//(re)calculate the z-values based on calibration-file
 	
 	//particle linking parameters
 	int nLinkFP;  //what kind of particles use for linking
@@ -113,20 +117,26 @@ public class SMLDialog {
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addNumericField("Pixel size of reconstructed image, nm", Prefs.get("SiMoLoc.Rec_PixSize", 30), 2);
 		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
-		dgReconstruct.addNumericField("Original image width, px", Prefs.get("SiMoLoc.Rec_ImWidth", 512), 0);
-		dgReconstruct.addNumericField("Original image height, px", Prefs.get("SiMoLoc.Rec_ImHeight", 512), 0);
-		dgReconstruct.addChoice("As spot's intensity use:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Normalized probability"));
-		dgReconstruct.addChoice("As spot's SD use:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
+		dgReconstruct.addNumericField("Width of original image, px", Prefs.get("SiMoLoc.Rec_ImWidth", 512), 0);
+		dgReconstruct.addNumericField("Height of original image, px", Prefs.get("SiMoLoc.Rec_ImHeight", 512), 0);
+		dgReconstruct.addChoice("Intensity of spot's:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Normalized probability"));
+		dgReconstruct.addChoice("SD of spot's:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
 		dgReconstruct.addNumericField("Value of SD in case of constant (in original pixels):", Prefs.get("SiMoLoc.Rec_SDFixed", 2), 2);
-		dgReconstruct.addCheckbox("Apply cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
+		dgReconstruct.addCheckbox("Cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
 		dgReconstruct.addNumericField("Cut-off particles with localization less than (in original pixels): ", Prefs.get("SiMoLoc.cutoff", 0.3), 2);
 		dgReconstruct.addMessage("\n");
-		dgReconstruct.addCheckbox("Apply correlation-based drift correction:", Prefs.get("SiMoLoc.drift", false));		
+		dgReconstruct.addCheckbox("Drift-correction (correlation based):", Prefs.get("SiMoLoc.drift", false));		
 		dgReconstruct.addNumericField("Number of frames for averaging:", Prefs.get("SiMoLoc.drift_frames", 1000), 0);
 		dgReconstruct.addNumericField("Maximum shift in pixels:", Prefs.get("SiMoLoc.drift_pixels", 10), 0);
 		dgReconstruct.addCheckbox("Show intermediate reconstructions (drift)", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
 		dgReconstruct.addCheckbox("Show cross-correlation images (drift)", Prefs.get("SiMoLoc.drift_cross_correlation", false));
-		dgReconstruct.addMessage("\n");		
+		//dgReconstruct.addMessage("\n");
+		dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.create3DStack", false));
+		dgReconstruct.addNumericField("Z-distance between slices (nm):", Prefs.get("SiMoLoc.distZSlices", 25), 0);
+		dgReconstruct.addCheckbox("Recalculate z-values based on calibration-file", Prefs.get("SiMoLoc.recalZvalues", false));
+		dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
+		//dgReconstruct.addMessage("\n");
 		dgReconstruct.addCheckbox("Reconstruct with translation (in original pixels):", Prefs.get("SiMoLoc.bTranslate", false));
 		dgReconstruct.addNumericField("X Offset:", Prefs.get("SiMoLoc.dTransX", 0), 4);
 		dgReconstruct.addNumericField("Y Offset:", Prefs.get("SiMoLoc.dTransY", 0), 4);
@@ -171,6 +181,15 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
 		bShowCrossCorrelation = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
+		
+		//values for 3D reconstruction
+		b3D= dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.create3DStack", b3D);
+		dDistBetweenZSlices =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.distZSlices", dDistBetweenZSlices);
+		bCalculateZValues = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
+		
 		bTranslation = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bTranslate", bTranslation);
 		dTranslationX =  dgReconstruct.getNextNumber();

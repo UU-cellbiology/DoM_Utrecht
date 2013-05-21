@@ -20,6 +20,7 @@ public class SMLReconstruct {
 	ImagePlus imp;
 	ImageStack driftstack;
 	ImageStack crosscorrstack;
+	ImageStack zstack;
 	ImageProcessor ip;
 	//ResultsTable table;
 	SMLDialog settings;
@@ -27,6 +28,7 @@ public class SMLReconstruct {
 	double [] amp;
 	double [] x;
 	double [] y;
+	double [] z_nm;
 	double [] sdx;
 	double [] sdy;
 	double [] f;
@@ -112,6 +114,12 @@ public class SMLReconstruct {
 		x   = sml_.ptable.getColumnAsDoubles(1);		
 		y   = sml_.ptable.getColumnAsDoubles(2);
 
+		//calculate z-values if necessary
+		if(settings.bCalculateZValues)
+			calcZValues(sml_);
+		
+		z_nm = sml_.ptable.getColumnAsDoubles(5);
+		
 		if (settings.bTranslation)			
 		{
 			for (int i=0; i<nParticlesCount; i++)
@@ -217,6 +225,128 @@ public class SMLReconstruct {
 		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
 		//imp.addSlice(null, ipf.convertToShort(true));
 		IJ.run(imp, "Enhance Contrast", "saturated=0.35");
+	}
+	
+	/** Reconstruction drawing function used by the "Reconstruct Image" plugin.
+	 *  Slow one since it assumes that Results table is not sorted. 
+	 * @param fstart show only particle after this frame
+	 * @param fstop show only particle before this frame
+	 * @param fstep distance between z-slices
+	 * @param 
+	*/
+	void draw_zstack(int fstart, int fstop, double zstep)
+	{	
+		double old_i, new_i, dErrx, dErry, xpeak, ypeak, sdxmag, sdymag;
+		int xmag, ymag, xsq, ysq;
+		int i,j;
+		double preG=0.25*Math.PI;
+		double dCutoff = 1.0;
+		double dNorm = 1.0;
+		//double dVerif = 0.0;
+
+		
+		int nSlices;		//total number of slices
+		int sliceNumber;	//slice number of particle
+		double[] zValues;	//array with cloned z values
+		double zmin, zmax;
+		
+		//create new array to sort without changing original
+		zValues = z_nm.clone();
+		Arrays.sort(zValues);
+		//zmin = zValues[0];
+		zmin = 0;
+		zmax = zValues[zValues.length-1];
+		
+		
+		/*DEBUGGING!*/
+		zmin = 0;
+		zmax = 800;
+		/*DEBUGGING!*/
+		
+		nSlices = (int) Math.ceil((zmax-zmin)/zstep);
+		//in case all z-values are zero still one slice has to be drawn
+		if(nSlices==0)
+			nSlices++;
+		
+		FloatProcessor[] ipf = new FloatProcessor[nSlices];
+		
+		for(int k = 0; k<nSlices; k++){
+			ipf[k] = new FloatProcessor(new_width, new_height);
+		}
+		
+		if(settings.bCutoff)
+			dCutoff = settings.dcutoff;
+		
+
+		IJ.showStatus("Reconstructing Z-stack...");
+		
+		for (int n=0;n<nParticlesCount;n++)
+		{
+			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
+			{
+				IJ.showProgress(n, nParticlesCount);
+				xmag=(int) Math.round(x[n]*settings.dMagnification);
+				ymag=(int) Math.round(y[n]*settings.dMagnification);
+				
+				//calculate sliceNumber for this particle
+				sliceNumber = (int) Math.floor((z_nm[n]-zmin)/zstep);
+				
+				/*DEBUGGING*/
+				if(sliceNumber>=nSlices)
+					sliceNumber = nSlices-1;
+				/*DEBUGGING*/
+				
+				if(sdx[n]<dCutoff && sdy[n]<dCutoff)
+				{
+					if(settings.nSDIndex>0)
+					{
+						sdx[n] = settings.dFixedSD;
+						sdy[n] = settings.dFixedSD;
+					}
+					xsq = (int) Math.round(3*sdx[n]*settings.dMagnification);
+					ysq = (int) Math.round(3*sdy[n]*settings.dMagnification);
+					xpeak=x[n]*settings.dMagnification;
+					ypeak=y[n]*settings.dMagnification;
+					sdxmag=sdx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					sdymag=sdy[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					if(bNormalized)
+					{
+						dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/sdxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/sdxmag);
+						dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/sdymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/sdymag);
+						dNorm = 1/(dErrx*dErry);
+					}
+					//dVerif=0;
+					for(i=xmag-xsq;i<xmag+xsq+1;i++)
+						for(j=ymag-ysq;j<ymag+ysq+1;j++)
+						{
+							if((i<new_width) && (j<new_height)&&(i>0)&&(j>0))
+							{
+								old_i=ipf[sliceNumber].getf(i, j);
+		
+								dErrx = ErrorFunction.erf2((i-xpeak)/sdxmag) - ErrorFunction.erf2((1+i-xpeak)/sdxmag);
+								dErry = ErrorFunction.erf2((j-ypeak)/sdymag) - ErrorFunction.erf2((1+j-ypeak)/sdymag);
+								if(bNormalized)
+									{new_i = old_i + dNorm*dErrx*dErry;}
+									//dVerif+=dNorm*dErrx*dErry;}
+								else
+									{new_i = old_i + preG*amp[n]*sdxmag*sdymag*dErrx*dErry;}
+								
+								ipf[sliceNumber].setf(i, j, (float)new_i);
+							}
+						}
+				}		
+			}
+		}
+		zstack = new ImageStack(new_width, new_height);
+		
+		for(int k=0; k<nSlices; k++){
+			zstack.addSlice(null, ipf[k].convertToShort(true));
+		}
+		
+		new ImagePlus("Z-stack (slices@"+zstep+"nm", zstack).show();
+
+		//IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
+		//IJ.run(imp, "Enhance Contrast", "saturated=0.35");
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin during drift correction.
@@ -889,7 +1019,39 @@ public class SMLReconstruct {
 		
 	}
 
+
+	/**function calculating z-values based on calibration curve*/
+	
+	void calcZValues(SMLAnalysis sml_)
+	{
+		double[] SDx = sml_.ptable.getColumnAsDoubles(15);
+		double[] SDy = sml_.ptable.getColumnAsDoubles(16);
+		
+		//double SDx;
+		//double SDy;
+		
+		double z;
+		
+		//calibration values, according to calibration curve: calValues[0]+calValues[1]*(SDx-SDy)+calValues[2]*(SDx-SDy)^2
+		double[] calValues = {389.4,-101.3,-4.075};
+		/*
+		for(int i=0; i<x.length; i++){
+			SDx = sml_.ptable.getValueAsDouble(15, i);
+			SDy = sml_.ptable.getValueAsDouble(16, i);
+			z = calValues[0]+calValues[1]*(SDx-SDy)+calValues[2]*(SDx-SDy)*(SDx-SDy);
+			sml_.ptable.setValue(5,i, z);
+		}
+		*/
+		
+		for(int i=0; i<SDx.length; i++){
+			z = calValues[0]+calValues[1]*(SDx[i]-SDy[i])+calValues[2]*(SDx[i]-SDy[i])*(SDx[i]-SDy[i]);
+			if(z<0)
+				z=0;
+			sml_.ptable.setValue(5,i, z);
+		}
+		
+		sml_.ptable.updateResults();
+		sml_.ptable.show("Results");
+	}
+
 }
-
-
-

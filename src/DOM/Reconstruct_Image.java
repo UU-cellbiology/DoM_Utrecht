@@ -1,5 +1,8 @@
 package DOM;
-
+//in detect molecules on line 329
+//add width and height of original image to the results table
+//sml.ptable.addValue("Original_image_size",imp.getWidth());
+//sml.ptable.addValue("Original_image_size",imp.getHeight());
 
 
 import java.util.Arrays;
@@ -35,7 +38,7 @@ public class Reconstruct_Image implements PlugIn{
 			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
 			return;
 		}
-	
+
 		imagename = "Reconstructed Image";
 		
 		//calculate average localization precision 	
@@ -108,16 +111,27 @@ public class Reconstruct_Image implements PlugIn{
 			smlViewer.averagelocalizations();
 			
 		}
-		if(dlg.bFramesInterval)
-		{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
-		else
-		{	smlViewer.draw_unsorted(1, smlViewer.nframes);}
-		
-		if(dlg.bCutoff)
+		if(!dlg.b3D)//if you don't want a z-stack
 		{
-			imagename += " (Cutoff localization=" + dlg.dcutoff +"px)";
+			if(dlg.bFramesInterval)
+			{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
+			else
+			{	smlViewer.draw_unsorted(1, smlViewer.nframes);}
+			
+			if(dlg.bCutoff)
+			{
+				imagename += " (Cutoff localization=" + dlg.dcutoff +"px)";
+			}
 		}
-		
+		else
+		{//create z-stack
+			int zStep = (int)dlg.dDistBetweenZSlices;
+			
+			if(dlg.bFramesInterval)
+			{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax,zStep);}
+			else
+			{	smlViewer.draw_zstack(1, smlViewer.nframes,zStep);}
+		}
 		
 		smlViewer.imp.setTitle(imagename);
 		smlViewer.imp.show();
