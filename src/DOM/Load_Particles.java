@@ -15,7 +15,7 @@ public class Load_Particles implements PlugIn{
 	
 	public void run(String arg) {
 		
-		
+		IJ.register(Load_Particles.class);
 		GenericDialog dgLoadParticles = new GenericDialog("Load Particles");
 		
 		String [] LoadFileFormatOptions = new String [] {

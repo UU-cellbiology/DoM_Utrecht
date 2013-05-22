@@ -17,6 +17,7 @@ public class Save_Particles implements PlugIn {
 	
 	public void run(String arg) {
 		
+		IJ.register(Save_Particles.class);
 		GenericDialog dgSaveParticles = new GenericDialog("Save Particles");
 		
 		String [] SaveFileFormatOptions = new String [] {
