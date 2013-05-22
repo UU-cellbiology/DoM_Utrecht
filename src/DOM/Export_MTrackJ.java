@@ -77,7 +77,8 @@ public class Export_MTrackJ implements PlugIn {
 			writer.write("MTrackJ 1.2.0 Data File\n");
 			writer.write("Assembly 1\n");
 			writer.write("Cluster 1\n");
-			i=0;			
+			i=0;				
+			
 			nAbsTracksNumber = 0;
 			while(i<smlLink.nPatNumber)
 			{
@@ -96,8 +97,10 @@ public class Export_MTrackJ implements PlugIn {
 					}
 					
 				}
-				
-				i+=nCurrTrackLength;
+				if(nCurrTrackLength>0)
+					{i+=nCurrTrackLength;}
+				else
+					{i++;}
 			}
 			
 			writer.write("End of MTrackJ Data File\n");
