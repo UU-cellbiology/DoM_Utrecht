@@ -20,7 +20,7 @@ public class SMLLinker {
 	double [] fp;
 	double [] trackid;
 	double [] patid;
-	double [] nLength;
+	double [] tracklength;
 	long nPatNumber;
 	int nUniqFrames;
 	Overlay ovTracks;
@@ -28,7 +28,7 @@ public class SMLLinker {
 	
 	ArrayList<double[]> TrackCoords;
 	
-	
+	//initializing Linker when no linking was performed
 	SMLLinker( SMLAnalysis sml_, SMLDialog dlg_, Overlay ovTracks_, ImagePlus imp_)
 	{
 		settings = dlg_;
@@ -36,10 +36,10 @@ public class SMLLinker {
 		ovTracks = ovTracks_;
 		implnk = imp_;
 			
-		//frame number
+		//coordinates
 		x   = smllink.ptable.getColumnAsDoubles(1);		
 		y   = smllink.ptable.getColumnAsDoubles(2);
-		//coordinates
+		//frame number
 		f   = smllink.ptable.getColumnAsDoubles(13);
 		//false positive mark
 		fp  = smllink.ptable.getColumnAsDoubles(6);
@@ -71,6 +71,27 @@ public class SMLLinker {
 		}
 		
 	}
+	//initializing Linker when linking was already performed 
+	SMLLinker(SMLAnalysis sml_)
+	{
+		smllink = sml_;
+		
+		//coordinates
+		x   = smllink.ptable.getColumnAsDoubles(1);		
+		y   = smllink.ptable.getColumnAsDoubles(2);
+		//frame number
+		f   = smllink.ptable.getColumnAsDoubles(13);
+		//false positive mark
+		fp  = smllink.ptable.getColumnAsDoubles(6);
+		//tracks ID
+		trackid = smllink.ptable.getColumnAsDoubles(18);
+		//particles ID
+		patid = smllink.ptable.getColumnAsDoubles(19);
+		//tracks length
+		tracklength = smllink.ptable.getColumnAsDoubles(20);
+		//total particles number
+		nPatNumber = f.length;	
+	}
 	
 	void Link_Closest()
 	{
@@ -83,7 +104,7 @@ public class SMLLinker {
 		int nCurrFrame, nCount, nFrameCount, nCurrentParticle, nCompareFrame, nCompareParticle,nFrameCompareCount;
 		double dDistance;
 		double dCandDistance;
-		int nCompareAbsCountCand;
+		int nCompareAbsCountCandidate;
 		int i;
 		int nCurrentTrack;
 		int nCurrentParticleinTrack;
@@ -194,56 +215,86 @@ public class SMLLinker {
 				nCompareParticle = -1;
 				nLinksNumber = 0;
 				nPenalty = 0;
-				nCompareAbsCountCand = 0;
+				nCompareAbsCountCandidate = 0;
 				dCandDistance = 2*settings.dLinkDistance;
 				//looking down the list for linked particles
 				while(bContinue) 
 				{
 					nCompareParticle++;
-					if(nCompareParticle == framesstat[nFrameCompareCount][1]) //end of particles list in current frame
+					 //reached the end of particles list in current frame
+					if(nCompareParticle == framesstat[nFrameCompareCount][1])
 					{
-						if (nFrameCompareCount == nUniqFrames - 1)	//reached the end of total particle list, stop						
-							{bContinue = false;}
-						else
-						{  
-							//jumping to next frame
-						    //but let's check whether we found something while scanning previous one?
-							//no, we didn't let's increase penalty
-							if(nCompareFrame-nCurrFrame>nLinksNumber+nPenalty)
-							{
-								nPenalty++;
-								if(nPenalty>settings.nLinkFrameGap)
+						//updating penalty
+						//equal to zero if everything is ok
+						nPenalty += nCompareFrame-nCurrFrame-nLinksNumber-nPenalty;
+						
+						//reached the end of total particle list, stop
+						if (nFrameCompareCount == nUniqFrames - 1)							
+						{
+								//check whether we found some particle in last frame
+								//and whether penalty restriction satisfied
+								//yes, it is. let's add particle to track
+							 	//(nCompareAbsCountCandidate>0 means there is a 'Candidate' particle)
+								if(nCompareAbsCountCandidate>0 && nPenalty<=settings.nLinkFrameGap)
 								{
-									bContinue = false;
+									//mark it as already used 
+									trackid[nCompareAbsCountCandidate] = nCurrentTrack;
+									nCurrentParticleinTrack++;
+									patid[nCompareAbsCountCandidate] = nCurrentParticleinTrack;
+									if(settings.nLinkTrace != 0) //change reference position
+									{
+											x_compare = x[nCompareAbsCountCandidate];
+											y_compare = y[nCompareAbsCountCandidate];
+									}
+									TrackCoords.add(new double[] {x[nCompareAbsCountCandidate],y[nCompareAbsCountCandidate]});									
 								}
+								//stop
+								bContinue = false;
+						}
+						//ok, reached the end of particles list in current frame
+						//but not in the whole list
+						//let's see what is going on
+						else
+						{
+							//is penalty restriction satisfied?
+							//noooo. let's stop current linking
+							if(nPenalty>settings.nLinkFrameGap)
+							{									
+								bContinue = false;
+							}
+							//yes,penalty restriction is satisfied
+							else
+							{	
+								//found some particle. let's add it to track
+								if(nCompareAbsCountCandidate>0)
+								{
+									//mark it as already used 
+									trackid[nCompareAbsCountCandidate] = nCurrentTrack;
+									nCurrentParticleinTrack++;
+									patid[nCompareAbsCountCandidate] = nCurrentParticleinTrack;
+									if(settings.nLinkTrace != 0) //change reference position
+									{
+											x_compare = x[nCompareAbsCountCandidate];
+											y_compare = y[nCompareAbsCountCandidate];
+									}
+									TrackCoords.add(new double[] {x[nCompareAbsCountCandidate],y[nCompareAbsCountCandidate]});
+									
+									nLinksNumber = nPenalty+nLinksNumber;
+									nPenalty = 0;
+									nFrameCompareCount++;									
+									nCompareFrame = framesstat[nFrameCompareCount][0];
+									nCompareParticle = 0;
+									nCompareAbsCountCandidate = 0;			
+								}
+								//no particle was found								
+								//just move to next frame
 								else
-								{									
+								{
 									nFrameCompareCount++;								
 									nCompareFrame = framesstat[nFrameCompareCount][0];
-									nCompareParticle = 0;										
+									nCompareParticle = 0;
 								}
 							}
-							//yes, we did, let's jump then
-							else
-							{
-								//mark it as already used 
-								trackid[nCompareAbsCountCand] = nCurrentTrack;
-								nCurrentParticleinTrack++;
-								patid[nCompareAbsCountCand] = nCurrentParticleinTrack;
-								if(settings.nLinkTrace != 0) //change reference position
-								{
-										x_compare = x[nCompareAbsCountCand];
-										y_compare = y[nCompareAbsCountCand];
-								}
-								TrackCoords.add(new double[] {x[nCompareAbsCountCand],y[nCompareAbsCountCand]});
-								
-								nLinksNumber = nPenalty+nLinksNumber;
-								nPenalty = 0;
-								nFrameCompareCount++;									
-								nCompareFrame = framesstat[nFrameCompareCount][0];
-								nCompareParticle = 0;
-								nCompareAbsCountCand = 0;
-							}													
 						}
 							
 					}
@@ -259,36 +310,22 @@ public class SMLLinker {
 						{
 							//found new link!
 							//let's store values
-							//first particle in frame
-							if (nCompareAbsCountCand == 0)
+							//first particle in the current frame
+							if (nCompareAbsCountCandidate == 0)
 							{
 								nLinksNumber++;
-								nCompareAbsCountCand = nCompareAbsCount;
+								nCompareAbsCountCandidate = nCompareAbsCount;
 								dCandDistance = dDistance;
 							}//other particles could be closer
 							else
 							{
 								if(dDistance<dCandDistance)
 								{
-									nCompareAbsCountCand = nCompareAbsCount;
+									nCompareAbsCountCandidate = nCompareAbsCount;
 									dCandDistance = dDistance;
 								}
 							}
-							
-							//mark it as already used 
-							//trackid[nCompareAbsCount] = nCurrentTrack;
-							//nCurrentParticleinTrack++;
-							//patid[nCompareAbsCount] = nCurrentParticleinTrack;
-							//if(settings.nLinkTrace != 0) //change reference position
-							//{
-							//	x_compare = x_un[nFrameCompareCount][nCompareParticle];
-							//	y_compare = y_un[nFrameCompareCount][nCompareParticle];
-							//}
 														
-							//TrackCoords.add(new double[] {x_un[nFrameCompareCount][nCompareParticle],y_un[nFrameCompareCount][nCompareParticle]});							
-
-							//exit from current frame (a bit lame one)
-							//nCompareParticle = framesstat[nFrameCompareCount][1] -1;
 						}
 					}
 				}//end of "while" cycle looking for next linkers
@@ -328,7 +365,7 @@ public class SMLLinker {
 		int nCount,i;
 		int nCurrTrack, nMaxVal, nIniPosition;
 		
-		nLength = new double [(int) nPatNumber];
+		tracklength = new double [(int) nPatNumber];
 		
 		trackid   = smllink.ptable.getColumnAsDoubles(18);		
 		patid     = smllink.ptable.getColumnAsDoubles(19);
@@ -347,7 +384,7 @@ public class SMLLinker {
 				//storing value of length at array
 				for(i=nIniPosition;i<nCount;i++)
 				{
-					nLength[i] = nMaxVal;
+					tracklength[i] = nMaxVal;
 				}
 				nMaxVal = (int) patid[nCount];
 				nIniPosition = nCount;
@@ -358,7 +395,7 @@ public class SMLLinker {
 			{
 				for(i=nIniPosition;i<nPatNumber;i++)
 				{
-					nLength[i] = nMaxVal;
+					tracklength[i] = nMaxVal;
 				}
 			}
 			
@@ -371,9 +408,9 @@ public class SMLLinker {
 	{
 		int nCount;
 		//adding to final table
-		smllink.ptable.setValue("Track_Det_N", 0, nLength[0]);
+		smllink.ptable.setValue("Track_Length", 0, tracklength[0]);
 		for(nCount = 1; nCount<nPatNumber; nCount++)
-			smllink.ptable.setValue(20, nCount, nLength[nCount]);
+			smllink.ptable.setValue(20, nCount, tracklength[nCount]);
 		
 	}
 	
@@ -386,10 +423,10 @@ public class SMLLinker {
 		boolean bMark;
 						
 		//lengths of tracks
-		nLength = smllink.ptable.getColumnAsDoubles(20);
+		tracklength = smllink.ptable.getColumnAsDoubles(20);
 		
 		nCurrTrack = (int) trackid[0];
-		nCurrLength = (int) nLength[0];
+		nCurrLength = (int) tracklength[0];
 		if(nCurrLength>=nLastParts)
 		{
 			bMark = true;
@@ -409,7 +446,7 @@ public class SMLLinker {
 			else
 			{
 				nCurrTrack = (int) trackid[nCount]; 
-				nCurrLength = (int) nLength[nCount];
+				nCurrLength = (int) tracklength[nCount];
 				if(nCurrLength>=nLastParts)
 				{
 					bMark = true;
@@ -461,6 +498,7 @@ public class SMLLinker {
 		
 	}
 	
+	//function adding a track to frame nFrame overlay with trackColor color  
 	void addTrack(Color trackColor, int nFrame)
 	{
 		int i;
@@ -483,7 +521,7 @@ public class SMLLinker {
 			ovTracks.add(polyLine);
 		}
 		
-		//starting point of the track
+		//mark with circle the starting point of the track
 		dx=TrackCoords.get(0)[0];
 		dy=TrackCoords.get(0)[1];
 		dx-=0.5;
@@ -495,6 +533,9 @@ public class SMLLinker {
 		ovTracks.add(startPoint);
 		
 	}
+	
+	//function given an integer number 
+	//returns color from a list of 8 very distinct numbers 
 	Color SwitchingColorPalette(int nNumber)	
 	{
 				
@@ -521,6 +562,7 @@ public class SMLLinker {
 		}				
 	}
 	
+	//adds all tracks from Results table to the overlay
 	void addTracksToOverlay()
 	{
 		int nCount=0;
@@ -540,8 +582,8 @@ public class SMLLinker {
 		//go through all table
 		while (nCount<nPatNumber)
 		{
-			if(nLength[nCount]<2)
-				//do not show not connected particles
+			if(tracklength[nCount]<2)
+				//do not show particles which are not connected 
 				nCount++;
 			else
 			{
@@ -549,7 +591,7 @@ public class SMLLinker {
 				TrackCoords.clear();
 				TrackCoords.add(new double[] {x[nCount], y[nCount]});
 				nPrevFrame = (int) f[nCount];
-				nTrackLength = (int) nLength[nCount];
+				nTrackLength = (int) tracklength[nCount];
 				nTrackNumber = (int)trackid[nCount];
 				addTrack(SwitchingColorPalette(nTrackNumber), nPrevFrame);
 				//remaining points
@@ -575,6 +617,9 @@ public class SMLLinker {
 		
 		
 	}
+	
+	//highlights detected particles with circles
+	//of different color, depending on the 'false positive' status
 	void addParticlesToOverlay()
 	{
 		int nCount;
