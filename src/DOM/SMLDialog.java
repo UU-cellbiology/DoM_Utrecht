@@ -69,7 +69,7 @@ public class SMLDialog {
 	//dialog showing options for particle search algorithm		
 	public boolean findParticles() {
 		String [] DetectionType = new String [] {
-				"Detect molecules (no fitting)","Detect molecules and fit", "BALM single molecule intensity calibration"};
+				"Detect molecules (no fitting)","Detect molecules and fit", "BALM single molecule intensity calibration", "Fit detected molecules"};
 		GenericDialog fpDial = new GenericDialog("Find Particles");
 		fpDial.addChoice("Task:", DetectionType, Prefs.get("SiMoLoc.DetectionType", "Detect molecules and fit"));
 		fpDial.addNumericField("PSF standard devation, pix", Prefs.get("SiMoLoc.dPSFsigma", 2), 3);

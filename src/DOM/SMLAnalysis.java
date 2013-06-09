@@ -11,13 +11,12 @@ import java.util.Stack;
 
 
 import ij.IJ;
-import ij.ImagePlus;
 
 import ij.gui.OvalRoi;
 import ij.gui.Overlay;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
-import ij.plugin.filter.Analyzer;
+
 
 import ij.plugin.filter.GaussianBlur;
 import ij.process.ByteProcessor;
@@ -35,7 +34,7 @@ public class SMLAnalysis {
 	float []		 fConKernel;  				//convolution kernel (Gaussian mexican hat)
 	float []		 fLPKernel;  				//low-pass Gaussian kernel 
 	
-	ResultsTable ptable = Analyzer.getResultsTable(); // table with particle's approximate center coordinates
+	ResultsTable ptable = ResultsTable.getResultsTable(); // table with particle's approximate center coordinates
 	
 	java.util.concurrent.locks.Lock ptable_lock = new java.util.concurrent.locks.ReentrantLock();
 	
@@ -43,6 +42,7 @@ public class SMLAnalysis {
 	//default constructor 
 	SMLAnalysis()
 	{
+		ptable = ResultsTable.getResultsTable();
 		ptable.setPrecision(5);
 		
 	}
@@ -162,6 +162,7 @@ public class SMLAnalysis {
 		int [] pos ;		
 		
 		Stack<int[]> sstack = new Stack<int[]>( );
+		//stackPost can be removed
 		Stack<int[]> stackPost = new Stack<int[]>( );
 		int [][] label = new int[width][height] ;
 		

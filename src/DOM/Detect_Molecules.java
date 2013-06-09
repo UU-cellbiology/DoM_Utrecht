@@ -40,7 +40,7 @@ public class Detect_Molecules implements PlugIn {
 		
 		IJ.register(Detect_Molecules.class);
 		
-		sml.ptable.reset(); // erase particle table
+		
 		particles_= new double [1][1];
 		//checking whether there is any open images
 		imp = IJ.getImage();		
@@ -75,75 +75,79 @@ public class Detect_Molecules implements PlugIn {
 		else
 			smlthreads = new SMLThread[nStackSize];
 		
-		IJ.showStatus("Detecting molecules...");
+
 		nFreeThread = -1;
 		nSlice = 0;
 		bContinue = true;
-		
-		while (bContinue)
+		if(dlg.nDetectionType==0 || dlg.nDetectionType==1)
 		{
-			//check whether reached the end of stack
-			if (nSlice >= nStackSize) bContinue = false;
-			else
+			sml.ptable.reset(); // erase particle table
+			IJ.showStatus("Detecting molecules...");		
+			while (bContinue)
 			{
-				imp.setSliceWithoutUpdate(nSlice+1);
-				ip = imp.getProcessor().duplicate();
-			}
-			
-			if (bContinue)
-			{
-				//filling free threads in the beginning
-				if (nSlice < smlthreads.length)
-					nFreeThread = nSlice;				
+				//check whether reached the end of stack
+				if (nSlice >= nStackSize) bContinue = false;
 				else
-				//looking for available free thread
 				{
-					nFreeThread = -1;
-					while (nFreeThread == -1)
+					imp.setSliceWithoutUpdate(nSlice+1);
+					ip = imp.getProcessor().duplicate();
+				}
+				
+				if (bContinue)
+				{
+					//filling free threads in the beginning
+					if (nSlice < smlthreads.length)
+						nFreeThread = nSlice;				
+					else
+					//looking for available free thread
 					{
-						for (int t=0; t < smlthreads.length; t++)
+						nFreeThread = -1;
+						while (nFreeThread == -1)
 						{
-							if (!smlthreads[t].isAlive())
+							for (int t=0; t < smlthreads.length; t++)
 							{
-								nFreeThread = t;
-								break;
+								if (!smlthreads[t].isAlive())
+								{
+									nFreeThread = t;
+									break;
+								}
 							}
-						}
-						if (nFreeThread == -1)
-						{
-							try
+							if (nFreeThread == -1)
 							{
-								Thread.currentThread();
-								Thread.sleep(1);
-							}
-							catch(Exception e)
-							{
-									IJ.error(""+e);
+								try
+								{
+									Thread.currentThread();
+									Thread.sleep(1);
+								}
+								catch(Exception e)
+								{
+										IJ.error(""+e);
+								}
 							}
 						}
 					}
+					smlthreads[nFreeThread] = new SMLThread();
+					smlthreads[nFreeThread].init(ip, sml, dlg, nSlice, SpotsPositions,nStackSize, smlcount);
+					smlthreads[nFreeThread].start();
+					//IJ.showProgress(nSlice, nStackSize);
+				} //end of if (bContinue)
+				nSlice++;
+			} // end of while (bContinue)
+			
+			for (int t=0; t<smlthreads.length;t++)
+			{
+				try
+				{
+					smlthreads[t].join();				
 				}
-				smlthreads[nFreeThread] = new SMLThread();
-				smlthreads[nFreeThread].init(ip, sml, dlg, nSlice, SpotsPositions,nStackSize, smlcount);
-				smlthreads[nFreeThread].start();
-				//IJ.showProgress(nSlice, nStackSize);
-			} //end of if (bContinue)
-			nSlice++;
-		} // end of while (bContinue)
-		
-		for (int t=0; t<smlthreads.length;t++)
-		{
-			try
-			{
-				smlthreads[t].join();				
+				catch(Exception e)
+				{
+					IJ.error(""+e);
+				}
 			}
-			catch(Exception e)
-			{
-				IJ.error(""+e);
-			}
+			//detection only
+			IJ.showStatus("Detection completed.");
 		}
-		//detection only
-		IJ.showStatus("Detection completed.");
 
 		if(dlg.nDetectionType==0)
 		{
