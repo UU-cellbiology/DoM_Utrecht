@@ -318,6 +318,7 @@ public class SMLAnalysis {
 		int i,j, nCount, nParticlesCount, nParticlesNumber;		
 		double xCentroid, yCentroid, xSD, ySD;
 		double dIntAmp, dIntNoise;
+		double dIMax, dIMin, dInt;
 		double dNoiseAvrg, dNoiseSD;
 		double dSNR;
 		int dBorder; // radius in pixels around center point to fit Gaussian
@@ -343,19 +344,29 @@ public class SMLAnalysis {
 					
 			//creating array of intensity values for fitting
 			nCount = 0;
+			dIMin = 10000000;
+			dIMax = -100;
 			for(i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; i++)
 				for(j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; j++)
 				{					
-					spotInt[nCount][0] =ipRaw.getPixel(i,j);
+					dInt = ipRaw.getPixel(i,j);
+					spotInt[nCount][0] =dInt;
 					spotInt[nCount][1] =(double)i;
 					spotInt[nCount][2] =(double)j;
+					if(dInt>dIMax)
+						dIMax=dInt;
+					if(dIMin<dInt)
+						dIMin=dInt;
 					nCount++;					
 				}
 			
 			
 				//initial values of fitting parameters				
-				dFitParams[0]= particles_[3][nParticlesCount]; //minimum, background level
-				dFitParams[1]= particles_[2][nParticlesCount] - particles_[3][nParticlesCount]; // intensity amplitude, max-min
+				//dFitParams[0]= particles_[3][nParticlesCount]; //minimum, background level
+				//dFitParams[1]= particles_[2][nParticlesCount] - particles_[3][nParticlesCount]; // intensity amplitude, max-min
+				dFitParams[0]= dIMin; //minimum, background level
+				dFitParams[1]= dIMax - dIMin; // intensity amplitude, max-min
+
 				dFitParams[2]= particles_[0][nParticlesCount];//x center
 				dFitParams[3]= particles_[1][nParticlesCount];//y center
 				dFitParams[4]= fdg.dPSFsigma;

@@ -79,7 +79,7 @@ public class Detect_Molecules implements PlugIn {
 		nFreeThread = -1;
 		nSlice = 0;
 		bContinue = true;
-		if(dlg.nDetectionType==0 || dlg.nDetectionType==1)
+		if(dlg.nDetectionType==0 || dlg.nDetectionType==1 || dlg.nDetectionType==2)
 		{
 			sml.ptable.reset(); // erase particle table
 			IJ.showStatus("Detecting molecules...");		
@@ -184,11 +184,11 @@ public class Detect_Molecules implements PlugIn {
 			//getting results from table
 			double[] nFrameN = sml.ptable.getColumnAsDoubles(0);
 			nDetPartNum = nFrameN.length;
-			detparticles = new double [4][nDetPartNum];
+			detparticles = new double [2][nDetPartNum];
 			detparticles[0] = sml.ptable.getColumnAsDoubles(1);
 			detparticles[1] = sml.ptable.getColumnAsDoubles(2);
-			detparticles[2] = sml.ptable.getColumnAsDoubles(3);
-			detparticles[3] = sml.ptable.getColumnAsDoubles(4);
+			//detparticles[2] = sml.ptable.getColumnAsDoubles(3);
+			//detparticles[3] = sml.ptable.getColumnAsDoubles(4);
 			//erase particle table
 			sml.ptable.reset();
 						
@@ -202,7 +202,7 @@ public class Detect_Molecules implements PlugIn {
 				detparticles = BaLMfilter(detparticles, nFrameN);
 				nDetPartNum = detparticles[0].length;
 				nFrameN = new double[nDetPartNum];
-				nFrameN = detparticles[4];
+				nFrameN = detparticles[2];
 			}
 			nUniqFrames = uniqFrames(nFrameN, nDetPartNum);
 			/// using only necessary number of threads	 
@@ -247,11 +247,11 @@ public class Detect_Molecules implements PlugIn {
 									bListEnd = true;															
 						}
 						//making array for them
-						particles_= new double [4][nPositionEnd-nPositionStart];
+						particles_= new double [2][nPositionEnd-nPositionStart];
 						particles_[0] = Arrays.copyOfRange(detparticles[0], nPositionStart, nPositionEnd);
 						particles_[1] = Arrays.copyOfRange(detparticles[1], nPositionStart, nPositionEnd);
-						particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
-						particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
+						//particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
+						//particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
 						//copying image
 						imp.setSliceWithoutUpdate(nSlice+1);
 						ip = imp.getProcessor().duplicate();
@@ -481,7 +481,7 @@ public class Detect_Molecules implements PlugIn {
 			}
 			
 		}
-		filteredparticles_ = new double[5][nCount];
+		filteredparticles_ = new double[3][nCount];
 		nCount = 0;
 		for(i=0;i<nDetPartNum;i++)
 		{
@@ -489,9 +489,9 @@ public class Detect_Molecules implements PlugIn {
 			{
 				filteredparticles_[0][nCount] = detparticles_[0][i];
 				filteredparticles_[1][nCount] = detparticles_[1][i];
-				filteredparticles_[2][nCount] = detparticles_[2][i];
-				filteredparticles_[3][nCount] = detparticles_[3][i];
-				filteredparticles_[4][nCount] = nFrameN_[i];
+				//filteredparticles_[2][nCount] = detparticles_[2][i];
+				//filteredparticles_[3][nCount] = detparticles_[3][i];
+				filteredparticles_[3][nCount] = nFrameN_[i];
 				nCount++;
 			}
 		}
