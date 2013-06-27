@@ -30,7 +30,6 @@ public class SMLAnalysis {
 	
 	ImageStatistics imgstat;
 	GaussianBlur lowpassGauss = new GaussianBlur(); //low pass prefiltering
-	//Convolver      colvolveOp = new Convolver(); //convolution filter
 	float []		 fConKernel;  				//convolution kernel (Gaussian mexican hat)
 	float []		 fLPKernel;  				//low-pass Gaussian kernel 
 	
@@ -105,20 +104,8 @@ public class SMLAnalysis {
 		//dupip.invert();
 		
 		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
-		//labelParticles(dubyte, duconv, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, fdg.dSymmetry/100);
 		
 
-		/*ImagePlus imp = new ImagePlus("result_decon", duconv);  
-		imp.show();
-		imp = new ImagePlus("result_threshold", dubyte);  
-		imp.show();*/
-
-		//ptable.show("Results");
-
-		//ip.setPixels(pixels)
-		//ImagePlus imp2 = new ImagePlus("result2", dupip);  
-
-		//imp2.show();  		
 	}
 	
 	//function that finds centroids x,y and area
@@ -132,46 +119,30 @@ public class SMLAnalysis {
 	{
 		int width = ipBinary.getWidth();
 		int height = ipBinary.getHeight();
-		//int nFitRadius = 3; //radius in number of SD around center point to fit Gaussian
+
 		int dBorder; // radius in pixels around center point to fit Gaussian
-		//int nIntBoxSize = 3; //half length of box for spot integration (in SD around) 
+ 
 		
 		
 		int nArea;
-		//double nFalsePositive;
+
 		int i,j;
-		//int nCount;
+
 		double dVal, dInt;
 		double dIMax, dIMin;
-		//double [][] spotInt;
-	
-		//double [] dFitParams;
-		//double [] dFitErrors;
-		//double dErrCoeff;
-		//LMA SMLlma;
-		//SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
 
 		double xCentroid, yCentroid;
-		//double xSD, ySD;
-		//double dIntAmp, dIntNoise;
-		//double dNoiseAvrg, dNoiseSD;
-		//double dSNR;
 		boolean bBorder;
 
 		int lab = 1;
 		int [] pos ;		
 		
 		Stack<int[]> sstack = new Stack<int[]>( );
-		//stackPost can be removed
-		Stack<int[]> stackPost = new Stack<int[]>( );
 		int [][] label = new int[width][height] ;
 		
 		OvalRoi spotROI;
 
 		dBorder= (int)(dPSFsigma_*DOMConstants.FITRADIUS);
-		//spotInt = new double [(2*dBorder+1)*(2*dBorder+1)][3];
-		//dFitParams = new double [6];
-		//dFitErrors = new double [6];
 				
 		
 		for (int r = 1; r < width-1; r++)
@@ -183,7 +154,6 @@ public class SMLAnalysis {
 				/* it means it is a new spot! */
 				/* push the position in the stack and assign label */
 				sstack.push(new int [] {r, c}) ;
-				stackPost.push(new int [] {r, c}) ;
 				label[r][c] = lab ;
 				nArea = 0;
 				dIMax = -1000;
@@ -213,48 +183,40 @@ public class SMLAnalysis {
 					
 					if (ipBinary.getPixel(i-1,j-1) > 0 && label[i-1][j-1] == 0) {
 						sstack.push( new int[] {i-1,j-1} );
-						stackPost.push( new int[] {i-1,j-1} );
 						label[i-1][j-1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i-1,j) > 0 && label[i-1][j] == 0) {
 						sstack.push( new int[] {i-1,j} );
-						stackPost.push( new int[] {i-1,j} );
 						label[i-1][j] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i-1,j+1) > 0 && label[i-1][j+1] == 0) {
 						sstack.push( new int[] {i-1,j+1} );
-						stackPost.push( new int[] {i-1,j+1} );
 						label[i-1][j+1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i,j-1) > 0 && label[i][j-1] == 0) {
 						sstack.push( new int[] {i,j-1} );
-						stackPost.push( new int[] {i,j-1} );
 						label[i][j-1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i,j+1) > 0 && label[i][j+1] == 0) {
 						sstack.push( new int[] {i,j+1} );
-						stackPost.push( new int[] {i,j+1} );
 						label[i][j+1] = lab ;
 					}
 					if (ipBinary.getPixel(i+1,j-1) > 0 && label[i+1][j-1] == 0) {
 						sstack.push( new int[] {i+1,j-1} );
-						stackPost.push( new int[] {i+1,j-1} );
 						label[i+1][j-1] = lab ;
 					}
 				
 					if (ipBinary.getPixel(i+1,j)>0 && label[i+1][j] == 0) {
 						sstack.push( new int[] {i+1,j} );
-						stackPost.push( new int[] {i+1,j} );
 						label[i+1][j] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i+1,j+1) > 0 && label[i+1][j+1] == 0) {
 						sstack.push( new int[] {i+1,j+1} );
-						stackPost.push( new int[] {i+1,j+1} );
 						label[i+1][j+1] = lab ;
 					}
 					
@@ -303,8 +265,6 @@ public class SMLAnalysis {
 				lab++ ;
 			} // end for cycle
 		
-		/*ImagePlus ipFit = new ImagePlus("after_fit", afterFit);  
-		ipFit.show();*/
 		return;// label ;
 
 		
@@ -322,7 +282,7 @@ public class SMLAnalysis {
 		double dNoiseAvrg, dNoiseSD;
 		double dSNR;
 		int dBorder; // radius in pixels around center point to fit Gaussian
-		double nFalsePositive;		
+		double nFalsePositive;				
 		
 		double [][] spotInt;		
 		double [] dFitParams;
@@ -355,7 +315,7 @@ public class SMLAnalysis {
 					spotInt[nCount][2] =(double)j;
 					if(dInt>dIMax)
 						dIMax=dInt;
-					if(dIMin<dInt)
+					if(dInt<dIMin)
 						dIMin=dInt;
 					nCount++;					
 				}
@@ -385,7 +345,9 @@ public class SMLAnalysis {
 				if (SMLlma.iterationCount== 101)
 					nFalsePositive = 0.5;
 				//spot is too big
-				if((SMLlma.parameters[4] > 1.3*fdg.dPSFsigma) || (SMLlma.parameters[4]<0.70*fdg.dPSFsigma)||(SMLlma.parameters[5]<0.70*fdg.dPSFsigma)||(SMLlma.parameters[5] > 1.3*fdg.dPSFsigma))
+				xSD = Math.abs(SMLlma.parameters[4]);
+				ySD = Math.abs(SMLlma.parameters[5]);
+				if((xSD > 1.3*fdg.dPSFsigma) || (xSD<0.70*fdg.dPSFsigma)||(ySD<0.70*fdg.dPSFsigma)||(ySD > 1.3*fdg.dPSFsigma))
 					nFalsePositive = 1.0;
 				//localization precision is bigger than PSF size
 				if((dFitErrors[2] > fdg.dPSFsigma) || (dFitErrors[3] > fdg.dPSFsigma))
@@ -399,10 +361,7 @@ public class SMLAnalysis {
 				//calculating integrated spot intensity and estimating SNR
 				if(nFalsePositive<0.5)
 				{
-					//xCentroid = Math.round(SMLlma.parameters[2]);
-					//yCentroid = Math.round(SMLlma.parameters[3]);
-					//xSD = Math.round(SMLlma.parameters[4]*DOMConstants.FITRADIUS);
-					//ySD = Math.round(SMLlma.parameters[5]*DOMConstants.FITRADIUS);
+
 					xSD = Math.round(fdg.dPSFsigma*DOMConstants.FITRADIUS);
 					ySD = Math.round(fdg.dPSFsigma*DOMConstants.FITRADIUS);
 
