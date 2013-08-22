@@ -3,6 +3,6 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/IJ"/>
-	<classpathentry kind="lib" path="/home/eugene/workspace/LMA/jama.jar"/>
+	<classpathentry kind="lib" path="Jama-1.0.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
