@@ -42,6 +42,7 @@
 	<!-- compress target -->
 	<target name="compress" depends="compile" description="generate JAR-file">
 		<echo>Compress class-files into JAR-file</echo>
+		<mkdir dir="${dist}" />
 		<jar jarfile="${dist}/DoM_GPU.jar">
 			<fileset dir="${build}" includes="DOM/*.*" />
 			<manifest>
@@ -53,6 +54,7 @@
 	<!-- compile target -->
 	<target name="compile" depends="jaolho" description="compiling source code">
 		<echo>Compiling source code</echo>
+		<mkdir dir="${build}" />
 		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
 			<compilerarg value="-Xlint:unchecked" />
 			<src path="${src}/DOM" />
@@ -64,6 +66,7 @@
 	<!-- jaolho target -->
 	<target name="jaolho" depends="" description="building jaolho library">
 		<echo>Compiling jaolho library</echo>
+		<mkdir dir="${build}" />
 		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
 			<compilerarg value="-Xlint:unchecked" />
 			<src path="${src}/jaolho" />
