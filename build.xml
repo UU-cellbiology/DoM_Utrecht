@@ -1,27 +1,102 @@
 <project name="DoM_" default="" basedir=".">
-    <description>
-        DoM_ build file
-    </description>
-  <property name="src" location="src" />
-  <property name="build" location="bin" />
-  <property name="dist"  location="dist" />
- 
-	 <property name="pluginsDir"  location="$basedir/../../IJ/plugins/" />
- 
-  <property name="user.name" value="Yevhen Katrukha" />
-<target name="main" depends="compress" description="Main target">
-	<echo>
-		Building the .jar file.
-	</echo>
-</target>
- <target name="compress" depends="" description="generate the distribution">
- 	<jar jarfile="DoM_.jar">
- 		<fileset dir="." includes="plugins.config" />
-		<fileset dir="${build}" includes="**/*.*" />
- 		<manifest>
- 		 	 	      <attribute name="Built-By" value="${user.name}"/>
- 		</manifest>
- 	</jar>
-    <copy file="DoM_.jar" toDir="${pluginsDir}" />
-  </target>
+	
+	<description>DoM GPU Fiji plug-in build file</description>
+	
+	<!-- user configuration -->
+	<property name="Fiji" location="/Applications/Fiji.app" />
+	<property name="FijiPluginsDir" location="${Fiji}/plugins/" />
+	<property name="FijiJarsDir" location="${Fiji}/jars/" />
+	
+	<!-- directories -->
+	<property name="src" location="src" />
+	<property name="build" location="bin" />
+	<property name="dist" location="dist" />
+	<property name="lib" location="lib" />
+	
+	<!-- manifest properties -->
+	<property name="user.name" value="Yevhen Katrukha" />
+	
+	<!-- java class path -->
+	<path id="dom.classpath">
+		<fileset dir="${lib}">
+			<include name="ij-1.48f.jar" />
+			<include name="jaolho.jar" />
+		</fileset>
+	</path>
+	<path id="jaolho.classpath">
+		<fileset dir="${lib}">
+			<include name="jama-1.0.3.jar" />
+		</fileset>
+	</path>
+	
+	<!-- main target -->
+	<target name="main" depends="compress" description="Main target">
+		<echo>Building the DoM plug-in</echo>
+	</target>
+	
+	<!-- compress target -->
+	<target name="compress" depends="compile" description="generate JAR-file">
+		<echo>Compress class-files into JAR-file</echo>
+		<jar jarfile="${dist}/DoM_GPU.jar">
+			<fileset dir="${build}/DOM" includes="**/*.*" />
+			<manifest>
+ 		 	 	<attribute name="Built-By" value="${user.name}"/>
+			</manifest>
+		</jar>
+	</target>
+	
+	<!-- compile target -->
+	<target name="compile" depends="jaolho" description="compiling source code">
+		<echo>Compiling source code</echo>
+		<javac destdir="${build}" includeantruntime="false">
+			<compilerarg value="-Xlint:unchecked" />
+			<src path="${src}/DOM" />
+			<classpath refid="dom.classpath" />
+		</javac>
+		<copy file="${src}/plugins.config" toDir="${build}" />
+	</target>
+	
+	<!-- jaolho target -->
+	<target name="jaolho" depends="" description="building jaolho library">
+		<echo>Compiling jaolho library</echo>
+		<javac destdir="${build}" includeantruntime="false">
+			<compilerarg value="-Xlint:unchecked" />
+			<src path="${src}/jaolho" />
+			<classpath refid="jaolho.classpath" />
+		</javac>
+		
+		<echo>Compress class-files into JAR-file</echo>
+		<jar jarfile="${lib}/jaolho.jar">
+			<fileset dir="${build}" includes="**/*.*" />
+			<manifest>
+ 		 	 	<attribute name="Built-By" value="${user.name}"/>
+			</manifest>
+		</jar>
+		
+	</target>
+	
+	<!-- install target -->
+	<target name="install" depends="main" description="generate distribution">
+		<copy file="${dist}/DoM_GPU.jar" toDir="${FijiPluginsDir}" />
+		<copy file="${lib}/jama-1.0.3.jar" toDir="${FijiJarsDir}" />
+		<copy file="${lib}/jaolho.jar" toDir="${FijiJarsDir}" />
+	</target>
+	
+	<!-- clean target -->
+	<target name="clean" depends="" description="clean build directory">
+		<echo>Cleaning build directory</echo>
+		<delete includeemptydirs="true">
+			<fileset dir="${build}" includes="**/*" />
+		</delete>
+	</target>
+	
+	<!-- deep clean target -->
+	<target name="deep_clean" depends="clean" description="clean distribution directory">
+		<echo>Cleaning distribution directory</echo>
+		<delete includeemptydirs="true">
+			<fileset dir="${dist}" includes="**/*" />
+			<fileset dir="${lib}" includes="jaolho.jar" />
+		</delete>
+	</target>
+	
 </project>
