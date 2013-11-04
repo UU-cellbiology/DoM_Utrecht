@@ -36,7 +36,7 @@ public class Link_Particles implements PlugIn {
 		imp = null;
 		ovTracks = null;
 		//whether or not show tracks
-		if(dlg.bShowTracks)
+		if(dlg.bShowTracks || dlg.bShowParticlesLink)
 		{
 			imp = IJ.getImage();		
 
@@ -80,14 +80,16 @@ public class Link_Particles implements PlugIn {
 		smlLink.calculate_Tracks_Lengths();
 		smlLink.add_Tracks_Lengths();	
 		
-		//marking last particles
-		smlLink.mark_Last_Detections(dlg.nLastDetections);
+		//marking particles in each track in reverse order
+		//in the Results table
+		smlLink.mark_Particles_in_Reverse();
 		
 		//adding tracks to overlay
 		if(dlg.bShowTracks)
 		{
 			smlLink.addTracksToOverlay();
 		}
+		//adding particles to overlay
 		if(dlg.bShowParticlesLink)
 		{
 			smlLink.addParticlesToOverlay();		

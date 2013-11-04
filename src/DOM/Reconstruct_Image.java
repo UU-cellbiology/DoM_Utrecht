@@ -22,10 +22,13 @@ public class Reconstruct_Image implements PlugIn{
 	{
 		
 		String imagename; 
-		double [] xloc;
-		double [] falsepos;	
+		double [] xloc;	
 		double [] yloc;
+		double [] xpix;
+		double [] ypix;
+		double [] falsepos;
 		double [] frames;
+		double xmax, ymax;
 		double xlocavg, ylocavg, pxsize;
 		double fminframe, fmaxframe;
 		int i, sz;
@@ -67,10 +70,27 @@ public class Reconstruct_Image implements PlugIn{
 		fminframe = frames[0];
 		fmaxframe = frames[frames.length-1];
 		
-		//show dialog with options
-		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe)) return;
+		//calculate max x and y coordinates
+		xpix = sml.ptable.getColumnAsDoubles(1);
+		ypix = sml.ptable.getColumnAsDoubles(2);		
+		xmax = 0;
+		ymax = 0;
+		for (i=0; i<sz; i++)
+		{
+			//use only true positives to estimate image borders
+			if(falsepos[i]<0.2)
+			{
+				if(xpix[i]>xmax)
+					xmax=xpix[i];
+				if(ypix[i]>ymax)
+					ymax=ypix[i];
+			}
+		}
 		
-		//check some parameters for consistensy 
+		//show dialog with options
+		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, (int)Math.ceil(xmax), (int)Math.ceil(ymax))) return;
+		
+		//check some parameters for consistency 
 		if(dlg.bFramesInterval)
 		{
 			if(dlg.nFrameMax>fmaxframe ||  dlg.nFrameMax<fminframe)

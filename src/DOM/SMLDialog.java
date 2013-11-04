@@ -64,7 +64,6 @@ public class SMLDialog {
 	int nLinkFrameGap; //maximum linking gap in frames
 	boolean bShowTracks; //whether to show linked tracks or not
 	boolean bShowParticlesLink; //show detected particles
-	int nLastDetections; //number of last detected spots at trace to mark
 	
 	//dialog showing options for particle search algorithm		
 	public boolean findParticles() {
@@ -104,7 +103,7 @@ public class SMLDialog {
 	}
 	
 	
-	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe) //dialog showing options for reconstruction image		
+	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, int xmax, int ymax) //dialog showing options for reconstruction image		
 	{
 		GenericDialog dgReconstruct = new GenericDialog("Reconstruct Dataset");
 		String [] RecIntOptions = new String [] {
@@ -117,10 +116,10 @@ public class SMLDialog {
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addNumericField("Pixel size of reconstructed image, nm", Prefs.get("SiMoLoc.Rec_PixSize", 30), 2);
 		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
-		dgReconstruct.addNumericField("Width of original image, px", Prefs.get("SiMoLoc.Rec_ImWidth", 512), 0);
-		dgReconstruct.addNumericField("Height of original image, px", Prefs.get("SiMoLoc.Rec_ImHeight", 512), 0);
-		dgReconstruct.addChoice("Intensity of spot's:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Normalized probability"));
-		dgReconstruct.addChoice("SD of spot's:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
+		dgReconstruct.addNumericField("Width of original image, px", xmax, 0);
+		dgReconstruct.addNumericField("Height of original image, px", ymax, 0);
+		dgReconstruct.addChoice("Intensity of spots:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Normalized probability"));
+		dgReconstruct.addChoice("SD of spots:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
 		dgReconstruct.addNumericField("Value of SD in case of constant (in original pixels):", Prefs.get("SiMoLoc.Rec_SDFixed", 2), 2);
 		dgReconstruct.addCheckbox("Cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
 		dgReconstruct.addNumericField("Cut particles off with localization less than (in original pixels): ", Prefs.get("SiMoLoc.cutoff", 0.3), 2);
@@ -219,8 +218,7 @@ public class SMLDialog {
 		dgLink.addNumericField("Distance between particles for linking, px", Prefs.get("SiMoLoc.LinkDist", 1), 2);
 		dgLink.addChoice("Measure distance from:", Link_Dist, Prefs.get("SiMoLoc.LinkTrace", "Initial position"));
 		dgLink.addNumericField("Maximum linking closing gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
-		dgLink.addNumericField("Mark this number of last detections:", Prefs.get("SiMoLoc.nLastDetections", 0), 0);
-		dgLink.addCheckbox("Tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
+		dgLink.addCheckbox("Display tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
 		dgLink.addCheckbox("Show detected particles?", Prefs.get("SiMoLoc.bShowParticlesLink", false));
 		dgLink.showDialog();
 		if (dgLink.wasCanceled())
@@ -234,8 +232,6 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.LinkTrace", Link_Dist[nLinkTrace]);
 		nLinkFrameGap= (int)dgLink.getNextNumber();
 		Prefs.set("SiMoLoc.LinkFrames", nLinkFrameGap);
-		nLastDetections= (int)dgLink.getNextNumber();
-		Prefs.set("SiMoLoc.nLastDetections", nLastDetections);
 		bShowTracks = dgLink.getNextBoolean();
 		Prefs.set("SiMoLoc.bShowTracks", bShowTracks);
 		bShowParticlesLink = dgLink.getNextBoolean();

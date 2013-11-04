@@ -413,57 +413,32 @@ public class SMLLinker {
 			smllink.ptable.setValue(20, nCount, tracklength[nCount]);
 		
 	}
-	
-	void mark_Last_Detections(int nLastParts)
+	//marking particles in each track in reverse order
+	//in the Results table	
+	void mark_Particles_in_Reverse()
 	{
-		double [] nMark = new double [(int) nPatNumber];
+		double [] nReverse = new double [(int) nPatNumber];
 
 		int nCount;
-		int nCurrTrack, nCurrLength;
-		boolean bMark;
+		long sz;
 						
 		//lengths of tracks
 		tracklength = smllink.ptable.getColumnAsDoubles(20);
+		//particles ID
+		patid = smllink.ptable.getColumnAsDoubles(19);
 		
-		nCurrTrack = (int) trackid[0];
-		nCurrLength = (int) tracklength[0];
-		if(nCurrLength>=nLastParts)
+		sz=(long)trackid.length;
+		
+		for (int i=0;i<sz;i++)
 		{
-			bMark = true;
-			if(nCurrLength==nLastParts)
-				nMark[0] = 1;
-		}
-		else 
-			bMark = false;
-		for(nCount = 0; nCount<nPatNumber; nCount++)
-		{		
-			if(trackid[nCount]==nCurrTrack)
-			{
-				if(bMark)
-					if (patid[nCount]+nLastParts>nCurrLength)
-						nMark[nCount] = 1;			
-			}
-			else
-			{
-				nCurrTrack = (int) trackid[nCount]; 
-				nCurrLength = (int) tracklength[nCount];
-				if(nCurrLength>=nLastParts)
-				{
-					bMark = true;
-					if(nCurrLength==nLastParts)
-						nMark[nCount] = 1;			
-				}
-				else 
-					bMark = false;
-			}
-			
+			if(tracklength[i]>0)
+				nReverse[i] = tracklength[i]-patid[i]+1;
 		}
 		//adding to final table
-		
-		smllink.ptable.setValue("Last_detections", 0, nMark[0]);
+		smllink.ptable.setValue("Reverse_numbering", 0, nReverse[0]);
 
 		for(nCount = 1; nCount<nPatNumber; nCount++)
-			smllink.ptable.setValue(21, nCount, nMark[nCount]);				
+			smllink.ptable.setValue(21, nCount, nReverse[nCount]);				
 
 	}
 	
