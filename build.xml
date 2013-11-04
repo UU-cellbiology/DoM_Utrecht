@@ -30,15 +30,20 @@
 	</path>
 	
 	<!-- main target -->
-	<target name="main" depends="compress" description="Main target">
+	<target name="main" depends="build" description="Main target">
 		<echo>Building the DoM plug-in</echo>
+	</target>
+	
+	<!-- compile target -->
+	<target name="build" depends="compress" description="building DoM">
+		<echo>Building DoM plug-in</echo>
 	</target>
 	
 	<!-- compress target -->
 	<target name="compress" depends="compile" description="generate JAR-file">
 		<echo>Compress class-files into JAR-file</echo>
 		<jar jarfile="${dist}/DoM_GPU.jar">
-			<fileset dir="${build}/DOM" includes="**/*.*" />
+			<fileset dir="${build}" includes="DOM/*.*" />
 			<manifest>
  		 	 	<attribute name="Built-By" value="${user.name}"/>
 			</manifest>
@@ -48,18 +53,18 @@
 	<!-- compile target -->
 	<target name="compile" depends="jaolho" description="compiling source code">
 		<echo>Compiling source code</echo>
-		<javac destdir="${build}" includeantruntime="false">
+		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
 			<compilerarg value="-Xlint:unchecked" />
 			<src path="${src}/DOM" />
 			<classpath refid="dom.classpath" />
 		</javac>
-		<copy file="${src}/plugins.config" toDir="${build}" />
+		<!--<copy file="${src}/plugins.config" toDir="${build}" />--> <!-- NOTE: not used, not up-to-date! -->
 	</target>
 	
 	<!-- jaolho target -->
 	<target name="jaolho" depends="" description="building jaolho library">
 		<echo>Compiling jaolho library</echo>
-		<javac destdir="${build}" includeantruntime="false">
+		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
 			<compilerarg value="-Xlint:unchecked" />
 			<src path="${src}/jaolho" />
 			<classpath refid="jaolho.classpath" />
@@ -67,7 +72,7 @@
 		
 		<echo>Compress class-files into JAR-file</echo>
 		<jar jarfile="${lib}/jaolho.jar">
-			<fileset dir="${build}" includes="**/*.*" />
+			<fileset dir="${build}" includes="jaolho/*.*" />
 			<manifest>
  		 	 	<attribute name="Built-By" value="${user.name}"/>
 			</manifest>
@@ -91,7 +96,7 @@
 	</target>
 	
 	<!-- deep clean target -->
-	<target name="deep_clean" depends="clean" description="clean distribution directory">
+	<target name="deep-clean" depends="clean" description="clean distribution directory">
 		<echo>Cleaning distribution directory</echo>
 		<delete includeemptydirs="true">
 			<fileset dir="${dist}" includes="**/*" />
