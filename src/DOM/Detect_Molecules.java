@@ -351,9 +351,14 @@ public class Detect_Molecules implements PlugIn {
 				boolean GPU_PROFILING_MODE_ENABLED = false; // for debugging only
 				boolean GPU_DEBUG_MODE_ENABLED = false; // for debugging only
 				
-				int GPU_MAX_ITERATIONS = 100;
-				int GPU_BATCH_SIZE = 1024;
-				int GPU_LWG_SIZE = 128;
+				// Fixed parameters in ParallelLMA.java
+				//int GPU_MAX_ITERATIONS = 100;
+				//int GPU_BATCH_SIZE = 1024;
+				//int GPU_LWG_SIZE = 128;
+				//
+				//double GPU_DEFAULT_X_SIGMA = 2.0f;
+				//double GPU_DEFAULT_Y_SIGMA = 2.0f;
+				//double GPU_DEFAULT_LAMBDA = 0.001f;
 				
 				// create new GPU base object and load OpenCL kernel file
 				GPUBase gpu = null;
@@ -363,14 +368,14 @@ public class Detect_Molecules implements PlugIn {
 				}
 				catch(CLException cle)
 				{
-					IJ.error("Could not set up OpenCL environment. MAybe user cancelled device selection dialog, or the OpenCL is not supported on this system");
+					IJ.error("Could not set up OpenCL environment.\nMaybe user cancelled device selection dialog,\nor the OpenCL is not supported on this system.");
 				}
 				
 				// open OpenCL kernel file
 				BufferedReader opencl_kernel_reader = null;
 				try
 				{
-					InputStream resource_stream = this.getClass().getClassLoader().getResourceAsStream("FittingKernelLMA");
+					InputStream resource_stream = gpu.getClass().getResourceAsStream("/FittingKernelLMA.cl");
 					if(resource_stream == null)
 					{
 						IJ.error("Could not load OpenCL kernel as resource from JAR file");
@@ -419,6 +424,8 @@ public class Detect_Molecules implements PlugIn {
 				// TODO: implement GPU fitting procedure
 				IJ.error("TODO: provide GPU implementation");
 				
+				//ParallelLMA.run(gpu, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.nKernelSize);
+				
 				//detparticles[0][n] = x-coordinate of nth particle
 				//detparticles[1][n] = y-coordinate of nth particle
 				//nFrameN[n] = frame number of nth particle
@@ -427,6 +434,8 @@ public class Detect_Molecules implements PlugIn {
 				//ip = imp.getProcessor().duplicate(); copy ip of current slice
 				//smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount); cpu fitting procedure
 				//this.sml.fitParticles(this.ip, this.dlg, this.particles, this.nFrame, this.SpotsPositions); called inside sml fit thread
+				// particles(_) is subset of detected_particles for current frame nFrame
+				
 			}
 
 
