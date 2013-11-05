@@ -21,6 +21,7 @@
 		<fileset dir="${lib}">
 			<include name="ij-1.48f.jar" />
 			<include name="jaolho.jar" />
+			<include name="jocl-0.1.9.jar" />
 		</fileset>
 	</path>
 	<path id="jaolho.classpath">
@@ -43,8 +44,12 @@
 	<target name="compress" depends="compile" description="generate JAR-file">
 		<echo>Compress class-files into JAR-file</echo>
 		<mkdir dir="${dist}" />
+		<!--<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />-->
+		<!--<copy file="${src}/plugins.config" toDir="${build}" />--> <!-- NOTE: not used, not up-to-date! -->
 		<jar jarfile="${dist}/DoM_GPU.jar">
-			<fileset dir="${build}" includes="DOM/*.*" />
+			<fileset dir="${build}" includes="DOM/**" />
+			<fileset dir="${src}" includes="FittingKernelLMA.cl" />
+			<!--<fileset dir="${src}" includes="plugins.config" />-->
 			<manifest>
  		 	 	<attribute name="Built-By" value="${user.name}"/>
 			</manifest>
@@ -52,7 +57,7 @@
 	</target>
 	
 	<!-- compile target -->
-	<target name="compile" depends="jaolho" description="compiling source code">
+	<target name="compile" depends="" description="compiling source code">
 		<echo>Compiling source code</echo>
 		<mkdir dir="${build}" />
 		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
@@ -60,7 +65,6 @@
 			<src path="${src}/DOM" />
 			<classpath refid="dom.classpath" />
 		</javac>
-		<!--<copy file="${src}/plugins.config" toDir="${build}" />--> <!-- NOTE: not used, not up-to-date! -->
 	</target>
 	
 	<!-- jaolho target -->
@@ -75,12 +79,11 @@
 		
 		<echo>Compress class-files into JAR-file</echo>
 		<jar jarfile="${lib}/jaolho.jar">
-			<fileset dir="${build}" includes="jaolho/*.*" />
+			<fileset dir="${build}" includes="jaolho/**" />
 			<manifest>
  		 	 	<attribute name="Built-By" value="${user.name}"/>
 			</manifest>
 		</jar>
-		
 	</target>
 	
 	<!-- install target -->
@@ -88,13 +91,14 @@
 		<copy file="${dist}/DoM_GPU.jar" toDir="${FijiPluginsDir}" />
 		<copy file="${lib}/jama-1.0.3.jar" toDir="${FijiJarsDir}" />
 		<copy file="${lib}/jaolho.jar" toDir="${FijiJarsDir}" />
+		<copy file="${lib}/jocl-0.1.9.jar" toDir="${FijiJarsDir}" />
 	</target>
 	
 	<!-- clean target -->
 	<target name="clean" depends="" description="clean build directory">
 		<echo>Cleaning build directory</echo>
 		<delete includeemptydirs="true">
-			<fileset dir="${build}" includes="**/*" />
+			<fileset dir="${build}" includes="**" defaultexcludes="no" />
 		</delete>
 	</target>
 	
@@ -102,7 +106,7 @@
 	<target name="deep-clean" depends="clean" description="clean distribution directory">
 		<echo>Cleaning distribution directory</echo>
 		<delete includeemptydirs="true">
-			<fileset dir="${dist}" includes="**/*" />
+			<fileset dir="${dist}" includes="**" defaultexcludes="no" />
 			<fileset dir="${lib}" includes="jaolho.jar" />
 		</delete>
 	</target>
