@@ -44,7 +44,7 @@
 	<target name="compress" depends="compile" description="generate JAR-file">
 		<echo>Compress class-files into JAR-file</echo>
 		<mkdir dir="${dist}" />
-		<!--<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />-->
+		<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />
 		<!--<copy file="${src}/plugins.config" toDir="${build}" />--> <!-- NOTE: not used, not up-to-date! -->
 		<jar jarfile="${dist}/DoM_GPU.jar">
 			<fileset dir="${build}" includes="DOM/**" />
