@@ -1,14 +1,27 @@
 package DOM;
 
-
+// Java
 import java.util.Arrays;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import java.io.IOException;
+
+// ImageJ
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Overlay;
 import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
 
+// OpenCL
+import static org.jocl.CL.*;
+import org.jocl.*;
+
+/**
+ *
+ */
 public class Detect_Molecules implements PlugIn {
 	
 	ImagePlus imp;
@@ -205,119 +218,218 @@ public class Detect_Molecules implements PlugIn {
 				nFrameN = detparticles[2];
 			}
 			nUniqFrames = uniqFrames(nFrameN, nDetPartNum);
-			/// using only necessary number of threads	 
-			if(dlg.nThreads < nUniqFrames) 
-				smlfitthreads = new SMLFitThread[dlg.nThreads];
-			else
-				smlfitthreads = new SMLFitThread[nUniqFrames];
 			
-			SMLProgressCount smlcount = new SMLProgressCount(0);
-			nFreeThread = -1;
-			nSlice = 0;
-			bContinue = true;
-			nPositionStart = 0;
-			nPositionEnd = 0;
-			nCountThread = -1;
-			while (bContinue)
+			/*************************/
+			/* CPU Fitting from here */
+			/*************************/
+			
+			if(!dlg.bUseGPUAcceleration)
 			{
-				//check whether reached the end of stack
-				if (nSlice >= nStackSize) bContinue = false;
+				/// using only necessary number of threads
+				if(dlg.nThreads < nUniqFrames) 
+					smlfitthreads = new SMLFitThread[dlg.nThreads];
 				else
+					smlfitthreads = new SMLFitThread[nUniqFrames];
+				
+				SMLProgressCount smlcount = new SMLProgressCount(0);
+				nFreeThread = -1;
+				nSlice = 0;
+				bContinue = true;
+				nPositionStart = 0;
+				nPositionEnd = 0;
+				nCountThread = -1;
+				while (bContinue)
 				{
-					nPositionStart = nPositionEnd;
-					//check whether reached the end of particles table
-					if(nPositionStart<nDetPartNum)
+					//check whether reached the end of stack
+					if (nSlice >= nStackSize) bContinue = false;
+					else
 					{
-						//no particles in this frame
-						if((int)(nFrameN[nPositionStart])>(nSlice+1))
+						nPositionStart = nPositionEnd;
+						//check whether reached the end of particles table
+						if(nPositionStart<nDetPartNum)
 						{
-							smlcount.SMLProgressCountIncreaseValue((int)(nFrameN[nPositionStart]-nSlice-1));
-							IJ.showProgress(smlcount.nSliceLeft-1, nStackSize);
-							nSlice = (int) (nFrameN[nPositionStart]-1);
+							//no particles in this frame
+							if((int)(nFrameN[nPositionStart])>(nSlice+1))
+							{
+								smlcount.SMLProgressCountIncreaseValue((int)(nFrameN[nPositionStart]-nSlice-1));
+								IJ.showProgress(smlcount.nSliceLeft-1, nStackSize);
+								nSlice = (int) (nFrameN[nPositionStart]-1);
+							}
+							//finding all particles in current frame
+							bListEnd = false;
+							while (!bListEnd)
+							{
+								nPositionEnd++;
+								if(nPositionEnd == nDetPartNum)
+									bListEnd = true;
+								else
+									if((int)(nFrameN[nPositionEnd])!=nSlice+1)
+										bListEnd = true;															
+							}
+							//making array for them
+							particles_= new double [2][nPositionEnd-nPositionStart];
+							particles_[0] = Arrays.copyOfRange(detparticles[0], nPositionStart, nPositionEnd);
+							particles_[1] = Arrays.copyOfRange(detparticles[1], nPositionStart, nPositionEnd);
+							//particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
+							//particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
+							//copying image
+							imp.setSliceWithoutUpdate(nSlice+1);
+							ip = imp.getProcessor().duplicate();
+							nCountThread++;
+							
 						}
-						//finding all particles in current frame
-						bListEnd = false;
-						while (!bListEnd)
-						{
-							nPositionEnd++;
-							if(nPositionEnd == nDetPartNum)
-								bListEnd = true;
-							else
-								if((int)(nFrameN[nPositionEnd])!=nSlice+1)
-									bListEnd = true;															
-						}
-						//making array for them
-						particles_= new double [2][nPositionEnd-nPositionStart];
-						particles_[0] = Arrays.copyOfRange(detparticles[0], nPositionStart, nPositionEnd);
-						particles_[1] = Arrays.copyOfRange(detparticles[1], nPositionStart, nPositionEnd);
-						//particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
-						//particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
-						//copying image
-						imp.setSliceWithoutUpdate(nSlice+1);
-						ip = imp.getProcessor().duplicate();
-						nCountThread++;
+						//reached the end of particles table
+						else
+							 bContinue = false;
+
 						
 					}
-					//reached the end of particles table
-					else
-						 bContinue = false;
-
 					
-				}
-				
-				if (bContinue)
-				{
-					//filling free threads in the beginning
-					if (nCountThread < smlfitthreads.length)
-						nFreeThread = nCountThread;				
-					else
-					//looking for available free thread
+					if (bContinue)
 					{
-						nFreeThread = -1;
-						while (nFreeThread == -1)
+						//filling free threads in the beginning
+						if (nCountThread < smlfitthreads.length)
+							nFreeThread = nCountThread;				
+						else
+						//looking for available free thread
 						{
-							for (int t=0; t < smlfitthreads.length; t++)
+							nFreeThread = -1;
+							while (nFreeThread == -1)
 							{
-								if (!smlfitthreads[t].isAlive())
+								for (int t=0; t < smlfitthreads.length; t++)
 								{
-									nFreeThread = t;
-									break;
+									if (!smlfitthreads[t].isAlive())
+									{
+										nFreeThread = t;
+										break;
+									}
 								}
-							}
-							if (nFreeThread == -1)
-							{
-								try
+								if (nFreeThread == -1)
 								{
-									Thread.currentThread();
-									Thread.sleep(1);
-								}
-								catch(Exception e)
-								{
-										IJ.error(""+e);
+									try
+									{
+										Thread.currentThread();
+										Thread.sleep(1);
+									}
+									catch(Exception e)
+									{
+											IJ.error(""+e);
+									}
 								}
 							}
 						}
+						smlfitthreads[nFreeThread] = new SMLFitThread();
+						smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount);
+						smlfitthreads[nFreeThread].start();
+						
+					} //end of if (bContinue)
+					nSlice++;
+				} // end of while (bContinue)
+				
+				for (int t=0; t<smlfitthreads.length;t++)
+				{
+					try
+					{
+						smlfitthreads[t].join();				
 					}
-					smlfitthreads[nFreeThread] = new SMLFitThread();
-					smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount);
-					smlfitthreads[nFreeThread].start();
-					
-				} //end of if (bContinue)
-				nSlice++;
-			} // end of while (bContinue)
-			
-			for (int t=0; t<smlfitthreads.length;t++)
-			{
-				try
-				{
-					smlfitthreads[t].join();				
-				}
-				catch(Exception e)
-				{
-					IJ.error(""+e);
+					catch(Exception e)
+					{
+						IJ.error(""+e);
+					}
 				}
 			}
 			
+			/**************************************************/
+			/* CPU fitting till here, GPU fitting starts here */
+			/**************************************************/
+			
+			else
+			{
+				// Fixed parameters for now
+				boolean GPU_USE_DOUBLE_PRECISION = false; // NOTE: double precision not supported
+				boolean GPU_AUTOMATIC_MODE_ENABLED = false; // NOTE: not yet implemented
+				boolean GPU_PROFILING_MODE_ENABLED = false; // for debugging only
+				boolean GPU_DEBUG_MODE_ENABLED = false; // for debugging only
+				
+				int GPU_MAX_ITERATIONS = 100;
+				int GPU_BATCH_SIZE = 1024;
+				int GPU_LWG_SIZE = 128;
+				
+				// create new GPU base object and load OpenCL kernel file
+				GPUBase gpu = null;
+				try
+				{
+					gpu = new GPUBase(GPU_USE_DOUBLE_PRECISION, GPU_AUTOMATIC_MODE_ENABLED, GPU_PROFILING_MODE_ENABLED, GPU_DEBUG_MODE_ENABLED);
+				}
+				catch(CLException cle)
+				{
+					IJ.error("Could not set up OpenCL environment. MAybe user cancelled device selection dialog, or the OpenCL is not supported on this system");
+				}
+				
+				// open OpenCL kernel file
+				BufferedReader opencl_kernel_reader = null;
+				try
+				{
+					InputStream resource_stream = this.getClass().getClassLoader().getResourceAsStream("FittingKernelLMA");
+					if(resource_stream == null)
+					{
+						IJ.error("Could not load OpenCL kernel as resource from JAR file");
+					}
+					opencl_kernel_reader = new BufferedReader(new InputStreamReader(resource_stream));
+				}
+				catch(Exception e)
+				{
+					IJ.error("Could not load OpenCL kernel");
+				}
+				
+				// load contents of OpenCL kernel file
+				String opencl_kernel_program = "";
+				String line = null;
+				try
+				{
+					while((line = opencl_kernel_reader.readLine()) != null)
+					{
+						// add line to program
+						opencl_kernel_program += line + '\n';
+					}
+				}
+				catch(IOException e)
+				{
+					// early exit
+					IJ.error("Could not load contents of OpenCL kernel file");
+				}
+				
+				// close file
+				try
+				{
+					opencl_kernel_reader.close();
+				}
+				catch(IOException e)
+				{
+					// ignore, do nothing
+				}
+				
+				// load OpenCL kernel program
+				boolean compile_success = gpu.loadProgramFromString(opencl_kernel_program);
+				if(!compile_success)
+				{
+					IJ.error("Could not load program file into OpenCL");
+				}
+				
+				// TODO: implement GPU fitting procedure
+				IJ.error("TODO: provide GPU implementation");
+				
+				//detparticles[0][n] = x-coordinate of nth particle
+				//detparticles[1][n] = y-coordinate of nth particle
+				//nFrameN[n] = frame number of nth particle
+				//imp = image plus (including stack)
+				//imp.setSliceWithoutUpdate(nSlice+1); set current slice
+				//ip = imp.getProcessor().duplicate(); copy ip of current slice
+				//smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount); cpu fitting procedure
+				//this.sml.fitParticles(this.ip, this.dlg, this.particles, this.nFrame, this.SpotsPositions); called inside sml fit thread
+			}
+
+
 			//in case of single image, update ROIs
 			if(nStackSize == 1 && dlg.bShowParticles)	
 			{
