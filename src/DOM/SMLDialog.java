@@ -22,7 +22,7 @@ public class SMLDialog {
 	int nAreaCut; //threshold of particles area
 	boolean bShowParticles; //whether or not add overlay to detected particles
 	boolean bIgnoreFP; //whether or not to ignore false positives
-	
+	boolean bUseGPUAcceleration; // wheter or not to use GPU acceleration using the OpenCL framework
 	
 	
 	//reconstructing image
@@ -78,7 +78,7 @@ public class SMLDialog {
 		fpDial.addNumericField("Number of parallel threads", Prefs.get("SiMoLoc.nThreads", 50), 0);
 		fpDial.addCheckbox("Mark detected particles? (better not use this feature on big datasets)", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
-		
+		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
 		
 		
 		fpDial.showDialog();
@@ -99,6 +99,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bShowParticles", bShowParticles);
 		bIgnoreFP = fpDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bIgnoreFP", bIgnoreFP);
+		bUseGPUAcceleration = fpDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bUseGPUAcceleration", bUseGPUAcceleration);
 
 		return true;
 	}
