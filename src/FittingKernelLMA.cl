@@ -126,12 +126,14 @@ void gaussian2D_derivative_combined(__private const fp_type x, __private const f
 
 // *****************************************************************************************
 
-__kernel void calculate_chi2(__global const fp_type* const image_data, __private const int image_width, __private const int image_height, __global const fp_type* const parameters, __global fp_type* const chi2)
+__kernel void calculate_chi2(__global const fp_type* const image_data, __global const fp_type* const x_positions, __global const fp_type* const y_positions, __private const int image_width, __private const int image_height, __global const fp_type* const parameters, __global fp_type* const chi2)
 {
 	// work unit
 	__private const int global_id = get_global_id(0);
 	__private const int image_pixel_count = image_width * image_height;
 	__global const fp_type* const my_image_data = image_data+(global_id * image_pixel_count);
+	__global const fp_type* const my_x_positions = x_positions+(global_id * image_pixel_count);
+	__global const fp_type* const my_y_positions = y_positions+(global_id * image_pixel_count);
 	__global const fp_type* const my_parameters = parameters+(global_id * GAUSSIAN_2D_PARAMETERS);
 	//__global fp_type* const my_chi2 = chi2+(global_id);
 	
@@ -143,7 +145,7 @@ __kernel void calculate_chi2(__global const fp_type* const image_data, __private
 		{
 			// calculate sum of squared difference
 			//dy = *px - gaussian2D(x, y, my_parameters);
-			__private fp_type dy = my_image_data[mad24(x,image_width,y)] - gaussian2D(x, y, my_parameters);
+			__private fp_type dy = my_image_data[mad24(x,image_width,y)] - gaussian2D(my_x_positions[mad24(x,image_width,y)], my_y_positions[mad24(x,image_width,y)], my_parameters); // RSLV: inline Gaussian2D function?
 			chi2_res += dy * dy;
 		}
 	}
@@ -154,11 +156,13 @@ __kernel void calculate_chi2(__global const fp_type* const image_data, __private
 
 // *****************************************************************************************
 
-__kernel void calculate_alpha_matrix(__private const int image_width, __private const int image_height, __global const fp_type* const parameters, __global fp_type* const alpha_matrix, __global const fp_type* const lambda)
+__kernel void calculate_alpha_matrix(__global const fp_type* const x_positions, __global const fp_type* const y_positions, __private const int image_width, __private const int image_height, __global const fp_type* const parameters, __global fp_type* const alpha_matrix, __global const fp_type* const lambda)
 
 {
 	// work unit
 	__private const int global_id = get_global_id(0);
+	__global const fp_type* const my_x_positions = x_positions+(global_id * image_pixel_count);
+	__global const fp_type* const my_y_positions = y_positions+(global_id * image_pixel_count);
 	__global const fp_type* const my_parameters = parameters+(global_id * GAUSSIAN_2D_PARAMETERS);
 	__global fp_type* my_alpha_matrix = alpha_matrix+(global_id * GAUSSIAN_2D_PARAMETERS * GAUSSIAN_2D_PARAMETERS);
 	__private const fp_type my_lambda = lambda[global_id]; // NOTE: __private variable, not a __global pointer!
@@ -207,13 +211,13 @@ __kernel void calculate_alpha_matrix(__private const int image_width, __private 
 		for(__private int y = 0; y < image_height; ++y)
 		{
 			// calculate derivates for position
-			__private const fp_type xmxpos = x-my_private_parameters[PARAM_X_SPOS];
+			__private const fp_type xmxpos = my_x_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_X_SPOS];
 			__private const fp_type xmxpos2 = xmxpos * xmxpos;
 			__private const fp_type xsig2 = my_private_parameters[PARAM_X_SIGMA] * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xsig3 = xsig2 * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xmxpos2dxsig2 = xmxpos2 / xsig2;
 			
-			__private const fp_type ymypos = y-my_private_parameters[PARAM_Y_SPOS];
+			__private const fp_type ymypos = my_y_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_Y_SPOS];
 			__private const fp_type ymypos2 = ymypos * ymypos;
 			__private const fp_type ysig2 = my_private_parameters[PARAM_Y_SIGMA] * my_private_parameters[PARAM_Y_SIGMA];
 			__private const fp_type ysig3 = ysig2 * my_private_parameters[PARAM_Y_SIGMA];
@@ -322,12 +326,14 @@ __kernel void calculate_alpha_matrix(__private const int image_width, __private 
 
 // *****************************************************************************************
 
-__kernel void calculate_beta_vector(__global const fp_type* const image_data, __private const int image_width, __private const int image_height, __global fp_type* const parameters, __global fp_type* const beta_vector)
+__kernel void calculate_beta_vector(__global const fp_type* const image_data, __global const fp_type* const x_positions, __global const fp_type* const y_positions, __private const int image_width, __private const int image_height, __global fp_type* const parameters, __global fp_type* const beta_vector)
 {
 	// work unit
 	__private const int global_id = get_global_id(0);
 	__private const int image_pixel_count = image_width * image_height;
 	__global const fp_type* const my_image_data = image_data+(global_id * image_pixel_count);
+	__global const fp_type* const my_x_positions = x_positions+(global_id * image_pixel_count);
+	__global const fp_type* const my_y_positions = y_positions+(global_id * image_pixel_count);
 	__global const fp_type* const my_parameters = parameters+(global_id * GAUSSIAN_2D_PARAMETERS);
 	__global fp_type* my_beta_vector = beta_vector+(global_id * GAUSSIAN_2D_PARAMETERS);
 	
@@ -361,13 +367,13 @@ __kernel void calculate_beta_vector(__global const fp_type* const image_data, __
 	{
 		for(__private int y = 0; y < image_height; ++y)
 		{
-			__private const fp_type xmxpos = x-my_private_parameters[PARAM_X_SPOS];
+			__private const fp_type xmxpos = my_x_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_X_SPOS];
 			__private const fp_type xmxpos2 = xmxpos * xmxpos;
 			__private const fp_type xsig2 = my_private_parameters[PARAM_X_SIGMA] * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xsig3 = xsig2 * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xmxpos2dxsig2 = xmxpos2 / xsig2;
 			
-			__private const fp_type ymypos = y-my_private_parameters[PARAM_Y_SPOS];
+			__private const fp_type ymypos = my_y_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_Y_SPOS];
 			__private const fp_type ymypos2 = ymypos * ymypos;
 			__private const fp_type ysig2 = my_private_parameters[PARAM_Y_SIGMA] * my_private_parameters[PARAM_Y_SIGMA];
 			__private const fp_type ysig3 = ysig2 * my_private_parameters[PARAM_Y_SIGMA];
@@ -384,7 +390,7 @@ __kernel void calculate_beta_vector(__global const fp_type* const image_data, __
 			//derivatives[5] = amp_common_exp * ymypos2 / ysig3;
 			
 			// compute intermediate shared result (difference)
-			px_dg = *px - gaussian2D(x, y, my_parameters);
+			px_dg = *px - gaussian2D(my_x_positions[mad24(x,image_width,y)], my_y_positions[mad24(x,image_width,y)], my_parameters);
 			my_beta_vector_0 +=  px_dg;// * gaussian2D_derivative_0(x, y, my_parameters); // NOTE: gaussian2D_derivative_0 returns 1.0f;
 //			my_beta_vector_1 +=  px_dg * gaussian2D_derivative_1(x, y, my_parameters);
 //			my_beta_vector_2 +=  px_dg * gaussian2D_derivative_2(x, y, my_parameters);
