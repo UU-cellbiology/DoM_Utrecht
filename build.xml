@@ -46,7 +46,7 @@
 		<mkdir dir="${dist}" />
 		<!--<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />-->
 		<!--<copy file="${src}/plugins.config" toDir="${build}" />-->
-		<jar jarfile="${dist}/DoM-GPU.jar">
+		<jar jarfile="${dist}/DoM_GPU.jar">
 			<fileset dir="${build}" includes="DOM/**" />
 			<fileset dir="${src}" includes="FittingKernelLMA.cl" />
 			<fileset dir="${src}" includes="plugins.config" />
@@ -88,7 +88,7 @@
 	
 	<!-- install target -->
 	<target name="install" depends="main" description="generate distribution">
-		<copy file="${dist}/DoM-GPU.jar" toDir="${FijiPluginsDir}" />
+		<copy file="${dist}/DoM_GPU.jar" toDir="${FijiPluginsDir}" />
 		<copy file="${lib}/jama-1.0.3.jar" toDir="${FijiJarsDir}" />
 		<copy file="${lib}/jaolho.jar" toDir="${FijiJarsDir}" />
 		<copy file="${lib}/jocl-0.1.9.jar" toDir="${FijiJarsDir}" />
