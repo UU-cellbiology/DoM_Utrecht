@@ -349,7 +349,7 @@ public class Detect_Molecules implements PlugIn {
 				boolean GPU_USE_DOUBLE_PRECISION = false; // NOTE: double precision not supported
 				boolean GPU_AUTOMATIC_MODE_ENABLED = false; // NOTE: not yet implemented
 				boolean GPU_PROFILING_MODE_ENABLED = false; // for debugging only
-				boolean GPU_DEBUG_MODE_ENABLED = false; // for debugging only
+				boolean GPU_DEBUG_MODE_ENABLED = true; // for debugging only
 				
 				// Fixed parameters in ParallelLMA.java
 				//int GPU_MAX_ITERATIONS = 100;
@@ -369,6 +369,7 @@ public class Detect_Molecules implements PlugIn {
 				catch(CLException cle)
 				{
 					IJ.error("Could not set up OpenCL environment.\nMaybe user cancelled device selection dialog,\nor the OpenCL is not supported on this system.");
+					return;
 				}
 				
 				// open OpenCL kernel file
@@ -379,12 +380,14 @@ public class Detect_Molecules implements PlugIn {
 					if(resource_stream == null)
 					{
 						IJ.error("Could not load OpenCL kernel as resource from JAR file");
+						return;
 					}
 					opencl_kernel_reader = new BufferedReader(new InputStreamReader(resource_stream));
 				}
 				catch(Exception e)
 				{
 					IJ.error("Could not load OpenCL kernel");
+					return;
 				}
 				
 				// load contents of OpenCL kernel file
@@ -402,6 +405,7 @@ public class Detect_Molecules implements PlugIn {
 				{
 					// early exit
 					IJ.error("Could not load contents of OpenCL kernel file");
+					return;
 				}
 				
 				// close file
@@ -419,12 +423,12 @@ public class Detect_Molecules implements PlugIn {
 				if(!compile_success)
 				{
 					IJ.error("Could not load program file into OpenCL");
+					return;
 				}
 				
-				// TODO: implement GPU fitting procedure
-				IJ.error("TODO: provide GPU implementation");
-				
-				//ParallelLMA.run(gpu, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.nKernelSize);
+				// fit spots on GPU
+				sml.ptable.reset();
+				ParallelLMA.run(gpu, imp, detparticles, nFrameN, dlg.dPSFsigma, sml.ptable);
 				
 				//detparticles[0][n] = x-coordinate of nth particle
 				//detparticles[1][n] = y-coordinate of nth particle

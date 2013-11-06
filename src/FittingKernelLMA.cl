@@ -1,34 +1,36 @@
 //#define ENABLE_FP64
 
 // enabling extensions
-#if defined(ENABLE_FP64)
-	#if defined(cl_khr_fp64)
-		#pragma OPENCL EXTENSION cl_khr_fp64 : enable
-	#elif defined(cl_amd_fp64)
-		#pragma OPENCL EXTENSION cl_amd_fp64 : enable
-	#else
-		#error "Double precision floating point not supported by OpenCL implementation"
-	#endif
-#endif
-
-#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
-#pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
-#pragma OPENCL EXTENSION cl_khr_local_int32_base_atomics : enable
-#pragma OPENCL EXTENSION cl_khr_local_int32_extended_atomics : enable
-
-#if defined(ENABLE_FP64)
-	#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
-	#pragma OPENCL EXTENSION cl_khr_int64_extended_atomics : enable
-#endif
+//#if defined(ENABLE_FP64)
+//	#if defined(cl_khr_fp64)
+//		#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+//	#elif defined(cl_amd_fp64)
+//		#pragma OPENCL EXTENSION cl_amd_fp64 : enable
+//	#else
+//		#error "Double precision floating point not supported by OpenCL implementation"
+//	#endif
+//#endif
+//
+//#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+//#pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
+//#pragma OPENCL EXTENSION cl_khr_local_int32_base_atomics : enable
+//#pragma OPENCL EXTENSION cl_khr_local_int32_extended_atomics : enable
+//
+//#if defined(ENABLE_FP64)
+//	#pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
+//	#pragma OPENCL EXTENSION cl_khr_int64_extended_atomics : enable
+//#endif
 
 // *****************************************************************************************
 
 // floating-point data type; depends on support from device
-#if defined(ENABLE_FP64)
-	typedef double fp_type;
-#else
-	typedef float fp_type;
-#endif
+//#if defined(ENABLE_FP64)
+//	typedef double fp_type;
+//#else
+//	typedef float fp_type;
+//#endif
+
+typedef float fp_type;
 
 __constant int GAUSSIAN_2D_PARAMETERS = 6; // number of parameters
 __constant int PARAM_BACKGROUND = 0;
@@ -145,7 +147,7 @@ __kernel void calculate_chi2(__global const fp_type* const image_data, __global 
 		{
 			// calculate sum of squared difference
 			//dy = *px - gaussian2D(x, y, my_parameters);
-			__private fp_type dy = my_image_data[mad24(x,image_width,y)] - gaussian2D(my_x_positions[mad24(x,image_width,y)], my_y_positions[mad24(x,image_width,y)], my_parameters); // RSLV: inline Gaussian2D function?
+			__private fp_type dy = my_image_data[mad24(y,image_width,x)] - gaussian2D(my_x_positions[mad24(y,image_width,x)], my_y_positions[mad24(y,image_width,x)], my_parameters); // RSLV: inline Gaussian2D function?
 			chi2_res += dy * dy;
 		}
 	}
@@ -161,6 +163,7 @@ __kernel void calculate_alpha_matrix(__global const fp_type* const x_positions, 
 {
 	// work unit
 	__private const int global_id = get_global_id(0);
+	__private const int image_pixel_count = image_width * image_height;
 	__global const fp_type* const my_x_positions = x_positions+(global_id * image_pixel_count);
 	__global const fp_type* const my_y_positions = y_positions+(global_id * image_pixel_count);
 	__global const fp_type* const my_parameters = parameters+(global_id * GAUSSIAN_2D_PARAMETERS);
@@ -211,13 +214,13 @@ __kernel void calculate_alpha_matrix(__global const fp_type* const x_positions, 
 		for(__private int y = 0; y < image_height; ++y)
 		{
 			// calculate derivates for position
-			__private const fp_type xmxpos = my_x_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_X_SPOS];
+			__private const fp_type xmxpos = my_x_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_X_SPOS];
 			__private const fp_type xmxpos2 = xmxpos * xmxpos;
 			__private const fp_type xsig2 = my_private_parameters[PARAM_X_SIGMA] * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xsig3 = xsig2 * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xmxpos2dxsig2 = xmxpos2 / xsig2;
 			
-			__private const fp_type ymypos = my_y_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_Y_SPOS];
+			__private const fp_type ymypos = my_y_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_Y_SPOS];
 			__private const fp_type ymypos2 = ymypos * ymypos;
 			__private const fp_type ysig2 = my_private_parameters[PARAM_Y_SIGMA] * my_private_parameters[PARAM_Y_SIGMA];
 			__private const fp_type ysig3 = ysig2 * my_private_parameters[PARAM_Y_SIGMA];
@@ -367,13 +370,13 @@ __kernel void calculate_beta_vector(__global const fp_type* const image_data, __
 	{
 		for(__private int y = 0; y < image_height; ++y)
 		{
-			__private const fp_type xmxpos = my_x_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_X_SPOS];
+			__private const fp_type xmxpos = my_x_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_X_SPOS];
 			__private const fp_type xmxpos2 = xmxpos * xmxpos;
 			__private const fp_type xsig2 = my_private_parameters[PARAM_X_SIGMA] * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xsig3 = xsig2 * my_private_parameters[PARAM_X_SIGMA];
 			__private const fp_type xmxpos2dxsig2 = xmxpos2 / xsig2;
 			
-			__private const fp_type ymypos = my_y_positions[mad24(x,image_width,y)]-my_private_parameters[PARAM_Y_SPOS];
+			__private const fp_type ymypos = my_y_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_Y_SPOS];
 			__private const fp_type ymypos2 = ymypos * ymypos;
 			__private const fp_type ysig2 = my_private_parameters[PARAM_Y_SIGMA] * my_private_parameters[PARAM_Y_SIGMA];
 			__private const fp_type ysig3 = ysig2 * my_private_parameters[PARAM_Y_SIGMA];
@@ -390,7 +393,7 @@ __kernel void calculate_beta_vector(__global const fp_type* const image_data, __
 			//derivatives[5] = amp_common_exp * ymypos2 / ysig3;
 			
 			// compute intermediate shared result (difference)
-			px_dg = *px - gaussian2D(my_x_positions[mad24(x,image_width,y)], my_y_positions[mad24(x,image_width,y)], my_parameters);
+			px_dg = *px - gaussian2D(my_x_positions[mad24(y,image_width,x)], my_y_positions[mad24(y,image_width,x)], my_parameters);
 			my_beta_vector_0 +=  px_dg;// * gaussian2D_derivative_0(x, y, my_parameters); // NOTE: gaussian2D_derivative_0 returns 1.0f;
 //			my_beta_vector_1 +=  px_dg * gaussian2D_derivative_1(x, y, my_parameters);
 //			my_beta_vector_2 +=  px_dg * gaussian2D_derivative_2(x, y, my_parameters);
