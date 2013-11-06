@@ -44,12 +44,12 @@
 	<target name="compress" depends="compile" description="generate JAR-file">
 		<echo>Compress class-files into JAR-file</echo>
 		<mkdir dir="${dist}" />
-		<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />
-		<!--<copy file="${src}/plugins.config" toDir="${build}" />--> <!-- NOTE: not used, not up-to-date! -->
-		<jar jarfile="${dist}/DoM_GPU.jar">
+		<!--<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />-->
+		<!--<copy file="${src}/plugins.config" toDir="${build}" />-->
+		<jar jarfile="${dist}/DoM-GPU.jar">
 			<fileset dir="${build}" includes="DOM/**" />
 			<fileset dir="${src}" includes="FittingKernelLMA.cl" />
-			<!--<fileset dir="${src}" includes="plugins.config" />-->
+			<fileset dir="${src}" includes="plugins.config" />
 			<manifest>
  		 	 	<attribute name="Built-By" value="${user.name}"/>
 			</manifest>
@@ -88,7 +88,7 @@
 	
 	<!-- install target -->
 	<target name="install" depends="main" description="generate distribution">
-		<copy file="${dist}/DoM_GPU.jar" toDir="${FijiPluginsDir}" />
+		<copy file="${dist}/DoM-GPU.jar" toDir="${FijiPluginsDir}" />
 		<copy file="${lib}/jama-1.0.3.jar" toDir="${FijiJarsDir}" />
 		<copy file="${lib}/jaolho.jar" toDir="${FijiJarsDir}" />
 		<copy file="${lib}/jocl-0.1.9.jar" toDir="${FijiJarsDir}" />
@@ -97,7 +97,7 @@
 	<!-- clean target -->
 	<target name="clean" depends="" description="clean build directory">
 		<echo>Cleaning build directory</echo>
-		<delete includeemptydirs="true">
+		<delete includeemptydirs="true" failonerror="false">
 			<fileset dir="${build}" includes="**" defaultexcludes="no" />
 		</delete>
 	</target>
@@ -105,9 +105,9 @@
 	<!-- deep clean target -->
 	<target name="deep-clean" depends="clean" description="clean distribution directory">
 		<echo>Cleaning distribution directory</echo>
-		<delete includeemptydirs="true">
+		<delete includeemptydirs="true" failonerror="false">
 			<fileset dir="${dist}" includes="**" defaultexcludes="no" />
-			<fileset dir="${lib}" includes="jaolho.jar" />
+			<!--<fileset dir="${lib}" includes="jaolho.jar" />-->
 		</delete>
 	</target>
 	
