@@ -4,6 +4,7 @@ package DOM;
 
 
 import jaolho.data.lma.LMA;
+import jaolho.data.lma.LMAMatrix;
 
 import java.awt.Color;
 
@@ -331,16 +332,24 @@ public class SMLAnalysis {
 				dFitParams[3]= particles_[1][nParticlesCount];//y center
 				dFitParams[4]= fdg.dPSFsigma;
 				dFitParams[5]= fdg.dPSFsigma;
+				nFalsePositive = 0.0;
 				SMLlma = new LMA(GFit, dFitParams, spotInt);
-				SMLlma.fit();
-				
-				dFitErrors = SMLlma.getStandardErrorsOfParameters();
+				try
+				{
+					SMLlma.fit();
+					dFitErrors = SMLlma.getStandardErrorsOfParameters();
+				}
+				catch (LMAMatrix.InvertException e) {
+					//matrix is inverted
+					//it is a bad fit
+					nFalsePositive = 1.0;
+				}				
 				// scaling coefficient for parameters errors estimation 
 				// (Standard deviation of residuals)
 				dErrCoeff = Math.sqrt(SMLlma.chi2/(nCount-6));
 				for (i=0;i<6;i++)
 					dFitErrors[i] *= dErrCoeff; 
-				nFalsePositive = 0.0;
+
 				//iterations didn't converge. suspicious point
 				if (SMLlma.iterationCount== 101)
 					nFalsePositive = 0.5;
@@ -352,7 +361,7 @@ public class SMLAnalysis {
 				//localization precision is bigger than PSF size
 				if((dFitErrors[2] > fdg.dPSFsigma) || (dFitErrors[3] > fdg.dPSFsigma))
 					nFalsePositive = 1.0;
-
+				//}
 				dIntAmp =0; dIntNoise = 0;			
 				dNoiseAvrg = 0;	dNoiseSD = 0;
 				dSNR = 0;
@@ -367,49 +376,39 @@ public class SMLAnalysis {
 
 					if( ((xCentroid-xSD-1)>0) && ((yCentroid-ySD-1)>0) && ((xCentroid+xSD+1)<(width-1)) && ((yCentroid+ySD+1)<(height-1)))
 					{
-						//int nIntCount=0;
 						//integrated intensity in 3SD * 3SD region
 						for(i=(int) (xCentroid-xSD); i<=(int)(xCentroid+xSD); i++)
 							for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 							{
 								dIntAmp += ipRaw.getPixel(i,j);
-								//nIntCount++;
 							}
 						
-						//int nNoiseCount = 0;
+
 						//averaged noise around spot
 						j = (int)(yCentroid-ySD-1);
 						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)	
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
-							//nNoiseCount++;
 						}
 						j = (int)(yCentroid+ySD+1);
 						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
-							//nNoiseCount++;
 						}
 						i=(int) (xCentroid-xSD-1);
 						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
-							//nNoiseCount++;
 						}
 						i=(int) (xCentroid+xSD+1);
 						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
-							//nNoiseCount++;
 						}
 						dNoiseAvrg = dIntNoise/(4*xSD+4*ySD+8);
-						//dIntAmp = dIntAmp/((2*xSD+1)*(2*ySD+1));
-						//dIntAmp = dIntAmp - dNoiseAvrg;
-						//dIntAmp = dIntAmp - (dNoiseAvrg*((2*xSD+1)*(2*ySD+1)));
+
 						dIntAmp = dIntAmp - (dFitParams[0]*((2*xSD+1)*(2*ySD+1)));
-						//dIntAmp = dIntAmp - (dFitParams[0]*nIntCount);
-						//dIntAmp = dIntAmp/((2*xSD+1)*(2*ySD+1));
-						//dIntAmp = dIntAmp/nIntCount;
+
 						//SD of noise
 						j = (int)(yCentroid-ySD-1);
 						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)							

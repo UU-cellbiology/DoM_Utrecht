@@ -340,7 +340,7 @@ public class ParallelLMA
 		
 		// get dataset dimension
 		final int num_spots = frame_numbers.length; //dataset.getSize();
-		System.err.println("num_spots = " + num_spots);
+		//System.err.println("num_spots = " + num_spots);
 		//final int num_spots = BATCH_SIZE; // TMP: limit to 1000 images for testing purpose
 
 		// get image dimensions
@@ -348,9 +348,9 @@ public class ParallelLMA
 		final int spot_width = 2 * spot_radius + 1; //dataset.getWidth();
 		final int spot_height = 2 * spot_radius + 1; //dataset.getHeight();
 		final int pixel_count = spot_width * spot_height;
-		System.err.println("spot_radius = " + spot_radius);
-		System.err.println("spot_width = " + spot_width);
-		System.err.println("spot_height = " + spot_height);
+		//System.err.println("spot_radius = " + spot_radius);
+		//System.err.println("spot_width = " + spot_width);
+		//System.err.println("spot_height = " + spot_height);
 
 		// create buffers
 		cl_mem image_data_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_READ_ONLY, batch_size * pixel_count * CL_DATATYPE_SIZE, null, null);
@@ -501,8 +501,6 @@ public class ParallelLMA
 				{
 					for(int x = sx; x <= ex; ++x)
 					{
-						System.err.println("(" + x + "," + y + ")");
-						
 						// get pixel value from image
 						double px = (double)(img_proc.get(x,y));
 						
