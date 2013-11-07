@@ -660,4 +660,21 @@ __kernel void update_parameters(__global fp_type* const current_chi2, __global c
 
 // *****************************************************************************************
 
+__kernel void calculate_standard_error(__global fp_type* const inverse_alpha_matrix, __global const fp_type* const standard_errors)
+{
+	// work unit
+	__private const int global_id = get_global_id(0);
+	__global fp_type* const my_inverse_alpha_matrix = inverse_alpha_matrix+(global_id * GAUSSIAN_2D_PARAMETERS * GAUSSIAN_2D_PARAMETERS);
+	__global fp_type* my_standard_errors = standard_errors+(global_id * GAUSSIAN_2D_PARAMETERS);
+	
+	my_standard_errors[0] = sqrt(my_inverse_alpha_matrix[0]);
+	my_standard_errors[1] = sqrt(my_inverse_alpha_matrix[7]);
+	my_standard_errors[2] = sqrt(my_inverse_alpha_matrix[14]);
+	my_standard_errors[3] = sqrt(my_inverse_alpha_matrix[21]);
+	my_standard_errors[4] = sqrt(my_inverse_alpha_matrix[28]);
+	my_standard_errors[5] = sqrt(my_inverse_alpha_matrix[35]);
+}
+
+// *****************************************************************************************
+
 // TEST ENVIRONMENT

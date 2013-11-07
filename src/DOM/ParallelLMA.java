@@ -33,7 +33,7 @@ public class ParallelLMA
 //	private static boolean USE_DOUBLE_PRECISION = false;
 	private static int CL_DATATYPE_SIZE = Sizeof.cl_float;
 	
-	private static int MAX_ITERATIONS = 10; // maximum number of iterations for fitting procedure
+	private static int MAX_ITERATIONS = 30; // maximum number of iterations for fitting procedure
 	private static int BATCH_SIZE = 1024; // NOTE: rule of thumb, take number of compute units * max dimension for a work unit; 1024|2048 for MacBook Pro
 	private static int LWG_SIZE = 128; // 128 for MacBook Pro
 	
@@ -328,7 +328,7 @@ public class ParallelLMA
 	// ************************************************************************************
 	
 	//private static void run(GPUBase gpu, ImageStack dataset) // old function header
-	public static void run(GPUBase gpu, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, ResultsTable res_table)
+	public static void run(GPUBase gpu, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, double pixel_size, boolean ignore_false_positives, ResultsTable res_table)
 	{
 		// get image stack
 		ImageStack dataset = image.getStack();
@@ -342,8 +342,12 @@ public class ParallelLMA
 		final int num_spots = frame_numbers.length; //dataset.getSize();
 		//System.err.println("num_spots = " + num_spots);
 		//final int num_spots = BATCH_SIZE; // TMP: limit to 1000 images for testing purpose
-
+		
 		// get image dimensions
+		final int image_width = image.getWidth();
+		final int image_height = image.getHeight();
+		
+		// get spot dimensions
 		final int spot_radius = (int)(psf_sigma * DOMConstants.FITRADIUS);
 		final int spot_width = 2 * spot_radius + 1; //dataset.getWidth();
 		final int spot_height = 2 * spot_radius + 1; //dataset.getHeight();
@@ -368,6 +372,8 @@ public class ParallelLMA
 		cl_mem inverse_alpha_matrix_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_READ_WRITE, batch_size * NUM_FITTING_PARAMETERS * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, null, null);
 		cl_mem da_vector_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_READ_WRITE, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, null, null);
 		cl_mem updated_parameters_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_READ_WRITE, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, null, null);
+		
+		cl_mem standard_errors_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_WRITE_ONLY, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, null, null);
 		
 		// create kernels
 		cl_kernel calculate_current_chi2 = clCreateKernel(gpu._ocl_program, "calculate_chi2", null);
@@ -434,6 +440,10 @@ public class ParallelLMA
 		clSetKernelArg(update_parameters, 3, Sizeof.cl_mem, Pointer.to(parameters_buffer));
 		clSetKernelArg(update_parameters, 4, Sizeof.cl_mem, Pointer.to(lambda_buffer));
 		
+		cl_kernel calculate_standard_error = clCreateKernel(gpu._ocl_program, "calculate_standard_error", null);
+		clSetKernelArg(calculate_standard_error, 0, Sizeof.cl_mem, Pointer.to(inverse_alpha_matrix_buffer));
+		clSetKernelArg(calculate_standard_error, 1, Sizeof.cl_mem, Pointer.to(standard_errors_buffer));
+		
 		// ******************************************************************************
 		
 //		// profiling
@@ -459,6 +469,7 @@ public class ParallelLMA
 //		long read_parameters_buffer_profiling = 0l;
 		
 		// loop over all batches
+		long start_time = System.nanoTime();
 		for(int ii = 0; ii < num_spots; ii+=batch_size) // proces images in batches
 		{
 			// show progress bar
@@ -741,7 +752,7 @@ public class ParallelLMA
 //					cholesky_decomposition_profiling += end_time - start_time;
 //				}
 				
-				// STEP: (a) invert alpha matrix through cholesky decomposition
+				// STEP: (b) invert alpha matrix through cholesky decomposition
 				clEnqueueNDRangeKernel(gpu._ocl_queue, forward_substitution, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
 				
 //				// DEBUG: print intermediate results
@@ -911,6 +922,23 @@ public class ParallelLMA
 			
 			// ******************************************************************************
 			
+			// set lambda to zero
+			lambda_f = new float[batch_size]; // shorthand
+			clEnqueueWriteBuffer(gpu._ocl_queue, lambda_buffer, true, 0, batch_size * CL_DATATYPE_SIZE, Pointer.to(lambda_f), 0, null, null);
+			
+			// recompute alpha matrix (with lambda equal to zero)
+			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_alpha_matrix, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
+			
+			// invert alpha matrix
+			clEnqueueNDRangeKernel(gpu._ocl_queue, cholesky_decomposition, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (a)
+			clEnqueueNDRangeKernel(gpu._ocl_queue, forward_substitution, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (b)
+			clEnqueueNDRangeKernel(gpu._ocl_queue, multiply_matrices, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (c)
+			
+			// calculate standard error of fitted parameters
+			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_standard_error, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (c)
+			
+			// ******************************************************************************
+
 			// use fitted parameters array in order to retain initial parameters
 //			double[] fitted_parameters_d = new double[batch_size * NUM_FITTING_PARAMETERS];
 			float[] fitted_parameters_f = new float[batch_size * NUM_FITTING_PARAMETERS];
@@ -918,19 +946,156 @@ public class ParallelLMA
 			// read results back into fitted parameters buffer (NOTE: stalling operation)
 			clEnqueueReadBuffer(gpu._ocl_queue, parameters_buffer, CL_TRUE, 0, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, Pointer.to(fitted_parameters_f), 0, null, null);
 			
-			// TODO: compute covariance matrix analysis (for localisation precision)
+			// read standard error of parameters
+			float[] standard_errors_f = new float[batch_size * NUM_FITTING_PARAMETERS];
+			clEnqueueReadBuffer(gpu._ocl_queue, standard_errors_buffer, CL_TRUE, 0, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, Pointer.to(standard_errors_f), 0, null, null);
 			
-			// TODO: add results to sml.ptable.add() (no lock needed?)
+			// read chi-sqaured values
+			float[] chi_squared_f = new float[batch_size * NUM_FITTING_PARAMETERS];
+			clEnqueueReadBuffer(gpu._ocl_queue, current_chi2_buffer, CL_TRUE, 0, batch_size * CL_DATATYPE_SIZE, Pointer.to(chi_squared_f), 0, null, null);
+			
+			// ******************************************************************************
+			
 			parameters_index = 0;
 			for(int i = ii; i < ii+batch_size && i < num_spots; ++i) // NOTE: check if less than num_spots
 			{
-				res_table.incrementCounter();
-				res_table.addValue("background", fitted_parameters_f[parameters_index+0]);
-				res_table.addValue("amplitude", fitted_parameters_f[parameters_index+1]);
-				res_table.addValue("x_sp", fitted_parameters_f[parameters_index+2]);
-				res_table.addValue("y_sp", fitted_parameters_f[parameters_index+3]);
-				res_table.addValue("x_sigma", fitted_parameters_f[parameters_index+4]);
-				res_table.addValue("y_sigma", fitted_parameters_f[parameters_index+5]);
+				// correction of error estimation with scaling coefficient
+				float error_coefficient = (float)Math.sqrt(chi_squared_f[i - ii]/(pixel_count-6));
+				for (int j = 0; j < NUM_FITTING_PARAMETERS; j++)
+				{
+					standard_errors_f[parameters_index + j] *= error_coefficient;
+				}
+				
+				// determine of spot is a false positive
+				double false_positive = 0.0; // higher value is higher likelihood spot is a false positive
+				
+				//iterations didn't converge. suspicious point; NOTE: cannot be done with fixe number of iterations!
+				//if (SMLlma.iterationCount== 101)
+				//{
+				//	nFalsePositive = 0.5;
+				//}
+				
+				// penalize large and small spots
+				double abs_xsd = Math.abs(fitted_parameters_f[parameters_index+4]);
+				double abs_ysd = Math.abs(fitted_parameters_f[parameters_index+5]);
+				if(abs_xsd > 1.3 * psf_sigma || abs_xsd < 0.7 * psf_sigma || abs_ysd > 1.3 * psf_sigma || abs_ysd < 0.7 * psf_sigma)
+				{
+					false_positive = 1.0;
+				}
+				
+				// penalize low localization precision (i.e. localization error higher than psf)
+				if(standard_errors_f[parameters_index+2] > psf_sigma || standard_errors_f[parameters_index+2] > psf_sigma)
+				{
+					false_positive = 1.0;
+				}
+				
+				// calculate integrated spot intensity and estimation of SNR
+				double integrated_amplitude = 0.0;
+				double integrated_noise = 0.0;
+				double average_noise = 0.0;
+				double stdev_noise = 0.0;
+				double snr_estimate = 0.0;
+				
+				if(false_positive < 0.5)
+				{
+					// get image processor for spot
+					ImageProcessor improc = image.getStack().getProcessor((int)frame_numbers[i]);
+					
+					// center and range of fitted spot
+					int x_centroid = (int)Math.round(fitted_parameters_f[parameters_index+2] + 0.5);
+					int y_centroid = (int)Math.round(fitted_parameters_f[parameters_index+3] + 0.5);
+					int mxsd = (int)Math.round(DOMConstants.FITRADIUS * psf_sigma);
+					int mysd = (int)Math.round(DOMConstants.FITRADIUS * psf_sigma);
+					
+					// check if spot if within range of original image
+					if(x_centroid - mxsd - 1 > 0 && x_centroid + mxsd + 1 < image_width && y_centroid - mysd - 1 > 0 && y_centroid + mysd + 1 < image_height)
+					{
+						//
+						int x, y;
+						
+						// integrated spot intensity
+						for(x = x_centroid - mxsd; x < x_centroid + mxsd; ++x)
+						{
+							for(y = y_centroid - mysd; y < y_centroid + mysd; ++y)
+							{
+								integrated_amplitude += improc.get(x, y);
+							}
+						}
+						integrated_amplitude = integrated_amplitude - (fitted_parameters_f[parameters_index+0] * (2 * mxsd + 1) * (2 * mysd + 1));
+						
+						// average noise around spot
+						double sum_squared = 0.0;
+						y = y_centroid - mysd - 1; // left border
+						for(x = x_centroid - mxsd - 1; x < x_centroid + mxsd + 1; ++x)
+						{
+							double px = improc.get(x, y);
+							integrated_noise += px;
+							sum_squared += px * px;
+						}
+						y = y_centroid - mysd + 1; // right border
+						for(x = x_centroid - mxsd - 1; x < x_centroid + mxsd + 1; ++x)
+						{
+							double px = improc.get(x, y);
+							integrated_noise += px;
+							sum_squared += px * px;
+						}
+						x = x_centroid - mxsd - 1; // top border
+						for(y = y_centroid - mysd - 1; y < y_centroid + mysd + 1; ++y)
+						{
+							double px = improc.get(x, y);
+							integrated_noise += px;
+							sum_squared += px * px;
+						}
+						x = x_centroid - mxsd + 1; // bottom border
+						for(y = y_centroid - mysd - 1; y < y_centroid + mysd + 1; ++y)
+						{
+							double px = improc.get(x, y);
+							integrated_noise += px;
+							sum_squared += px * px;
+						}
+						average_noise = integrated_noise / (4 * mxsd + 4 * mysd + 8);
+						stdev_noise = Math.sqrt(sum_squared - (average_noise * average_noise));
+						
+						// extimate snr
+						snr_estimate = fitted_parameters_f[parameters_index+1] / stdev_noise;
+					}
+				}
+				
+				// add results to table (no lock needed) if spot is within image dimenions
+				if(fitted_parameters_f[parameters_index+2] > 0 && fitted_parameters_f[parameters_index+2] < image_width && fitted_parameters_f[parameters_index+3] > 0 && fitted_parameters_f[parameters_index+2] < image_height)
+				{
+					// ignore false positives if requested
+					if(!(ignore_false_positives && false_positive > 0.3))
+					{
+						res_table.incrementCounter();
+						
+						res_table.addValue("Amplitude_fit", fitted_parameters_f[parameters_index+1]);
+						
+						res_table.addValue("X_(px)", fitted_parameters_f[parameters_index+2]);
+						res_table.addValue("Y_(px)", fitted_parameters_f[parameters_index+3]);
+						res_table.addValue("X_(nm)", fitted_parameters_f[parameters_index+2] * pixel_size);
+						res_table.addValue("Y_(nm)", fitted_parameters_f[parameters_index+3] * pixel_size);
+						res_table.addValue("Z_(nm)", 0.0);
+						res_table.addValue("False positive", false_positive);
+						res_table.addValue("X_loc_error(px)", standard_errors_f[parameters_index+2]);
+						res_table.addValue("Y_loc_error(px)", standard_errors_f[parameters_index+3]);
+						
+						res_table.addValue("BGfit", fitted_parameters_f[parameters_index+0]);
+						res_table.addValue("IntegratedInt", integrated_amplitude);
+						res_table.addValue("SNR", snr_estimate);
+						
+						res_table.addValue("chi2_fit", chi_squared_f[i - ii]);
+						res_table.addValue("Frame Number", frame_numbers[i]);
+						res_table.addValue("Iterations_fit", MAX_ITERATIONS);
+						res_table.addValue("SD_X_fit_(px)", fitted_parameters_f[parameters_index+4]);
+						res_table.addValue("SD_Y_fit_(px)", fitted_parameters_f[parameters_index+5]);
+						res_table.addValue("Amp_loc_error", standard_errors_f[parameters_index+1]);
+						
+						// TODO: show particles in image as ROIs
+					}
+				}
+				
+				//  increment counters
 				parameters_index+=NUM_FITTING_PARAMETERS;
 			}
 			
@@ -1021,9 +1186,28 @@ public class ParallelLMA
 //			System.err.println();
 //		}
 		
+		// print execution time
+		long end_time = System.nanoTime();
+		double time_diff = (double)(end_time - start_time);
+		String[] units = new String[]{"nanoseconds", "microseconds", "milliseconds", "seconds", "minutes", "hours", "way too long!"};
+		int unit_index = 0;
+		while(time_diff > 1e3f && unit_index < 3)
+		{
+			time_diff /= 1e3f;
+			++unit_index;
+		}
+		while(time_diff > 60f && unit_index < 5)
+		{
+			time_diff /= 60f;
+			++unit_index;
+		}
+		System.err.format("GPU fitting took %.1f %s\n", (time_diff), units[unit_index]);
+		System.err.format("Averaging %.1f spots per second\n", num_spots/((end_time-start_time)/1e9f));
+		
 		// ******************************************************************************
 		
 		// release kernels
+		clReleaseKernel(calculate_standard_error);
 		clReleaseKernel(update_parameters);
 		clReleaseKernel(calculate_updated_chi2);
 		clReleaseKernel(calculate_updated_parameters);
@@ -1036,6 +1220,7 @@ public class ParallelLMA
 		clReleaseKernel(calculate_current_chi2);
 		
 		// release buffers
+		clReleaseMemObject(standard_errors_buffer);
 		clReleaseMemObject(updated_parameters_buffer);
 		clReleaseMemObject(da_vector_buffer);
 		clReleaseMemObject(inverse_alpha_matrix_buffer);
