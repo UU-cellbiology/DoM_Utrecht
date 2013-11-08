@@ -141,9 +141,9 @@ __kernel void calculate_chi2(__global const fp_type* const image_data, __global 
 	
 	// loop over all pixels in image to sum the product of difference between image and model
 	__private fp_type chi2_res = 0.0f;
-	for(__private int x = 0; x < image_width; ++x)
+	for(__private int y = 0; y < image_height; ++y)
 	{
-		for(__private int y = 0; y < image_height; ++y)
+		for(__private int x = 0; x < image_width; ++x)
 		{
 			// calculate sum of squared difference
 			//dy = *px - gaussian2D(x, y, my_parameters);
@@ -209,9 +209,9 @@ __kernel void calculate_alpha_matrix(__global const fp_type* const x_positions, 
 	__private fp_type alpha_res_45 = 0.0f;
 	
 	// loop over all pixel, computating all intermediate values
-	for(__private int x = 0; x < image_width; ++x)
+	for(__private int y = 0; y < image_height; ++y)
 	{
-		for(__private int y = 0; y < image_height; ++y)
+		for(__private int x = 0; x < image_width; ++x)
 		{
 			// calculate derivates for position
 			__private const fp_type xmxpos = my_x_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_X_SPOS];
@@ -366,9 +366,9 @@ __kernel void calculate_beta_vector(__global const fp_type* const image_data, __
 	// loop over all pixels in image
 	__private fp_type px_dg = 0.0f;
 	__global const fp_type* px = my_image_data;
-	for(__private int x = 0; x < image_width; ++x)
+	for(__private int y = 0; y < image_height; ++y)
 	{
-		for(__private int y = 0; y < image_height; ++y)
+		for(__private int x = 0; x < image_width; ++x)
 		{
 			__private const fp_type xmxpos = my_x_positions[mad24(y,image_width,x)]-my_private_parameters[PARAM_X_SPOS];
 			__private const fp_type xmxpos2 = xmxpos * xmxpos;

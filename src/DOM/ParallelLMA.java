@@ -33,9 +33,9 @@ public class ParallelLMA
 //	private static boolean USE_DOUBLE_PRECISION = false;
 	private static int CL_DATATYPE_SIZE = Sizeof.cl_float;
 	
-	private static int MAX_ITERATIONS = 30; // maximum number of iterations for fitting procedure
-	private static int BATCH_SIZE = 1024; // NOTE: rule of thumb, take number of compute units * max dimension for a work unit; 1024|2048 for MacBook Pro
-	private static int LWG_SIZE = 128; // 128 for MacBook Pro
+//	private static int MAX_ITERATIONS = 30; // maximum number of iterations for fitting procedure
+//	private static int BATCH_SIZE = 1024; // NOTE: rule of thumb, take number of compute units * max dimension for a work unit; 1024|2048 for MacBook Pro
+//	private static int LWG_SIZE = 128; // 128 for MacBook Pro
 	
 	/**
 	 *	Constants
@@ -328,14 +328,14 @@ public class ParallelLMA
 	// ************************************************************************************
 	
 	//private static void run(GPUBase gpu, ImageStack dataset) // old function header
-	public static void run(GPUBase gpu, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, double pixel_size, boolean ignore_false_positives, ResultsTable res_table)
+	public static void run(GPUBase gpu, int batch_size, int lwg_size, int iterations, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, double pixel_size, boolean ignore_false_positives, ResultsTable res_table)
 	{
 		// get image stack
 		ImageStack dataset = image.getStack();
 		
 		// set batch size
-		final int batch_size = BATCH_SIZE;
-		final int lwg_size = LWG_SIZE;
+		//final int batch_size = BATCH_SIZE;
+		//final int lwg_size = LWG_SIZE;
 		final long[] lwgs = new long[]{lwg_size}; // set to null for auto
 		
 		// get dataset dimension
@@ -348,7 +348,7 @@ public class ParallelLMA
 		final int image_height = image.getHeight();
 		
 		// get spot dimensions
-		final int spot_radius = (int)(psf_sigma * DOMConstants.FITRADIUS);
+		final int spot_radius = (int)(psf_sigma * DOMConstants.FITRADIUS); // floor
 		final int spot_width = 2 * spot_radius + 1; //dataset.getWidth();
 		final int spot_height = 2 * spot_radius + 1; //dataset.getHeight();
 		final int pixel_count = spot_width * spot_height;
@@ -635,7 +635,7 @@ public class ParallelLMA
 			
 			// iterate fixed number of times
 			int iteration_count = 0;
-			while(iteration_count < MAX_ITERATIONS)
+			while(iteration_count < iterations)
 			{
 //				// DEBUG: print intermediate results
 //				if(DEBUG_MODE_ENABLED)
@@ -923,7 +923,7 @@ public class ParallelLMA
 			// ******************************************************************************
 			
 			// set lambda to zero
-			lambda_f = new float[batch_size]; // shorthand
+			lambda_f = new float[batch_size]; // shorthand for initializing all elements to zero
 			clEnqueueWriteBuffer(gpu._ocl_queue, lambda_buffer, true, 0, batch_size * CL_DATATYPE_SIZE, Pointer.to(lambda_f), 0, null, null);
 			
 			// recompute alpha matrix (with lambda equal to zero)
@@ -935,7 +935,7 @@ public class ParallelLMA
 			clEnqueueNDRangeKernel(gpu._ocl_queue, multiply_matrices, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (c)
 			
 			// calculate standard error of fitted parameters
-			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_standard_error, 1, null, new long[]{batch_size}, lwgs, 0, null, null); // step (c)
+			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_standard_error, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
 			
 			// ******************************************************************************
 
@@ -984,7 +984,7 @@ public class ParallelLMA
 				}
 				
 				// penalize low localization precision (i.e. localization error higher than psf)
-				if(standard_errors_f[parameters_index+2] > psf_sigma || standard_errors_f[parameters_index+2] > psf_sigma)
+				if(standard_errors_f[parameters_index+2] > psf_sigma || standard_errors_f[parameters_index+3] > psf_sigma)
 				{
 					false_positive = 1.0;
 				}
@@ -1008,15 +1008,15 @@ public class ParallelLMA
 					int mysd = (int)Math.round(DOMConstants.FITRADIUS * psf_sigma);
 					
 					// check if spot if within range of original image
-					if(x_centroid - mxsd - 1 > 0 && x_centroid + mxsd + 1 < image_width && y_centroid - mysd - 1 > 0 && y_centroid + mysd + 1 < image_height)
+					if(x_centroid - mxsd - 1 >= 0 && x_centroid + mxsd + 1 < image_width && y_centroid - mysd - 1 >= 0 && y_centroid + mysd + 1 < image_height)
 					{
 						//
 						int x, y;
 						
 						// integrated spot intensity
-						for(x = x_centroid - mxsd; x < x_centroid + mxsd; ++x)
+						for(x = x_centroid - mxsd; x <= x_centroid + mxsd; ++x)
 						{
-							for(y = y_centroid - mysd; y < y_centroid + mysd; ++y)
+							for(y = y_centroid - mysd; y <= y_centroid + mysd; ++y)
 							{
 								integrated_amplitude += improc.get(x, y);
 							}
@@ -1024,39 +1024,71 @@ public class ParallelLMA
 						integrated_amplitude = integrated_amplitude - (fitted_parameters_f[parameters_index+0] * (2 * mxsd + 1) * (2 * mysd + 1));
 						
 						// average noise around spot
-						double sum_squared = 0.0;
+						//double sum_squared = 0.0;
 						y = y_centroid - mysd - 1; // left border
-						for(x = x_centroid - mxsd - 1; x < x_centroid + mxsd + 1; ++x)
+						for(x = x_centroid - mxsd - 1; x <= x_centroid + mxsd + 1; ++x)
 						{
 							double px = improc.get(x, y);
 							integrated_noise += px;
-							sum_squared += px * px;
+							//sum_squared += px * px;
 						}
 						y = y_centroid - mysd + 1; // right border
-						for(x = x_centroid - mxsd - 1; x < x_centroid + mxsd + 1; ++x)
+						for(x = x_centroid - mxsd - 1; x <= x_centroid + mxsd + 1; ++x)
 						{
 							double px = improc.get(x, y);
 							integrated_noise += px;
-							sum_squared += px * px;
+							//sum_squared += px * px;
 						}
 						x = x_centroid - mxsd - 1; // top border
-						for(y = y_centroid - mysd - 1; y < y_centroid + mysd + 1; ++y)
+						for(y = y_centroid - mysd - 1; y <= y_centroid + mysd + 1; ++y)
 						{
 							double px = improc.get(x, y);
 							integrated_noise += px;
-							sum_squared += px * px;
+							//sum_squared += px * px;
 						}
 						x = x_centroid - mxsd + 1; // bottom border
-						for(y = y_centroid - mysd - 1; y < y_centroid + mysd + 1; ++y)
+						for(y = y_centroid - mysd - 1; y <= y_centroid + mysd + 1; ++y)
 						{
 							double px = improc.get(x, y);
 							integrated_noise += px;
-							sum_squared += px * px;
+							//sum_squared += px * px;
 						}
 						average_noise = integrated_noise / (4 * mxsd + 4 * mysd + 8);
-						stdev_noise = Math.sqrt(sum_squared - (average_noise * average_noise));
+						//sum_squared = sum_squared / (4 * mxsd + 4 * mysd + 8);
+						//stdev_noise = Math.sqrt(sum_squared - (average_noise * average_noise));
+
+						// standard deviation of noise
+						y = y_centroid - mysd - 1; // left border
+						for(x = x_centroid - mxsd - 1; x <= x_centroid + mxsd + 1; ++x)
+						{
+							double px = improc.get(x, y);
+							stdev_noise += Math.pow(average_noise - px,2);
+							//sum_squared += px * px;
+						}
+						y = y_centroid - mysd + 1; // right border
+						for(x = x_centroid - mxsd - 1; x <= x_centroid + mxsd + 1; ++x)
+						{
+							double px = improc.get(x, y);
+							stdev_noise += Math.pow(average_noise - px,2);
+							//sum_squared += px * px;
+						}
+						x = x_centroid - mxsd - 1; // top border
+						for(y = y_centroid - mysd - 1; y <= y_centroid + mysd + 1; ++y)
+						{
+							double px = improc.get(x, y);
+							stdev_noise += Math.pow(average_noise - px,2);
+							//sum_squared += px * px;
+						}
+						x = x_centroid - mxsd + 1; // bottom border
+						for(y = y_centroid - mysd - 1; y <= y_centroid + mysd + 1; ++y)
+						{
+							double px = improc.get(x, y);
+							stdev_noise += Math.pow(average_noise - px,2);
+							//sum_squared += px * px;
+						}
+						stdev_noise = Math.sqrt(stdev_noise / (4 * mxsd + 4 * mysd + 8));
 						
-						// extimate snr
+						// estimate signal-to-noise ratio
 						snr_estimate = fitted_parameters_f[parameters_index+1] / stdev_noise;
 					}
 				}
@@ -1086,7 +1118,7 @@ public class ParallelLMA
 						
 						res_table.addValue("chi2_fit", chi_squared_f[i - ii]);
 						res_table.addValue("Frame Number", frame_numbers[i]);
-						res_table.addValue("Iterations_fit", MAX_ITERATIONS);
+						res_table.addValue("Iterations_fit", iterations);
 						res_table.addValue("SD_X_fit_(px)", fitted_parameters_f[parameters_index+4]);
 						res_table.addValue("SD_Y_fit_(px)", fitted_parameters_f[parameters_index+5]);
 						res_table.addValue("Amp_loc_error", standard_errors_f[parameters_index+1]);
