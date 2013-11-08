@@ -23,7 +23,9 @@ public class SMLDialog {
 	boolean bShowParticles; //whether or not add overlay to detected particles
 	boolean bIgnoreFP; //whether or not to ignore false positives
 	boolean bUseGPUAcceleration; // wheter or not to use GPU acceleration using the OpenCL framework
-	
+	int nBatchSize; // number of spots per batch for GPU processing
+	int nGroupSize; // size of local workgroups on GPU
+	int nIterations; // fixed number of iterations on GPU
 	
 	//reconstructing image
 	int nRecParticles;       //what type of particles use for reconstruction 
@@ -78,6 +80,9 @@ public class SMLDialog {
 		fpDial.addCheckbox("Mark detected particles? (better not use this feature on big datasets)", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
+		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0);
+		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);
+		fpDial.addNumericField("Iterations", Prefs.get("SiMoLoc.nIterations", 30), 0);
 		
 		
 		fpDial.showDialog();
@@ -100,6 +105,12 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bIgnoreFP", bIgnoreFP);
 		bUseGPUAcceleration = fpDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bUseGPUAcceleration", bUseGPUAcceleration);
+		nBatchSize = (int)fpDial.getNextNumber();
+		Prefs.set("SiMoLoc.nBatchSize", nBatchSize);
+		nGroupSize = (int)fpDial.getNextNumber();
+		Prefs.set("SiMoLoc.nGroupSize", nGroupSize);
+		nIterations = (int)fpDial.getNextNumber();
+		Prefs.set("SiMoLoc.nIterations", nIterations);
 
 		return true;
 	}

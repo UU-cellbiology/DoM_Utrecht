@@ -428,7 +428,7 @@ public class Detect_Molecules implements PlugIn {
 				
 				// fit spots on GPU
 				sml.ptable.reset();
-				ParallelLMA.run(gpu, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.dPixelSize, dlg.bIgnoreFP, sml.ptable);
+				ParallelLMA.run(gpu, dlg.nBatchSize, dlg.nGroupSize, dlg.nIterations, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.dPixelSize, dlg.bIgnoreFP, sml.ptable);
 				
 				//detparticles[0][n] = x-coordinate of nth particle
 				//detparticles[1][n] = y-coordinate of nth particle

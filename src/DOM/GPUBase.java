@@ -31,7 +31,6 @@ public class GPUBase
 	private static boolean DEBUG_MODE_ENABLED = false; // enables printing of debug statements to standerd error console
 	
 	// configurable options (fixed for now)
-	
 	private static final boolean JOCL_THROW_EXCEPTIONS = true; // JOCL will throw CLException when errors occur
 	private static final LogLevel JOCL_DEBUG_LEVEL = LogLevel.LOG_WARNING;//LogLevel.LOG_TRACE; // options are { LOG_QUIET, LOG_ERROR, LOG_WARNING, LOG_INFO, LOG_TRACE, LOG_DEBUG, LOG_DEBUGTRACE }
 	private static final long JOCL_DEVICE_TYPE = CL_DEVICE_TYPE_GPU; // options are { CL_DEVICE_TYPE_DEFAULT | CL_DEVICE_TYPE_ALL | CL_DEVICE_TYPE_CPU | CL_DEVICE_TYPE_GPU | CL_DEVICE_TYPE_ACCELERATOR }
@@ -205,7 +204,7 @@ public class GPUBase
 			// Show device selection dialog
 			GenericDialog gd = new GenericDialog("Select OpenCL-enabled device");
 			gd.addChoice("Device", deviceNames.toArray(new String[0]), deviceNames.get(0)); // NOTE: type casting using toArray(T[])
-			gd.setResizable( false );
+			gd.setResizable(false);
 			gd.showDialog(); // NOTE: modal dialog!
 			
 			// Throw exception if dialog was canceled by the user
@@ -216,6 +215,7 @@ public class GPUBase
 			
 			// store selected device id and its corresponding platform id
 			selectedDeviceName = gd.getNextChoice();
+			
 		}
 		
 		// look up device id and platform id for selected device name
