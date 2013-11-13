@@ -28,7 +28,7 @@ public class GPUBase
 	private static boolean JOCL_USE_DOUBLE_PRECISION = false; // use double precision float point computations (more accurate, but likely to be slower)
 	private static boolean AUTOMATIC_MODE_ENABLED = false; // enables automatic selection of best opencl device
 	private static boolean PROFILING_MODE_ENABLED = false; // enables profiling on the OpenCL device
-	private static boolean DEBUG_MODE_ENABLED = false; // enables printing of debug statements to standerd error console
+	private static boolean DEBUG_MODE_ENABLED = true; // enables printing of debug statements to standerd error console
 	
 	// configurable options (fixed for now)
 	private static final boolean JOCL_THROW_EXCEPTIONS = true; // JOCL will throw CLException when errors occur
@@ -194,28 +194,34 @@ public class GPUBase
 		// Throw exception if no OpenCL-enabled device was found for any of the platforms
 		if(deviceIDs.size() == 0) throw new CLException("No OpenCL-enabled devices found!");
 		
-		String selectedDeviceName = deviceNames.get(0); // NOTE: for now, just select first available device
+		String selectedDeviceName = "";// = deviceNames.get(0); // NOTE: for now, just select first available device
 		if(AUTOMATIC_MODE_ENABLED)
 		{
 			// TODO: determine best device automatically
 		}
 		else
 		{
-			// Show device selection dialog
-			GenericDialog gd = new GenericDialog("Select OpenCL-enabled device");
-			gd.addChoice("Device", deviceNames.toArray(new String[0]), deviceNames.get(0)); // NOTE: type casting using toArray(T[])
-			gd.setResizable(false);
-			gd.showDialog(); // NOTE: modal dialog!
-			
-			// Throw exception if dialog was canceled by the user
-			if(!gd.wasOKed())
+			if(deviceNames.size() == 1) // If one device is available then select this device
 			{
-				throw new CLException("Device selection was canceled by user"); // canceled
+				selectedDeviceName = deviceNames.get(0);
 			}
-			
-			// store selected device id and its corresponding platform id
-			selectedDeviceName = gd.getNextChoice();
-			
+			else // If multiple devices are present let user select a device
+			{
+				// Show device selection dialog
+				GenericDialog gd = new GenericDialog("Select OpenCL-enabled device");
+				gd.addChoice("Device", deviceNames.toArray(new String[0]), deviceNames.get(0)); // NOTE: type casting using toArray(T[])
+				gd.setResizable(false);
+				gd.showDialog(); // NOTE: modal dialog!
+				
+				// Throw exception if dialog was canceled by the user
+				if(!gd.wasOKed())
+				{
+					throw new CLException("Device selection was canceled by user"); // canceled
+				}
+				
+				// store selected device id and its corresponding platform id
+				selectedDeviceName = gd.getNextChoice();
+			}
 		}
 		
 		// look up device id and platform id for selected device name
@@ -410,7 +416,8 @@ public class GPUBase
 		GPUBase gpu = null;
 		try
 		{
-			gpu = new GPUBase();
+			//gpu = new GPUBase();
+			gpu = new GPUBase(false, false, false, true);
 		}
 		catch(CLException e)
 		{
