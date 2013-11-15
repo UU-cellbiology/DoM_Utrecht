@@ -5,6 +5,10 @@ package DOM;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.HashMap;
+import java.util.Iterator;
 
 import java.io.IOException;
 import java.io.BufferedReader;
@@ -262,6 +266,66 @@ public class GPUBase
 	
 	// ******************************************************
 	
+	private long GetDeviceInfoHelperLong(cl_device_id device_id, int paramName)
+	{
+		int numValues = 1;
+		long values[] = new long[numValues];
+        clGetDeviceInfo(device_id, paramName, Sizeof.cl_long * numValues, Pointer.to(values), null);
+        return values[0];
+	}
+	
+	private int GetDeviceInfoHelperInteger(cl_device_id device_id, int paramName)
+	{
+		int numValues = 1;
+		int values[] = new int[numValues];
+        clGetDeviceInfo(device_id, paramName, Sizeof.cl_int * numValues, Pointer.to(values), null);
+        return values[0];
+	}
+	
+	private String GetDeviceInfoHelperString(cl_device_id device_id, int paramName)
+	{
+		// Obtain the length of the string that will be queried
+		long size[] = new long[1];
+		clGetDeviceInfo(device_id, paramName, 0, null, size);
+
+		// Create a buffer of the appropriate size and fill it with the info
+		byte buffer[] = new byte[(int)size[0]];
+		clGetDeviceInfo(device_id, paramName, buffer.length, Pointer.to(buffer), null);
+
+		// Create a string from the buffer (excluding the trailing \0 byte)
+		return new String(buffer, 0, buffer.length-1);
+	}
+	
+	public String getDeviceName()
+	{
+		System.err.println("CL_DEVICE_NAME : "  + GetDeviceInfoHelperString(_ocl_device_id, CL_DEVICE_NAME));
+		return GetDeviceInfoHelperString(_ocl_device_id, CL_DEVICE_NAME);
+	}
+	
+	public int getNumberOfComputeUnits()
+	{
+		System.err.println("CL_DEVICE_MAX_COMPUTE_UNITS : "  + GetDeviceInfoHelperInteger(_ocl_device_id, CL_DEVICE_MAX_COMPUTE_UNITS));
+		return GetDeviceInfoHelperInteger(_ocl_device_id, CL_DEVICE_MAX_COMPUTE_UNITS);
+	}
+	
+	public long getMaxWorkItemDimensions()
+	{
+		System.err.println("CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS : "  + GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS));
+		return GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS);
+	}
+	
+	public long getMaxWorkGroupSize()
+	{
+		System.err.println("CL_DEVICE_MAX_WORK_GROUP_SIZE : "  + GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE));
+		return GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE);
+	}
+	
+	public long getGlobalMemSize()
+	{
+		System.err.println("CL_DEVICE_GLOBAL_MEM_SIZE : "  + GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_GLOBAL_MEM_SIZE));
+		return GetDeviceInfoHelperLong(_ocl_device_id, CL_DEVICE_GLOBAL_MEM_SIZE);
+	}
+		
 	protected boolean loadProgramFromString(String program) // TODO: add throws CLException when program could not be compiled
 	{
 		// DEBUG print
@@ -418,6 +482,9 @@ public class GPUBase
 		{
 			//gpu = new GPUBase();
 			gpu = new GPUBase(false, false, false, true);
+			gpu.getDeviceName();
+			gpu.getGlobalMemSize();
+			gpu.getMaxWorkGroupSize();
 		}
 		catch(CLException e)
 		{
@@ -427,12 +494,12 @@ public class GPUBase
 		}
 		
 		// load program file
-		if(gpu.loadProgramFromFile(args[0]))
-		{
-			System.err.println("New instance of GPUBase created successful for program " + args[0]);
-		}
-		
-		System.err.println();
+//		if(gpu.loadProgramFromFile(args[0]))
+//		{
+//			System.err.println("New instance of GPUBase created successful for program " + args[0]);
+//		}
+//		
+//		System.err.println();
 		System.exit(0);
 	}
 }
