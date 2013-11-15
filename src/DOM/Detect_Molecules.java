@@ -15,6 +15,8 @@ import ij.gui.Overlay;
 import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
 
+import ij.gui.YesNoCancelDialog; // There is no Yes/No dialog?
+
 // OpenCL
 import static org.jocl.CL.*;
 import org.jocl.*;
@@ -223,10 +225,135 @@ public class Detect_Molecules implements PlugIn {
 			/* CPU Fitting from here */
 			/*************************/
 			
+			if(dlg.bUseGPUAcceleration)
+			{
+				// Fixed parameters for now
+				boolean GPU_USE_DOUBLE_PRECISION = false; // NOTE: double precision not supported
+				boolean GPU_AUTOMATIC_MODE_ENABLED = false; // NOTE: not yet implemented
+				boolean GPU_PROFILING_MODE_ENABLED = false; // for debugging only
+				boolean GPU_DEBUG_MODE_ENABLED = true; // for debugging only
+				
+				// Fixed parameters in ParallelLMA.java
+				//int GPU_MAX_ITERATIONS = 100;
+				//int GPU_BATCH_SIZE = 1024;
+				//int GPU_LWG_SIZE = 128;
+				//
+				//double GPU_DEFAULT_X_SIGMA = 2.0f;
+				//double GPU_DEFAULT_Y_SIGMA = 2.0f;
+				//double GPU_DEFAULT_LAMBDA = 0.001f;
+				
+				// create new GPU base object and load OpenCL kernel file
+				GPUBase gpu = null;
+				try
+				{
+					gpu = new GPUBase(GPU_USE_DOUBLE_PRECISION, GPU_AUTOMATIC_MODE_ENABLED, GPU_PROFILING_MODE_ENABLED, GPU_DEBUG_MODE_ENABLED);
+				}
+				catch(CLException cle)
+				{
+					YesNoCancelDialog continue_diag = new YesNoCancelDialog(null, "Problem setting up OpenCL context for GPU acceleration", "Could not set up an OpenCL context on your system. Either\nno suitable device was found for GPU acceleration or\nthe device selection dialog was canceled.\n\nWould you like to continue fitting on the CPU instead?");
+					if(continue_diag.yesPressed())
+					{
+						dlg.bUseGPUAcceleration = false;
+					}
+					else
+					{
+						return;
+					}
+				}
+				catch(Throwable e) // catch everything throwable, include errors and exceptions
+				{
+					YesNoCancelDialog continue_diag = new YesNoCancelDialog(null, "GPU acceleration not supported", "OpenCL is not supported on your computer. Make sure\nyou installed the appropriate OpenCL drivers for your device\nand installed the jar-libraries bundled with this plug-in\ninto the right folder.\n\nWould you like to continue fitting on the CPU instead?");
+					if(continue_diag.yesPressed())
+					{
+						dlg.bUseGPUAcceleration = false;
+					}
+					else
+					{
+						return;
+					}
+				}
+				
+				// continue only if gpu was constructed successfully
+				if(gpu != null)
+				{
+					// open OpenCL kernel file
+					BufferedReader opencl_kernel_reader = null;
+					try
+					{
+						InputStream resource_stream = gpu.getClass().getResourceAsStream("/FittingKernelLMA.cl");
+						if(resource_stream == null)
+						{
+							IJ.error("Could not load OpenCL kernel as resource from JAR file");
+							return;
+						}
+						opencl_kernel_reader = new BufferedReader(new InputStreamReader(resource_stream));
+					}
+					catch(Exception e)
+					{
+						IJ.error("Could not load OpenCL kernel");
+						return;
+					}
+					
+					// load contents of OpenCL kernel file
+					String opencl_kernel_program = "";
+					String line = null;
+					try
+					{
+						while((line = opencl_kernel_reader.readLine()) != null)
+						{
+							// add line to program
+							opencl_kernel_program += line + '\n';
+						}
+					}
+					catch(IOException e)
+					{
+						// early exit
+						IJ.error("Could not load contents of OpenCL kernel file");
+						return;
+					}
+					
+					// close file
+					try
+					{
+						opencl_kernel_reader.close();
+					}
+					catch(IOException e)
+					{
+						// ignore, do nothing
+					}
+					
+					// load OpenCL kernel program
+					boolean compile_success = gpu.loadProgramFromString(opencl_kernel_program);
+					if(!compile_success)
+					{
+						IJ.error("Could not load program file into OpenCL");
+						return;
+					}
+					
+					// fit spots on GPU
+					sml.ptable.reset();
+					ParallelLMA.run(gpu, dlg.nBatchSize, dlg.nGroupSize, dlg.nIterations, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.dPixelSize, dlg.bIgnoreFP, sml.ptable);
+					
+					//detparticles[0][n] = x-coordinate of nth particle
+					//detparticles[1][n] = y-coordinate of nth particle
+					//nFrameN[n] = frame number of nth particle
+					//imp = image plus (including stack)
+					//imp.setSliceWithoutUpdate(nSlice+1); set current slice
+					//ip = imp.getProcessor().duplicate(); copy ip of current slice
+					//smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount); cpu fitting procedure
+					//this.sml.fitParticles(this.ip, this.dlg, this.particles, this.nFrame, this.SpotsPositions); called inside sml fit thread
+					// particles(_) is subset of detected_particles for current frame nFrame
+				}
+			}
+			
+			/**************************************************/
+			/* GPU fitting till here, CPU fitting starts here */
+			/**************************************************/
+			
 			if(!dlg.bUseGPUAcceleration)
 			{
 				/// using only necessary number of threads
-				if(dlg.nThreads < nUniqFrames) 
+				if(dlg.nThreads < nUniqFrames)
 					smlfitthreads = new SMLFitThread[dlg.nThreads];
 				else
 					smlfitthreads = new SMLFitThread[nUniqFrames];
@@ -264,7 +391,7 @@ public class Detect_Molecules implements PlugIn {
 									bListEnd = true;
 								else
 									if((int)(nFrameN[nPositionEnd])!=nSlice+1)
-										bListEnd = true;															
+										bListEnd = true;
 							}
 							//making array for them
 							particles_= new double [2][nPositionEnd-nPositionStart];
@@ -280,8 +407,8 @@ public class Detect_Molecules implements PlugIn {
 						}
 						//reached the end of particles table
 						else
-							 bContinue = false;
-
+							bContinue = false;
+						
 						
 					}
 					
@@ -289,9 +416,9 @@ public class Detect_Molecules implements PlugIn {
 					{
 						//filling free threads in the beginning
 						if (nCountThread < smlfitthreads.length)
-							nFreeThread = nCountThread;				
+							nFreeThread = nCountThread;
 						else
-						//looking for available free thread
+							//looking for available free thread
 						{
 							nFreeThread = -1;
 							while (nFreeThread == -1)
@@ -313,7 +440,7 @@ public class Detect_Molecules implements PlugIn {
 									}
 									catch(Exception e)
 									{
-											IJ.error(""+e);
+										IJ.error(""+e);
 									}
 								}
 							}
@@ -330,116 +457,13 @@ public class Detect_Molecules implements PlugIn {
 				{
 					try
 					{
-						smlfitthreads[t].join();				
+						smlfitthreads[t].join();
 					}
 					catch(Exception e)
 					{
 						IJ.error(""+e);
 					}
 				}
-			}
-			
-			/**************************************************/
-			/* CPU fitting till here, GPU fitting starts here */
-			/**************************************************/
-			
-			else
-			{
-				// Fixed parameters for now
-				boolean GPU_USE_DOUBLE_PRECISION = false; // NOTE: double precision not supported
-				boolean GPU_AUTOMATIC_MODE_ENABLED = false; // NOTE: not yet implemented
-				boolean GPU_PROFILING_MODE_ENABLED = false; // for debugging only
-				boolean GPU_DEBUG_MODE_ENABLED = true; // for debugging only
-				
-				// Fixed parameters in ParallelLMA.java
-				//int GPU_MAX_ITERATIONS = 100;
-				//int GPU_BATCH_SIZE = 1024;
-				//int GPU_LWG_SIZE = 128;
-				//
-				//double GPU_DEFAULT_X_SIGMA = 2.0f;
-				//double GPU_DEFAULT_Y_SIGMA = 2.0f;
-				//double GPU_DEFAULT_LAMBDA = 0.001f;
-				
-				// create new GPU base object and load OpenCL kernel file
-				GPUBase gpu = null;
-				try
-				{
-					gpu = new GPUBase(GPU_USE_DOUBLE_PRECISION, GPU_AUTOMATIC_MODE_ENABLED, GPU_PROFILING_MODE_ENABLED, GPU_DEBUG_MODE_ENABLED);
-				}
-				catch(CLException cle)
-				{
-					IJ.error("Could not set up OpenCL environment.\nMaybe user cancelled device selection dialog,\nor the OpenCL is not supported on this system.");
-					return;
-				}
-				
-				// open OpenCL kernel file
-				BufferedReader opencl_kernel_reader = null;
-				try
-				{
-					InputStream resource_stream = gpu.getClass().getResourceAsStream("/FittingKernelLMA.cl");
-					if(resource_stream == null)
-					{
-						IJ.error("Could not load OpenCL kernel as resource from JAR file");
-						return;
-					}
-					opencl_kernel_reader = new BufferedReader(new InputStreamReader(resource_stream));
-				}
-				catch(Exception e)
-				{
-					IJ.error("Could not load OpenCL kernel");
-					return;
-				}
-				
-				// load contents of OpenCL kernel file
-				String opencl_kernel_program = "";
-				String line = null;
-				try
-				{
-					while((line = opencl_kernel_reader.readLine()) != null)
-					{
-						// add line to program
-						opencl_kernel_program += line + '\n';
-					}
-				}
-				catch(IOException e)
-				{
-					// early exit
-					IJ.error("Could not load contents of OpenCL kernel file");
-					return;
-				}
-				
-				// close file
-				try
-				{
-					opencl_kernel_reader.close();
-				}
-				catch(IOException e)
-				{
-					// ignore, do nothing
-				}
-				
-				// load OpenCL kernel program
-				boolean compile_success = gpu.loadProgramFromString(opencl_kernel_program);
-				if(!compile_success)
-				{
-					IJ.error("Could not load program file into OpenCL");
-					return;
-				}
-				
-				// fit spots on GPU
-				sml.ptable.reset();
-				ParallelLMA.run(gpu, dlg.nBatchSize, dlg.nGroupSize, dlg.nIterations, imp, detparticles, nFrameN, dlg.dPSFsigma, dlg.dPixelSize, dlg.bIgnoreFP, sml.ptable);
-				
-				//detparticles[0][n] = x-coordinate of nth particle
-				//detparticles[1][n] = y-coordinate of nth particle
-				//nFrameN[n] = frame number of nth particle
-				//imp = image plus (including stack)
-				//imp.setSliceWithoutUpdate(nSlice+1); set current slice
-				//ip = imp.getProcessor().duplicate(); copy ip of current slice
-				//smlfitthreads[nFreeThread].init(ip, sml, dlg, particles_, nSlice, SpotsPositions, nStackSize, smlcount); cpu fitting procedure
-				//this.sml.fitParticles(this.ip, this.dlg, this.particles, this.nFrame, this.SpotsPositions); called inside sml fit thread
-				// particles(_) is subset of detected_particles for current frame nFrame
-				
 			}
 
 
