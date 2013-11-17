@@ -80,11 +80,11 @@ public class SMLDialog {
 		fpDial.addCheckbox("Mark detected particles? (better not use this feature on big datasets)", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
-		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0);
-		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);
+		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0, 6, "Max : "); //TODO: get maximum value of the GPU
+		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0, 6, "Max : ");  //TODO: get maximum value of the GPU
 		fpDial.addNumericField("Iterations", Prefs.get("SiMoLoc.nIterations", 30), 0);
 		
-		
+		fpDial.setResizable(false);
 		fpDial.showDialog();
 		if (fpDial.wasCanceled())
             return false;
@@ -114,7 +114,6 @@ public class SMLDialog {
 
 		return true;
 	}
-	
 	
 	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, int xmax, int ymax) //dialog showing options for reconstruction image		
 	{
