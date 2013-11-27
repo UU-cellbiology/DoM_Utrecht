@@ -328,7 +328,7 @@ public class ParallelLMA
 	// ************************************************************************************
 	
 	//private static void run(GPUBase gpu, ImageStack dataset) // old function header
-	public static void run(GPUBase gpu, int batch_size, int lwg_size, int iterations, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, double pixel_size, boolean ignore_false_positives, ResultsTable res_table)
+	public static void run(GPUBase gpu, boolean use_mle, int batch_size, int lwg_size, int iterations, ImagePlus image, double[][] detected_particles, double[] frame_numbers, double psf_sigma, double pixel_size, boolean ignore_false_positives, ResultsTable res_table)
 	{
 		// get image stack
 		ImageStack dataset = image.getStack();
@@ -376,14 +376,22 @@ public class ParallelLMA
 		cl_mem standard_errors_buffer = clCreateBuffer(gpu._ocl_context, CL_MEM_WRITE_ONLY, batch_size * NUM_FITTING_PARAMETERS * CL_DATATYPE_SIZE, null, null);
 		
 		// create kernels
-		cl_kernel calculate_current_chi2 = clCreateKernel(gpu._ocl_program, "calculate_chi2", null);
-		clSetKernelArg(calculate_current_chi2, 0, Sizeof.cl_mem, Pointer.to(image_data_buffer));
-		clSetKernelArg(calculate_current_chi2, 1, Sizeof.cl_mem, Pointer.to(x_positions_buffer));
-		clSetKernelArg(calculate_current_chi2, 2, Sizeof.cl_mem, Pointer.to(y_positions_buffer));
-		clSetKernelArg(calculate_current_chi2, 3, Sizeof.cl_int, Pointer.to(new int[]{spot_width}));
-		clSetKernelArg(calculate_current_chi2, 4, Sizeof.cl_int, Pointer.to(new int[]{spot_height}));
-		clSetKernelArg(calculate_current_chi2, 5, Sizeof.cl_mem, Pointer.to(parameters_buffer));
-		clSetKernelArg(calculate_current_chi2, 6, Sizeof.cl_mem, Pointer.to(current_chi2_buffer));
+		cl_kernel calculate_current_goodness = null;
+		if(use_mle)
+		{
+			calculate_current_goodness = clCreateKernel(gpu._ocl_program, "calculate_log_mle", null);
+		}
+		else
+		{
+			calculate_current_goodness = clCreateKernel(gpu._ocl_program, "calculate_chi2", null);
+		}
+		clSetKernelArg(calculate_current_goodness, 0, Sizeof.cl_mem, Pointer.to(image_data_buffer));
+		clSetKernelArg(calculate_current_goodness, 1, Sizeof.cl_mem, Pointer.to(x_positions_buffer));
+		clSetKernelArg(calculate_current_goodness, 2, Sizeof.cl_mem, Pointer.to(y_positions_buffer));
+		clSetKernelArg(calculate_current_goodness, 3, Sizeof.cl_int, Pointer.to(new int[]{spot_width}));
+		clSetKernelArg(calculate_current_goodness, 4, Sizeof.cl_int, Pointer.to(new int[]{spot_height}));
+		clSetKernelArg(calculate_current_goodness, 5, Sizeof.cl_mem, Pointer.to(parameters_buffer));
+		clSetKernelArg(calculate_current_goodness, 6, Sizeof.cl_mem, Pointer.to(current_chi2_buffer));
 		
 		cl_kernel calculate_alpha_matrix = clCreateKernel(gpu._ocl_program, "calculate_alpha_matrix", null);
 		clSetKernelArg(calculate_alpha_matrix, 0, Sizeof.cl_mem, Pointer.to(x_positions_buffer));
@@ -423,15 +431,23 @@ public class ParallelLMA
 		clSetKernelArg(calculate_updated_parameters, 0, Sizeof.cl_mem, Pointer.to(parameters_buffer));
 		clSetKernelArg(calculate_updated_parameters, 1, Sizeof.cl_mem, Pointer.to(da_vector_buffer));
 		clSetKernelArg(calculate_updated_parameters, 2, Sizeof.cl_mem, Pointer.to(updated_parameters_buffer));
-		 
-		cl_kernel calculate_updated_chi2 = clCreateKernel(gpu._ocl_program, "calculate_chi2", null);
-		clSetKernelArg(calculate_updated_chi2, 0, Sizeof.cl_mem, Pointer.to(image_data_buffer));
-		clSetKernelArg(calculate_updated_chi2, 1, Sizeof.cl_mem, Pointer.to(x_positions_buffer));
-		clSetKernelArg(calculate_updated_chi2, 2, Sizeof.cl_mem, Pointer.to(y_positions_buffer));
-		clSetKernelArg(calculate_updated_chi2, 3, Sizeof.cl_int, Pointer.to(new int[]{spot_width}));
-		clSetKernelArg(calculate_updated_chi2, 4, Sizeof.cl_int, Pointer.to(new int[]{spot_height}));
-		clSetKernelArg(calculate_updated_chi2, 5, Sizeof.cl_mem, Pointer.to(updated_parameters_buffer));
-		clSetKernelArg(calculate_updated_chi2, 6, Sizeof.cl_mem, Pointer.to(updated_chi2_buffer));
+		
+		cl_kernel calculate_updated_goodness = null;
+		if(use_mle)
+		{
+			calculate_updated_goodness = clCreateKernel(gpu._ocl_program, "calculate_log_mle", null);
+		}
+		else
+		{
+			calculate_updated_goodness = clCreateKernel(gpu._ocl_program, "calculate_chi2", null);
+		}
+		clSetKernelArg(calculate_updated_goodness, 0, Sizeof.cl_mem, Pointer.to(image_data_buffer));
+		clSetKernelArg(calculate_updated_goodness, 1, Sizeof.cl_mem, Pointer.to(x_positions_buffer));
+		clSetKernelArg(calculate_updated_goodness, 2, Sizeof.cl_mem, Pointer.to(y_positions_buffer));
+		clSetKernelArg(calculate_updated_goodness, 3, Sizeof.cl_int, Pointer.to(new int[]{spot_width}));
+		clSetKernelArg(calculate_updated_goodness, 4, Sizeof.cl_int, Pointer.to(new int[]{spot_height}));
+		clSetKernelArg(calculate_updated_goodness, 5, Sizeof.cl_mem, Pointer.to(updated_parameters_buffer));
+		clSetKernelArg(calculate_updated_goodness, 6, Sizeof.cl_mem, Pointer.to(updated_chi2_buffer));
 		
 		cl_kernel update_parameters = clCreateKernel(gpu._ocl_program, "update_parameters", null);
 		clSetKernelArg(update_parameters, 0, Sizeof.cl_mem, Pointer.to(current_chi2_buffer));
@@ -456,7 +472,7 @@ public class ParallelLMA
 //		long write_image_data_buffer_profiling = 0l;
 //		long write_parameters_buffer_profiling = 0l;
 //		long write_lambda_buffer_profiling = 0l;
-//		long calculate_current_chi2_profiling = 0l;
+//		long calculate_current_goodness_profiling = 0l;
 //		long calculate_alpha_matrix_profiling = 0l;
 //		long calculate_beta_vector_profiling = 0l;
 //		long cholesky_decomposition_profiling = 0l;
@@ -464,7 +480,7 @@ public class ParallelLMA
 //		long multiply_matrices_profiling = 0l;
 //		long calculate_da_vector_profiling = 0l;
 //		long calculate_updated_parameters_profiling = 0l;
-//		long calculate_updated_chi2_profiling = 0l;
+//		long calculate_updated_goodness_profiling = 0l;
 //		long update_parameters_profiling = 0l;
 //		long read_parameters_buffer_profiling = 0l;
 		
@@ -621,7 +637,7 @@ public class ParallelLMA
 			// STEP: calculate chi2 for current parameters
 			// NOTE: updated chi2 is retained in update_parameters
 			// NOTE: updated chi2 is current chi2 in next iteration!
-			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_current_chi2, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
+			clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_current_goodness, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
 			
 //			if(PROFILING_MODE_ENABLED)
 //			{
@@ -630,7 +646,7 @@ public class ParallelLMA
 //				start_time = profiling_result[0];
 //				clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_END, Sizeof.cl_long, Pointer.to(profiling_result), null);
 //				end_time = profiling_result[0];
-//				calculate_current_chi2_profiling += end_time - start_time;
+//				calculate_current_goodness_profiling += end_time - start_time;
 //			}
 			
 			// iterate fixed number of times
@@ -862,7 +878,7 @@ public class ParallelLMA
 //				}
 				
 				// STEP: calculate chi2 for updated parameters
-				clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_updated_chi2, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
+				clEnqueueNDRangeKernel(gpu._ocl_queue, calculate_updated_goodness, 1, null, new long[]{batch_size}, lwgs, 0, null, null);
 				
 //				// DEBUG: print intermediate results
 //				float[] updated_chi2_dbp = new float[batch_size]; // NOTE: outside if statement on purpose
@@ -881,7 +897,7 @@ public class ParallelLMA
 //					start_time = profiling_result[0];
 //					clGetEventProfilingInfo(kernel_event, CL_PROFILING_COMMAND_END, Sizeof.cl_long, Pointer.to(profiling_result), null);
 //					end_time = profiling_result[0];
-//					calculate_updated_chi2_profiling += end_time - start_time;
+//					calculate_updated_goodness_profiling += end_time - start_time;
 //				}
 				
 				// STEP: update parameters (conditional)
@@ -1197,12 +1213,12 @@ public class ParallelLMA
 //			System.err.println("Number of iterations = " + MAX_ITERATIONS);
 //			System.err.println();
 //			
-//			long total_execution_time = transform_data_profiling + write_image_data_buffer_profiling + write_parameters_buffer_profiling + write_lambda_buffer_profiling + calculate_current_chi2_profiling + calculate_alpha_matrix_profiling + calculate_beta_vector_profiling + cholesky_decomposition_profiling + forward_substitution_profiling + multiply_matrices_profiling + calculate_da_vector_profiling + calculate_updated_parameters_profiling + calculate_updated_chi2_profiling + update_parameters_profiling + read_parameters_buffer_profiling;
+//			long total_execution_time = transform_data_profiling + write_image_data_buffer_profiling + write_parameters_buffer_profiling + write_lambda_buffer_profiling + calculate_current_goodness_profiling + calculate_alpha_matrix_profiling + calculate_beta_vector_profiling + cholesky_decomposition_profiling + forward_substitution_profiling + multiply_matrices_profiling + calculate_da_vector_profiling + calculate_updated_parameters_profiling + calculate_updated_goodness_profiling + update_parameters_profiling + read_parameters_buffer_profiling;
 //			System.err.format("Transform data\t\t\t%.0f%%\t%.2f\n", 100 * transform_data_profiling / (float)total_execution_time, 1e-6 * transform_data_profiling);
 //			System.err.format("Write image data buffer\t\t%.0f%%\t%.2f\n", 100 * write_image_data_buffer_profiling / (float)total_execution_time, 1e-6 * write_image_data_buffer_profiling);
 //			System.err.format("Write parameters buffer\t\t%.0f%%\t%.2f\n", 100 * write_parameters_buffer_profiling / (float)total_execution_time, 1e-6 * write_parameters_buffer_profiling);
 //			System.err.format("Write lambda buffer\t\t%.0f%%\t%.2f\n", 100 * write_lambda_buffer_profiling / (float)total_execution_time, 1e-6 * write_lambda_buffer_profiling);
-//			System.err.format("Calculate current chi2\t\t%.0f%%\t%.2f\n", 100 * calculate_current_chi2_profiling / (float)total_execution_time, 1e-6 * calculate_current_chi2_profiling);
+//			System.err.format("Calculate current chi2\t\t%.0f%%\t%.2f\n", 100 * calculate_current_goodness_profiling / (float)total_execution_time, 1e-6 * calculate_current_goodness_profiling);
 //			System.err.format("Calculate alpha matrix\t\t%.0f%%\t%.2f\n", 100 * calculate_alpha_matrix_profiling / (float)total_execution_time, 1e-6 * calculate_alpha_matrix_profiling);
 //			System.err.format("Calculate beta vector\t\t%.0f%%\t%.2f\n", 100 * calculate_beta_vector_profiling / (float)total_execution_time, 1e-6 * calculate_beta_vector_profiling);
 //			System.err.format("Cholesky decomposition\t\t%.0f%%\t%.2f\n", 100 * cholesky_decomposition_profiling / (float)total_execution_time, 1e-6 * cholesky_decomposition_profiling);
@@ -1210,7 +1226,7 @@ public class ParallelLMA
 //			System.err.format("Multiply matrices\t\t%.0f%%\t%.2f\n", 100 * multiply_matrices_profiling / (float)total_execution_time, 1e-6 * multiply_matrices_profiling);
 //			System.err.format("Calculate da vector\t\t%.0f%%\t%.2f\n", 100 * calculate_da_vector_profiling / (float)total_execution_time, 1e-6 * calculate_da_vector_profiling);
 //			System.err.format("Calculate updated parameters\t%.0f%%\t%.2f\n", 100 * calculate_updated_parameters_profiling / (float)total_execution_time, 1e-6 * calculate_updated_parameters_profiling);
-//			System.err.format("Calculate updated chi2\t\t%.0f%%\t%.2f\n", 100 * calculate_updated_chi2_profiling / (float)total_execution_time, 1e-6 * calculate_updated_chi2_profiling);
+//			System.err.format("Calculate updated chi2\t\t%.0f%%\t%.2f\n", 100 * calculate_updated_goodness_profiling / (float)total_execution_time, 1e-6 * calculate_updated_goodness_profiling);
 //			System.err.format("Update parameters\t\t%.0f%%\t%.2f\n", 100 * update_parameters_profiling / (float)total_execution_time, 1e-6 * update_parameters_profiling);
 //			System.err.format("Read fitted parameters\t\t%.0f%%\t%.2f\n", 100 * read_parameters_buffer_profiling / (float)total_execution_time, 1e-6 * read_parameters_buffer_profiling);
 //			System.err.format("Total execution time\t\t%.0f%%\t%.2f\n", 100 * total_execution_time / (float)total_execution_time, 1e-6 * total_execution_time);
@@ -1241,7 +1257,7 @@ public class ParallelLMA
 		// release kernels
 		clReleaseKernel(calculate_standard_error);
 		clReleaseKernel(update_parameters);
-		clReleaseKernel(calculate_updated_chi2);
+		clReleaseKernel(calculate_updated_goodness);
 		clReleaseKernel(calculate_updated_parameters);
 		clReleaseKernel(calculate_da_vector);
 		clReleaseKernel(multiply_matrices);
@@ -1249,7 +1265,7 @@ public class ParallelLMA
 		clReleaseKernel(cholesky_decomposition);
 		clReleaseKernel(calculate_beta_vector);
 		clReleaseKernel(calculate_alpha_matrix);
-		clReleaseKernel(calculate_current_chi2);
+		clReleaseKernel(calculate_current_goodness);
 		
 		// release buffers
 		clReleaseMemObject(standard_errors_buffer);

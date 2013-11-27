@@ -26,7 +26,8 @@ public class SMLDialog {
 	int nBatchSize; // number of spots per batch for GPU processing
 	int nGroupSize; // size of local workgroups on GPU
 	int nIterations; // fixed number of iterations on GPU
-	
+	boolean bUseMLE; // fixed number of iterations on GPU
+
 	//reconstructing image
 	int nRecParticles;       //what type of particles use for reconstruction 
 	double dRecPixelSize;    //pixel size in nm of reconstructed image
@@ -79,10 +80,11 @@ public class SMLDialog {
 		fpDial.addNumericField("Number of parallel threads", Prefs.get("SiMoLoc.nThreads", 50), 0);
 		fpDial.addCheckbox("Mark detected particles? (better not use this feature on big datasets)", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
-		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
+		fpDial.addCheckbox("Use GPU acceleration", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
 		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0);
 		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);
 		fpDial.addNumericField("Iterations", Prefs.get("SiMoLoc.nIterations", 30), 0);
+		//fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
 		
 		
 		fpDial.showDialog();
@@ -111,7 +113,9 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.nGroupSize", nGroupSize);
 		nIterations = (int)fpDial.getNextNumber();
 		Prefs.set("SiMoLoc.nIterations", nIterations);
-
+		bUseMLE = false;// TODO: set to fpDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bUseMLE", bUseMLE);
+		
 		return true;
 	}
 	

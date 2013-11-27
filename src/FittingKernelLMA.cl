@@ -48,6 +48,7 @@ __constant fp_type MIN_EPSILON = 1e-30f;
 // *****************************************************************************************
 
 fp_type gaussian2D(__private const fp_type x, __private const fp_type y, __global const fp_type* const parameters);
+fp_type gaussian2Dn(__private const fp_type x, __private const fp_type y, __global const fp_type* const parameters);
 
 /*
 //fp_type gaussian2D_derivative_0(__private const fp_type x, __private const fp_type y, __global const fp_type* const parameters);
@@ -68,6 +69,11 @@ fp_type gaussian2D_derivative_5(__private const fp_type x, __private const fp_ty
 fp_type gaussian2D(__private const fp_type x, __private const fp_type y, __global const fp_type* const parameters)
 {
 	return parameters[PARAM_BACKGROUND] + parameters[PARAM_AMPLITUDE] * exp(-0.5f * ((x-parameters[PARAM_X_SPOS])*(x-parameters[PARAM_X_SPOS])/(parameters[PARAM_X_SIGMA]*parameters[PARAM_X_SIGMA]) + (y-parameters[PARAM_Y_SPOS])*(y-parameters[PARAM_Y_SPOS])/(parameters[PARAM_Y_SIGMA]*parameters[PARAM_Y_SIGMA])));
+}
+
+fp_type gaussian2Dn(__private const fp_type x, __private const fp_type y, __global const fp_type* const parameters)
+{
+	return (1/(2*M_PI_F*parameters[PARAM_X_SIGMA]*parameters[PARAM_Y_SIGMA])) * exp(-0.5f * ((x-parameters[PARAM_X_SPOS])*(x-parameters[PARAM_X_SPOS])/(parameters[PARAM_X_SIGMA]*parameters[PARAM_X_SIGMA]) + (y-parameters[PARAM_Y_SPOS])*(y-parameters[PARAM_Y_SPOS])/(parameters[PARAM_Y_SIGMA]*parameters[PARAM_Y_SIGMA])));
 }
 
 /*
@@ -154,6 +160,34 @@ __kernel void calculate_chi2(__global const fp_type* const image_data, __global 
 	
 	// store result
 	chi2[global_id] = chi2_res;
+}
+
+// *****************************************************************************************
+
+__kernel void calculate_log_mle(__global const fp_type* const image_data, __global const fp_type* const x_positions, __global const fp_type* const y_positions, __private const int image_width, __private const int image_height, __global const fp_type* const parameters, __global fp_type* const log_mle)
+{
+	// work unit
+	__private const int global_id = get_global_id(0);
+	__private const int image_pixel_count = image_width * image_height;
+	__global const fp_type* const my_image_data = image_data+(global_id * image_pixel_count);
+	__global const fp_type* const my_x_positions = x_positions+(global_id * image_pixel_count);
+	__global const fp_type* const my_y_positions = y_positions+(global_id * image_pixel_count);
+	__global const fp_type* const my_parameters = parameters+(global_id * GAUSSIAN_2D_PARAMETERS);
+	//__global fp_type* const my_chi2 = chi2+(global_id);
+	
+	// loop over all pixels in image to sum the product of difference between image and model
+	__private fp_type log_mle_res = 0.0f;
+	for(__private int y = 0; y < image_height; ++y)
+	{
+		for(__private int x = 0; x < image_width; ++x)
+		{
+			// calculate log maximum likelihood
+			log_mle_res += gaussian2Dn(my_x_positions[mad24(y,image_width,x)], my_y_positions[mad24(y,image_width,x)], my_parameters) * my_image_data[mad24(y,image_width,x)];
+		}
+	}
+	
+	// store result
+	log_mle[global_id] = log_mle_res;
 }
 
 // *****************************************************************************************
@@ -665,7 +699,7 @@ __kernel void calculate_standard_error(__global fp_type* const inverse_alpha_mat
 	// work unit
 	__private const int global_id = get_global_id(0);
 	__global fp_type* const my_inverse_alpha_matrix = inverse_alpha_matrix+(global_id * GAUSSIAN_2D_PARAMETERS * GAUSSIAN_2D_PARAMETERS);
-	__global fp_type* my_standard_errors = standard_errors+(global_id * GAUSSIAN_2D_PARAMETERS);
+	__global fp_type* const my_standard_errors = standard_errors+(global_id * GAUSSIAN_2D_PARAMETERS);
 	
 	my_standard_errors[0] = sqrt(my_inverse_alpha_matrix[0]);
 	my_standard_errors[1] = sqrt(my_inverse_alpha_matrix[7]);
@@ -674,7 +708,3 @@ __kernel void calculate_standard_error(__global fp_type* const inverse_alpha_mat
 	my_standard_errors[4] = sqrt(my_inverse_alpha_matrix[28]);
 	my_standard_errors[5] = sqrt(my_inverse_alpha_matrix[35]);
 }
-
-// *****************************************************************************************
-
-// TEST ENVIRONMENT
