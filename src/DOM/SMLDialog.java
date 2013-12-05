@@ -80,10 +80,12 @@ public class SMLDialog {
 		fpDial.addNumericField("Number of parallel threads", Prefs.get("SiMoLoc.nThreads", 50), 0);
 		fpDial.addCheckbox("Mark detected particles? (better not use this feature on big datasets)", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
-		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
-		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
-		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
-		fpDial.addNumericField("Iterations", Prefs.get("SiMoLoc.nIterations", 30), 0);
+		
+		fpDial.setInsets(15, 20, 0); // extra space on top
+		fpDial.addCheckbox("Accelerate using GPU", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
+		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 4196), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
+		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 256), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
+		fpDial.addNumericField("Iterations", Prefs.get("SiMoLoc.nIterations", 10), 0);
 		//fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
 		
 		fpDial.setResizable(false);
