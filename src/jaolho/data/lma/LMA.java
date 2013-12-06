@@ -364,6 +364,11 @@ public class LMA {
 	}
 	
 	
+	public void setMaxIterations(int new_maximum)
+	{
+		maxIterations = new_maximum;
+	}
+	
 	/** 
 	 * The default fit. If used after calling fit(lambda, minDeltaChi2, maxIterations),
 	 * uses those values. The stop condition is fetched from <code>this.stop()</code>.
@@ -372,8 +377,12 @@ public class LMA {
 	public void fit() throws LMAMatrix.InvertException {
 		iterationCount = 0;
 		if (Double.isNaN(calculateChi2())) throw new RuntimeException("INITIAL PARAMETERS ARE ILLEGAL.");
-		do {
-			chi2 = calculateChi2();
+		//updateAlpha();
+		//updateBeta();
+		chi2 = calculateChi2();
+		
+		while(!stop()) { // do
+			//chi2 = calculateChi2(); // value is retained
 			if (verbose) System.out.println(iterationCount + ": chi2 = " + chi2 + ", " + Arrays.toString(parameters));
 			updateAlpha();
 			updateBeta();
@@ -388,6 +397,7 @@ public class LMA {
 				else {
 					lambda /= lambdaFactor;
 					updateParameters();
+					chi2 = incrementedChi2; // retain new chi2 value
 				}
 			}
 			catch (LMAMatrix.InvertException e) {
@@ -400,8 +410,8 @@ public class LMA {
 				lambda *= lambdaFactor;
 			}
 			iterationCount++;
-		} while (!stop());
-		printEndReport();
+		}// while (!stop());
+		//printEndReport();
 	}
 	
 	private void printEndReport() {
@@ -435,7 +445,8 @@ public class LMA {
 	 * Override this if you want to use another stop condition.
 	 */
 	public boolean stop() {
-		return Math.abs(chi2 - incrementedChi2) < minDeltaChi2 || iterationCount > maxIterations;
+		//return Math.abs(chi2 - incrementedChi2) < minDeltaChi2 || iterationCount > maxIterations;
+		return iterationCount >= maxIterations;
 	}
 	
 	/** Updates parameters from incrementedParameters. */

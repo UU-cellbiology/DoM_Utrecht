@@ -334,6 +334,7 @@ public class SMLAnalysis {
 				dFitParams[5]= fdg.dPSFsigma;
 				nFalsePositive = 0.0;
 				SMLlma = new LMA(GFit, dFitParams, spotInt);
+				SMLlma.setMaxIterations(fdg.nIterations);
 				try
 				{
 					SMLlma.fit();
