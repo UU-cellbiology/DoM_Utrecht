@@ -1,27 +1,148 @@
-<project name="DoM_" default="" basedir=".">
-    <description>
-        DoM_ build file
-    </description>
-  <property name="src" location="src" />
-  <property name="build" location="bin" />
-  <property name="dist"  location="dist" />
- 
-	 <property name="pluginsDir"  location="$basedir/../../IJ/plugins/" />
- 
-  <property name="user.name" value="Yevhen Katrukha" />
-<target name="main" depends="compress" description="Main target">
-	<echo>
-		Building the .jar file.
-	</echo>
-</target>
- <target name="compress" depends="" description="generate the distribution">
- 	<jar jarfile="DoM_.jar">
- 		<fileset dir="." includes="plugins.config" />
-		<fileset dir="${build}" includes="**/*.*" />
- 		<manifest>
- 		 	 	      <attribute name="Built-By" value="${user.name}"/>
- 		</manifest>
- 	</jar>
-    <copy file="DoM_.jar" toDir="${pluginsDir}" />
-  </target>
+<project name="DoM_GPU" default="" basedir=".">
+	
+	<description>DoM GPU Fiji plug-in build file</description>
+	
+	<!-- user configuration -->
+	<property name="Fiji" location="/Applications/Fiji.app" />
+	<property name="FijiPluginsDir" location="${Fiji}/plugins/" />
+	<property name="FijiJarsDir" location="${Fiji}/jars/" />
+	
+	<!-- directories -->
+	<property name="src" location="src" />
+	<property name="build" location="bin" />
+	<property name="dist" location="dist" />
+	<property name="lib" location="lib" />
+	<property name="rel" location="rel" />
+	
+	<!-- manifest properties -->
+	<property name="project.name" value="Detection of Molecules" />
+	<property name="vendor.name" value="Utrecht University, Netherlands" />
+	<property name="developer.name" value="Yevhen Katrukha, Jalmar Teeuw, Jens den Braber" />
+	<property name="version" value="0.9.0" />
+	
+	<tstamp>
+		<format property="date.today" pattern="yyyy-MM-dd HH:mm:ss" />
+	</tstamp>
+	
+	<!-- java class path -->
+	<path id="dom.classpath">
+		<fileset dir="${lib}">
+			<include name="ij-1.48i.jar" />
+			<include name="jocl-0.1.9.jar" />
+		</fileset>
+		<fileset dir="${dist}">
+			<include name="jaolho.jar" />
+		</fileset>
+	</path>
+	<path id="jaolho.classpath">
+		<fileset dir="${lib}">
+			<include name="jama.jar" />
+		</fileset>
+	</path>
+	
+	<!-- main target -->
+	<target name="main" depends="build" description="Main target">
+		<echo>Building the DoM plug-in</echo>
+	</target>
+	
+	<!-- compile target -->
+	<target name="build" depends="compress" description="building DoM">
+		<echo>Building DoM plug-in</echo>
+	</target>
+	
+	<!-- compress target -->
+	<target name="compress" depends="compile" description="generate JAR-file">
+		<echo>Compress class-files into JAR-file</echo>
+		<mkdir dir="${dist}" />
+		<!--<copy file="${src}/FittingKernelLMA.cl" toDir="${build}" />-->
+		<!--<copy file="${src}/plugins.config" toDir="${build}" />-->
+		<jar jarfile="${dist}/DoM_GPU-${version}.jar">
+			<fileset dir="${build}" includes="DOM/**" />
+			<fileset dir="${src}" includes="FittingKernelLMA.cl" />
+			<fileset dir="${src}" includes="plugins.config" />
+			<manifest>
+				<attribute name="Signature-Title" value="${project.name}" />
+				<attribute name="Signature-Vendor" value="${vendor.name}" />
+ 		 	 	<attribute name="Built-By" value="${developer.name}"/>
+				<attribute name="Built-Date" value="${date.today}" />
+			</manifest>
+		</jar>
+	</target>
+	
+	<!-- compile target -->
+	<target name="compile" depends="jaolho" description="compiling source code">
+		<echo>Compiling source code</echo>
+		<mkdir dir="${build}" />
+		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
+			<compilerarg value="-Xlint:unchecked" />
+			<src path="${src}/DOM" />
+			<classpath refid="dom.classpath" />
+		</javac>
+	</target>
+	
+	<!-- jaolho target -->
+	<target name="jaolho" depends="" description="building jaolho library">
+		<echo>Compiling jaolho library</echo>
+		<mkdir dir="${build}" />
+		<javac destdir="${build}" source="1.6" target="1.6" includeantruntime="false">
+			<compilerarg value="-Xlint:unchecked" />
+			<src path="${src}/jaolho" />
+			<classpath refid="jaolho.classpath" />
+		</javac>
+		
+		<echo>Compress class-files into JAR-file</echo>
+		<mkdir dir="${dist}" />
+		<jar jarfile="${dist}/jaolho.jar">
+			<fileset dir="${build}" includes="jaolho/**" />
+		</jar>
+	</target>
+	
+	<!-- release target -->
+	<target name="release" depends="main" description="release distribution">
+		<copy file="${dist}/DoM_GPU-${version}.jar" toFile="${rel}/DoM_GPU-${version}-RELEASE.jar" />
+		<copy file="${dist}/jaolho.jar" toDir="${rel}" />
+		<copy file="${lib}/jocl-0.1.9.jar" toDir="${rel}" />
+	</target>
+	
+	<!-- install target -->
+	<target name="install" depends="main" description="install distribution">
+		<copy file="${dist}/DoM_GPU-${version}.jar" toFile="${FijiPluginsDir}/DoM_GPU-${version}-SNAPSHOT.jar" verbose="true" />
+		<copy file="${dist}/jaolho.jar" toDir="${FijiJarsDir}" verbose="true" />
+		<copy file="${lib}/jocl-0.1.9.jar" toDir="${FijiJarsDir}" verbose="true" />
+	</target>
+	
+	<!-- install release target -->
+	<target name="install-release" depends="release" description="install release distribution">
+		<copy file="${rel}/DoM_GPU-${version}-RELEASE.jar" toFile="${FijiPluginsDir}/DoM_GPU-${version}-RELEASE.jar" verbose="true" />
+		<copy file="${rel}/jaolho.jar" toDir="${FijiJarsDir}" verbose="true" />
+		<copy file="${rel}/jocl-0.1.9.jar" toDir="${FijiJarsDir}" verbose="true" />
+	</target>
+	
+	<!-- clean target -->
+	<target name="clean" depends="" description="clean build directory">
+		<echo>Cleaning build directory</echo>
+		<delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${build}" includes="**" defaultexcludes="no" />
+		</delete>
+	</target>
+	
+	<!-- deep clean target -->
+	<target name="deep-clean" depends="clean" description="clean distribution directory">
+		<echo>Cleaning distribution directory</echo>
+		<delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${dist}" includes="**" defaultexcludes="no" />
+			<!--<fileset dir="${lib}" includes="jaolho.jar" />-->
+		</delete>
+	</target>
+	
+	<!-- uninstall -->
+	<target name="uninstall" depends="" description="uninstall distribution">
+		<echo>Uninstalling distribution directory</echo>
+		<delete includeemptydirs="true" failonerror="false" verbose="true">
+			<fileset dir="${FijiPluginsDir}" includes="DoM_GPU*" defaultexcludes="no" />
+			<fileset dir="${FijiJarsDir}" includes="jaolho.jar" defaultexcludes="no" />
+			<fileset dir="${FijiJarsDir}" includes="jocl-0.1.9.jar" defaultexcludes="no" />
+		</delete>
+	</target>
+	
 </project>
