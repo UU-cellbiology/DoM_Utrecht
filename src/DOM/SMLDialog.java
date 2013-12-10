@@ -83,8 +83,8 @@ public class SMLDialog {
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		
 		fpDial.setInsets(15, 20, 0); // extra space on top
-		fpDial.addCheckbox("Use GPU acceleration (experimental)", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
-		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 2048), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
+		fpDial.addCheckbox("Accelerate using GPU", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
+		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 4096), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
 		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
 		//fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
 		

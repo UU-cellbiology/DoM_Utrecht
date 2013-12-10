@@ -486,7 +486,8 @@ public class LMA {
 				);
 				return Double.NaN;
 			}
-			result += weights[i] * dy * dy; 
+			//result += weights[i] * dy * dy;
+			result += dy * dy;
 		}
 		return result;
 	}
@@ -509,10 +510,29 @@ public class LMA {
 	
 	/** Calculates all elements for <code>this.alpha</code>. */
 	protected void updateAlpha() {
-		for (int i = 0; i < parameters.length; i++) {
-			for (int j = 0; j < parameters.length; j++) {
-				alpha.setElement(i, j, calculateAlphaElement(i, j));
+		//for (int i = 0; i < parameters.length; i++) {
+		//	for (int j = 0; j < parameters.length; j++) {
+		//		alpha.setElement(i, j, calculateAlphaElement(i, j));
+		//	}
+		//}
+		
+		// non-diagonal elements
+		for(int i = 0; i < parameters.length; ++i)
+		{
+			for(int j = i+1; j < parameters.length; ++j)
+			{
+				double alpha_value = calculateAlphaElement(i, j); // same as (j, i)
+				alpha.setElement(i, j, alpha_value);
+				alpha.setElement(j, i, alpha_value); // exploit symmetry
 			}
+		}
+		
+		// diagonal elements
+		for(int k = 0; k < parameters.length; ++k)
+		{
+			double alpha_value = calculateAlphaElement(k, k);
+			alpha_value *= (1 + lambda); // Marquardt's lambda addition
+			alpha.setElement(k, k, alpha_value);
 		}
 	}
 	
@@ -524,12 +544,12 @@ public class LMA {
 		double result = 0;
 		for (int i = 0; i < yDataPoints.length; i++) {
 			result += 
-				weights[i] * 
+				//weights[i] * // removed weights
 				function.getPartialDerivate(xDataPoints[i], parameters, row) *
 				function.getPartialDerivate(xDataPoints[i], parameters, col);
 		}
-		// Marquardt's lambda addition
-		if (row == col) result *= (1 + lambda);
+//		// Marquardt's lambda addition
+//		if (row == col) result *= (1 + lambda);
 		return result;
 	}
 	
@@ -548,7 +568,7 @@ public class LMA {
 		double result = 0;
 		for (int i = 0; i < yDataPoints.length; i++) {
 			result += 
-				weights[i] * 
+				//weights[i] * // removed weights
 				(yDataPoints[i] - function.getY(xDataPoints[i], parameters)) *
 				function.getPartialDerivate(xDataPoints[i], parameters, row);
 		}
@@ -637,7 +657,7 @@ public class LMA {
 				result[i][j] = alpha.getElement(i, j);
 			}
 		}
-		alpha.invert();
+		//alpha.invert(); // redundant!
 		lambda = oldLambda;
 		updateAlpha();
 		return result;
