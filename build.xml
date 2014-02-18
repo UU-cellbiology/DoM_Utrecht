@@ -18,7 +18,7 @@
 	<property name="project.name" value="Detection of Molecules" />
 	<property name="vendor.name" value="Utrecht University, Netherlands" />
 	<property name="developer.name" value="Yevhen Katrukha, Jalmar Teeuw, Jens den Braber" />
-	<property name="version" value="0.9.0" />
+	<property name="version" value="0.9.1" />
 	
 	<tstamp>
 		<format property="date.today" pattern="yyyy-MM-dd HH:mm:ss" />

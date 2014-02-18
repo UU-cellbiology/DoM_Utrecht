@@ -276,7 +276,7 @@ public class SMLAnalysis {
 	{
 		int width = ipRaw.getWidth();
 		int height = ipRaw.getHeight();
-		int i,j, nCount, nParticlesCount, nParticlesNumber;		
+		int x,y, i,j, nCount, nParticlesCount, nParticlesNumber;		
 		double xCentroid, yCentroid, xSD, ySD;
 		double dIntAmp, dIntNoise;
 		double dIMax, dIMin, dInt;
@@ -285,17 +285,22 @@ public class SMLAnalysis {
 		int dBorder; // radius in pixels around center point to fit Gaussian
 		double nFalsePositive;				
 		
-		double [][] spotInt;		
+		double [][] spotInt;
+		double [][] spotXpos;
+		double [][] spotYpos;
 		double [] dFitParams;
 		double [] dFitErrors;
 		double dErrCoeff;
-		LMA SMLlma;
-		SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
+		LevenbergMarquardt SMLlma = new LevenbergMarquardt();
+		//LMA SMLlma;
+		//SMLTwoDGaussian GFit = new SMLTwoDGaussian(); 
 		OvalRoi spotROI;
 		
 		//initialization
 		dBorder= (int)(fdg.dPSFsigma*DOMConstants.FITRADIUS);
-		spotInt = new double [(2*dBorder+1)*(2*dBorder+1)][3];
+		spotInt = new double [(2*dBorder+1)][(2*dBorder+1)];
+		spotXpos = new double [(2*dBorder+1)][(2*dBorder+1)];
+		spotYpos = new double [(2*dBorder+1)][(2*dBorder+1)];
 		dFitParams = new double [6];
 		dFitErrors = new double [6];
 		nParticlesNumber = particles_[0].length;
@@ -307,13 +312,13 @@ public class SMLAnalysis {
 			nCount = 0;
 			dIMin = 10000000;
 			dIMax = -100;
-			for(i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; i++)
-				for(j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; j++)
+			for(x = 0, i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; ++x, i++)
+				for(y = 0, j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; ++y, j++)
 				{					
 					dInt = ipRaw.getPixel(i,j);
-					spotInt[nCount][0] =dInt;
-					spotInt[nCount][1] =(double)i;
-					spotInt[nCount][2] =(double)j;
+					spotInt[y][x] = dInt;
+					spotXpos[y][x] =(double)i;
+					spotYpos[y][x] =(double)j;
 					if(dInt>dIMax)
 						dIMax=dInt;
 					if(dInt<dIMin)
@@ -333,40 +338,45 @@ public class SMLAnalysis {
 				dFitParams[4]= fdg.dPSFsigma;
 				dFitParams[5]= fdg.dPSFsigma;
 				nFalsePositive = 0.0;
-				SMLlma = new LMA(GFit, dFitParams, spotInt);
-				try
-				{
-					SMLlma.fit();
-					dFitErrors = SMLlma.getStandardErrorsOfParameters();
-				}
-				catch (LMAMatrix.InvertException e) {
-					//matrix is inverted
-					//it is a bad fit
-					nFalsePositive = 1.0;
-				}				
+				//SMLlma = new LMA(GFit, dFitParams, spotInt);
+				//SMLlma.setMaxIterations(fdg.nIterations);
+				double[] fitted_parameters = new double[6];
+				double[] fit_errors = new double[6];
+				double chi2_fit = 0.0;
+				//try
+				//{
+					fitted_parameters = SMLlma.run(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, dFitParams, fdg.nIterations, 0.001);
+					fit_errors = SMLlma.calculateStandardErrors(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
+					chi2_fit = SMLlma.calculateChi2(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
+				//}
+				//catch (LMAMatrix.InvertException e) {
+				//	//matrix is inverted
+				//	//it is a bad fit
+				//	nFalsePositive = 1.0;
+				//}				
 				// scaling coefficient for parameters errors estimation 
 				// (Standard deviation of residuals)
-				dErrCoeff = Math.sqrt(SMLlma.chi2/(nCount-6));
-				for (i=0;i<6;i++)
-					dFitErrors[i] *= dErrCoeff; 
+				dErrCoeff = Math.sqrt(chi2_fit/(nCount-6));
+				for(i =0;i<6;i++)
+					fit_errors[i] *= dErrCoeff; 
 
 				//iterations didn't converge. suspicious point
-				if (SMLlma.iterationCount== 101)
-					nFalsePositive = 0.5;
+				//if (SMLlma.iterationCount== 101)
+				//	nFalsePositive = 0.5;
 				//spot is too big
-				xSD = Math.abs(SMLlma.parameters[4]);
-				ySD = Math.abs(SMLlma.parameters[5]);
+				xSD = Math.abs(fitted_parameters[4]);
+				ySD = Math.abs(fitted_parameters[5]);
 				if((xSD > 1.3*fdg.dPSFsigma) || (xSD<0.70*fdg.dPSFsigma)||(ySD<0.70*fdg.dPSFsigma)||(ySD > 1.3*fdg.dPSFsigma))
 					nFalsePositive = 1.0;
 				//localization precision is bigger than PSF size
-				if((dFitErrors[2] > fdg.dPSFsigma) || (dFitErrors[3] > fdg.dPSFsigma))
+				if((fit_errors[2] > fdg.dPSFsigma) || (fit_errors[3] > fdg.dPSFsigma))
 					nFalsePositive = 1.0;
 				//}
 				dIntAmp =0; dIntNoise = 0;			
 				dNoiseAvrg = 0;	dNoiseSD = 0;
 				dSNR = 0;
-				xCentroid = Math.round(SMLlma.parameters[2]+0.5);// 0.5 is for correction of pixel shift
-				yCentroid = Math.round(SMLlma.parameters[3]+0.5);
+				xCentroid = Math.round(fitted_parameters[2]+0.5);// 0.5 is for correction of pixel shift
+				yCentroid = Math.round(fitted_parameters[3]+0.5);
 				//calculating integrated spot intensity and estimating SNR
 				if(nFalsePositive<0.5)
 				{
@@ -377,8 +387,8 @@ public class SMLAnalysis {
 					if( ((xCentroid-xSD-1)>0) && ((yCentroid-ySD-1)>0) && ((xCentroid+xSD+1)<(width-1)) && ((yCentroid+ySD+1)<(height-1)))
 					{
 						//integrated intensity in 3SD * 3SD region
-						for(i=(int) (xCentroid-xSD); i<=(int)(xCentroid+xSD); i++)
-							for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
+						for(i =(int) (xCentroid-xSD); i<=(int)(xCentroid+xSD); i++)
+							for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 							{
 								dIntAmp += ipRaw.getPixel(i,j);
 							}
@@ -386,22 +396,22 @@ public class SMLAnalysis {
 
 						//averaged noise around spot
 						j = (int)(yCentroid-ySD-1);
-						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)	
+						for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)	
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
 						}
 						j = (int)(yCentroid+ySD+1);
-						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)
+						for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
 						}
 						i=(int) (xCentroid-xSD-1);
-						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
+						for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
 						}
 						i=(int) (xCentroid+xSD+1);
-						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
+						for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 						{
 							dIntNoise += ipRaw.getPixel(i,j);
 						}
@@ -411,49 +421,49 @@ public class SMLAnalysis {
 
 						//SD of noise
 						j = (int)(yCentroid-ySD-1);
-						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)							
+						for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)							
 							dNoiseSD += Math.pow(dNoiseAvrg - ipRaw.getPixel(i,j),2);
 						j = (int)(yCentroid+ySD+1);
-						for(i=(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)							
+						for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)							
 							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
 						i=(int) (xCentroid-xSD-1);
-						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
+						for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
 						i=(int) (xCentroid+xSD+1);
-						for(j=(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
+						for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 							dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
 						dNoiseSD = Math.sqrt(dNoiseSD/(4*xSD+4*ySD+8));
-						dSNR =  SMLlma.parameters[1]/dNoiseSD;
+						dSNR =  fitted_parameters[1]/dNoiseSD;
 					}
 				}
-				if(SMLlma.parameters[2]>0 && SMLlma.parameters[2]<width && SMLlma.parameters[3]>0 && SMLlma.parameters[3]<height && SMLlma.parameters[1]>0)
+				if(fitted_parameters[2]>0 && fitted_parameters[2]<width && fitted_parameters[3]>0 && fitted_parameters[3]<height && fitted_parameters[1]>0)
 					{
 						if(!(fdg.bIgnoreFP && nFalsePositive>0.3))
 						{
 							ptable_lock.lock();
 							ptable.incrementCounter();
 							
-							ptable.addValue("Amplitude_fit",SMLlma.parameters[1]);
+							ptable.addValue("Amplitude_fit",fitted_parameters[1]);
 							
-							ptable.addValue("X_(px)",SMLlma.parameters[2]);							
-							ptable.addValue("Y_(px)",SMLlma.parameters[3]);
-							ptable.addValue("X_(nm)",SMLlma.parameters[2]*fdg.dPixelSize);							
-							ptable.addValue("Y_(nm)",SMLlma.parameters[3]*fdg.dPixelSize);
+							ptable.addValue("X_(px)",fitted_parameters[2]);							
+							ptable.addValue("Y_(px)",fitted_parameters[3]);
+							ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
+							ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
 							ptable.addValue("Z_(nm)",0);
 							ptable.addValue("False positive", nFalsePositive);
-							ptable.addValue("X_loc_error(px)", dFitErrors[2]);
-							ptable.addValue("Y_loc_error(px)", dFitErrors[3]);
+							ptable.addValue("X_loc_error(px)", fit_errors[2]);
+							ptable.addValue("Y_loc_error(px)", fit_errors[3]);
 	
-							ptable.addValue("BGfit",SMLlma.parameters[0]);							
+							ptable.addValue("BGfit",fitted_parameters[0]);							
 							ptable.addValue("IntegratedInt",dIntAmp);
 							ptable.addValue("SNR", dSNR);
 	
-							ptable.addValue("chi2_fit",SMLlma.chi2);
+							ptable.addValue("chi2_fit",chi2_fit);
 							ptable.addValue("Frame Number", nFrame+1);					
-							ptable.addValue("Iterations_fit",SMLlma.iterationCount);
-							ptable.addValue("SD_X_fit_(px)",SMLlma.parameters[4]);
-							ptable.addValue("SD_Y_fit_(px)",SMLlma.parameters[5]);
-							ptable.addValue("Amp_loc_error",dFitErrors[1]);
+							ptable.addValue("Iterations_fit",fdg.nIterations);
+							ptable.addValue("SD_X_fit_(px)",fitted_parameters[4]);
+							ptable.addValue("SD_Y_fit_(px)",fitted_parameters[5]);
+							ptable.addValue("Amp_loc_error",fit_errors[1]);
 				
 							
 							ptable_lock.unlock();
@@ -522,9 +532,9 @@ public class SMLAnalysis {
 		
 		//first run, filling array with gaussian function Approximation values (integrated over pixel)
 		//and calculating number of pixels which will serve as a background
-		for (i=0; i<fdg.nKernelSize; i++)
+		for(i =0; i<fdg.nKernelSize; i++)
 		{
-			for (j=0; j<fdg.nKernelSize; j++)
+			for(j =0; j<fdg.nKernelSize; j++)
 			{
 				fDist = (i-nCenter)*(i-nCenter) + (j-nCenter)*(j-nCenter);
 				
@@ -545,9 +555,9 @@ public class SMLAnalysis {
 		fDivFactor = (float)(1.0/(double)nBgPixCount);
 		
 		//second run, normalization and background subtraction
-		for (i=0; i<fdg.nKernelSize; i++)
+		for(i =0; i<fdg.nKernelSize; i++)
 		{
-			for (j=0; j<fdg.nKernelSize; j++)
+			for(j =0; j<fdg.nKernelSize; j++)
 			{
 				fDist = (i-nCenter)*(i-nCenter) + (j-nCenter)*(j-nCenter);
 				//normalization
@@ -595,7 +605,7 @@ public class SMLAnalysis {
 	
 		//determine position and height of maximum count in histogram (mode)
 		//and height at maximum
-		for (i=0; i<nHistSize; i++)
+		for(i =0; i<nHistSize; i++)
 		{
 			
 			nCount=imgstat.histogram[i];
@@ -641,7 +651,7 @@ public class SMLAnalysis {
 		nDownCount = (int)dLeftWidth;
 		//preparing histogram range for fitting
 		dNoiseFit = new double [2][nUpCount-nDownCount+1];
-		for(i=nDownCount;i<=nUpCount;i++)
+		for(i =nDownCount;i<=nUpCount;i++)
 		{
 			dNoiseFit[0][i-nDownCount] = dHistogram[0][i];
 			dNoiseFit[1][i-nDownCount] = dHistogram[1][i];
@@ -656,9 +666,9 @@ public class SMLAnalysis {
 		// scaling coefficient for parameters errors estimation 
 		// (Standard deviation of residuals)
 		dErrCoeff = Math.sqrt(fitlma.chi2/(nUpCount-nDownCount+1-3));
-		for (i=0;i<3;i++)
+		for(i =0;i<3;i++)
 			dFitErrors[i] *= dErrCoeff;
-		for (i=0;i<3;i++)
+		for(i =0;i<3;i++)
 			dFitErrors[i] *= 100/fitlma.parameters[i]; 
 		
 		if (dFitErrors[1]> 20 || dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
@@ -753,7 +763,7 @@ public class SMLAnalysis {
         final int width = ippp.getWidth();
         final int height = ippp.getHeight();
         final int length = xDirection ? width : height;     //number of points per line (line can be a row or column)
-        final int pointInc = xDirection ? 1 : width;        //increment of the pixels array index to the next point in a line
+        final int pointInc = xDirection ? 1 : width;        //increment of the pixels array index to the next poin a line
         final int lineInc = xDirection ? width : 1;         //increment of the pixels array index to the next line
         final int lineFromA = 0 - extraLines;  //the first line to process
         final int lineFrom;
