@@ -260,7 +260,7 @@ public class ParallelLMA
 					for(int x = sx; x <= ex; ++x)
 					{
 						// get pixel value from image
-						double px = (double)(img_proc.get(x,y));
+						double px = (double)(img_proc.getPixel(x,y)); // NOTE: .get(x,y) is faster because no out-of-bounds check is performed. However, we cannot guarantee the point is within the image
 						
 						// set pixel value in data input buffer
 //						if(USE_DOUBLE_PRECISION)
