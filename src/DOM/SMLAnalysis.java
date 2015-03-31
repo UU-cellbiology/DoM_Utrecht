@@ -464,6 +464,14 @@ public class SMLAnalysis {
 							ptable.addValue("SD_X_fit_(px)",fitted_parameters[4]);
 							ptable.addValue("SD_Y_fit_(px)",fitted_parameters[5]);
 							ptable.addValue("Amp_loc_error",fit_errors[1]);
+							//case of importing from MTrackJ
+							//keeping track information
+							if (particles_.length==5)
+							{
+								ptable.addValue("Track_ID",particles_[2][nParticlesCount]);
+								ptable.addValue("Particle_ID",particles_[3][nParticlesCount]);
+								ptable.addValue("Track_Length",particles_[4][nParticlesCount]);
+							}
 				
 							
 							ptable_lock.unlock();

@@ -18,7 +18,7 @@ import ij.process.ImageProcessor;
 import ij.gui.YesNoCancelDialog; // There is no Yes/No dialog?
 
 // OpenCL
-import static org.jocl.CL.*;
+//import static org.jocl.CL.*;
 import org.jocl.*;
 
 /**
@@ -38,6 +38,7 @@ public class Detect_Molecules implements PlugIn {
 	SMLProgressCount smlcount = new SMLProgressCount(0);
 	//SMLProgressCount smlfitcount = new SMLProgressCount(0);
 	int nDetPartNum, nCountThread;
+	int nNumberofDetectedColumns;
 	
 	//launch search of particles 
 	public void run(String arg) {
@@ -195,15 +196,35 @@ public class Detect_Molecules implements PlugIn {
 			SpotsPositions = new Overlay();
 			//sorting results by frame
 			IJ.showStatus("Sorting Results Table: Preparation...");
+
+			//check if there is non-empty table
+			nNumberofDetectedColumns = sml.ptable.getLastColumn()+1; 
+			if(nNumberofDetectedColumns==0)
+			{
+				 IJ.error("There is no valid Results table with detections!");
+				 return;
+			}
 			Sort_Results.sorting_external_silent(sml, 0, true);
 			//getting results from table
 			double[] nFrameN = sml.ptable.getColumnAsDoubles(0);
 			nDetPartNum = nFrameN.length;
-			detparticles = new double [2][nDetPartNum];
+			//imported from MTrackJ
+			if(nNumberofDetectedColumns==9)
+			{
+				detparticles = new double [5][nDetPartNum];
+			}
+			else
+			{
+				detparticles = new double [2][nDetPartNum];
+			}
 			detparticles[0] = sml.ptable.getColumnAsDoubles(1);
 			detparticles[1] = sml.ptable.getColumnAsDoubles(2);
-			//detparticles[2] = sml.ptable.getColumnAsDoubles(3);
-			//detparticles[3] = sml.ptable.getColumnAsDoubles(4);
+			if(nNumberofDetectedColumns==9)
+			{			
+				detparticles[2] = sml.ptable.getColumnAsDoubles(6);
+				detparticles[3] = sml.ptable.getColumnAsDoubles(7);
+				detparticles[4] = sml.ptable.getColumnAsDoubles(8);
+			}
 			//erase particle table
 			sml.ptable.reset();
 						
@@ -394,11 +415,19 @@ public class Detect_Molecules implements PlugIn {
 										bListEnd = true;
 							}
 							//making array for them
-							particles_= new double [2][nPositionEnd-nPositionStart];
+							if(nNumberofDetectedColumns==9)
+								particles_= new double [5][nPositionEnd-nPositionStart];
+							else
+								particles_= new double [2][nPositionEnd-nPositionStart];
+														
 							particles_[0] = Arrays.copyOfRange(detparticles[0], nPositionStart, nPositionEnd);
 							particles_[1] = Arrays.copyOfRange(detparticles[1], nPositionStart, nPositionEnd);
-							//particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
-							//particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
+							if(nNumberofDetectedColumns==9)
+							{
+								particles_[2] = Arrays.copyOfRange(detparticles[2], nPositionStart, nPositionEnd);
+								particles_[3] = Arrays.copyOfRange(detparticles[3], nPositionStart, nPositionEnd);
+								particles_[4] = Arrays.copyOfRange(detparticles[4], nPositionStart, nPositionEnd);
+							}
 							//copying image
 							imp.setSliceWithoutUpdate(nSlice+1);
 							ip = imp.getProcessor().duplicate();
