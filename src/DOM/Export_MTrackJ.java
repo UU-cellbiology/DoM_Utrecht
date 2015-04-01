@@ -26,8 +26,8 @@ public class Export_MTrackJ implements PlugIn {
 		DecimalFormat df1 = new DecimalFormat ("#.0");
 		String filename;
 		String sFileWrite;
-		int i, j, absJ, nCurrTrackLength;
-		long nAbsTracksNumber=0;
+		int i, nCurrTrack, nAbsTracksNumber;
+
 
 		IJ.register(Export_MTrackJ.class);
 		
@@ -79,28 +79,26 @@ public class Export_MTrackJ implements PlugIn {
 			writer.write("Cluster 1\n");
 			i=0;				
 			
-			nAbsTracksNumber = 0;
+			//nAbsTracksNumber = smlLink.trackid[0];
+			nCurrTrack = (int)smlLink.trackid[0];
+			sFileWrite = "Track "+nCurrTrack + "\n";
+			writer.write(sFileWrite);
 			while(i<smlLink.nPatNumber)
 			{
-				nCurrTrackLength = (int)(smlLink.tracklength[i]);
-				//if track length is more then one
-				if(nCurrTrackLength>1)
+				
+				nAbsTracksNumber = (int)smlLink.trackid[i];
+				
+				//new track
+				if(nAbsTracksNumber != nCurrTrack)
 				{
-					nAbsTracksNumber++;
-					sFileWrite = "Track "+nAbsTracksNumber + "\n";
+					nCurrTrack = nAbsTracksNumber;
+					sFileWrite = "Track "+nCurrTrack + "\n";
 					writer.write(sFileWrite);
-					for (j=1; j<=nCurrTrackLength; j++)
-					{
-						absJ = i+j-1;
-						sFileWrite = "Point "+ j + " " + df3.format(smlLink.x[absJ])+" "+df3.format(smlLink.y[absJ])+" 1.0 " + df1.format(smlLink.f[absJ])+ " 1.0\n";
-						writer.write(sFileWrite);
-					}
-					
 				}
-				if(nCurrTrackLength>0)
-					{i+=nCurrTrackLength;}
-				else
-					{i++;}
+								
+				sFileWrite = "Point "+ (int)smlLink.patid[i] + " " + df3.format(smlLink.x[i])+" "+df3.format(smlLink.y[i])+" 1.0 " + df1.format(smlLink.f[i])+ " 1.0\n";
+				writer.write(sFileWrite);				
+				i++;
 			}
 			
 			writer.write("End of MTrackJ Data File\n");
