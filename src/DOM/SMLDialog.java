@@ -60,6 +60,15 @@ public class SMLDialog {
 	double dDistBetweenZSlices;	//z-distance between the slices in the stack
 	boolean bCalculateZValues;	//(re)calculate the z-values based on calibration-file
 	
+	//z-calibration curve parameters
+	String sZcUse;       			//what to use for z-calibration 
+	int fitPolynomialDegree;
+	int zCalDistBetweenPlanes;
+	
+	//add linking options!!
+	
+	
+	
 	//particle linking parameters
 	int nLinkFP;  //what kind of particles use for linking
 	double dLinkDistance; //distance between particles to link then
@@ -68,6 +77,33 @@ public class SMLDialog {
 	boolean bShowTracks; //whether to show linked tracks or not
 	boolean bShowParticlesLink; //show detected particles
 	
+	//dialog showing options for particle search algorithm		
+		public boolean zCalibration() {
+			String [] zcPolDegreeOptions = new String [] {"1","2","3"};
+			String [] zcUseOptions = new String [] {"Image stack","Particle table","Polynomial coefficients"};
+			
+			GenericDialog zcDial = new GenericDialog("Z Calibration");
+			zcDial.addRadioButtonGroup("Base z-calibration on: ",zcUseOptions,1,3,Prefs.get("SiMoLoc.ZC_Use", zcUseOptions[0]));
+			zcDial.addChoice("Degree of polynomial fit", zcPolDegreeOptions, Prefs.get("SiMoLoc.ZC_fitPolDegree", "1"));
+			zcDial.addNumericField("Spacing between z-planes (nm): ", Prefs.get("SiMoLoc.ZC_distBetweenPlanes", 20), 0);
+			
+			
+			zcDial.setResizable(false);
+			zcDial.showDialog();
+			if (zcDial.wasCanceled())
+	            return false;
+			
+			sZcUse = zcDial.getNextRadioButton();
+			Prefs.set("SiMoLoc.ZC_Use", sZcUse);
+			fitPolynomialDegree = zcDial.getNextChoiceIndex() + 1;//you retrieve the index => add 1 for polynomial degree
+			Prefs.set("SiMoLoc.ZC_fitPolDegree", fitPolynomialDegree);
+			zCalDistBetweenPlanes = (int)zcDial.getNextNumber();
+			Prefs.set("SiMoLoc.ZC_distBetweenPlanes", zCalDistBetweenPlanes);
+			
+			
+			return true;
+		}
+		
 	//dialog showing options for particle search algorithm		
 	public boolean findParticles() {
 		String [] DetectionType = new String [] {
