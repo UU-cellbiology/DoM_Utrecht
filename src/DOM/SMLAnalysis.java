@@ -4,8 +4,6 @@ package DOM;
 
 
 import jaolho.data.lma.LMA;
-import jaolho.data.lma.LMAMatrix;
-
 import java.awt.Color;
 
 import java.util.Stack;
@@ -344,9 +342,9 @@ public class SMLAnalysis {
 				double chi2_fit = 0.0;
 				//try
 				//{
-					fitted_parameters = SMLlma.run(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, dFitParams, fdg.nIterations, 0.001);
-					fit_errors = SMLlma.calculateStandardErrors(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
-					chi2_fit = SMLlma.calculateChi2(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
+				fitted_parameters = SMLlma.run(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, dFitParams, fdg.nIterations, 0.001);
+				fit_errors = SMLlma.calculateStandardErrors(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
+				chi2_fit = SMLlma.calculateChi2(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
 				//}
 				//catch (LMAMatrix.InvertException e) {
 				//	//matrix is inverted
@@ -412,7 +410,7 @@ public class SMLAnalysis {
 						dIntNoise += ipRaw.getPixel(i,j);
 					}
 					dNoiseAvrg = dIntNoise/(4*xSD+4*ySD+8);
-					dIntAmp = dIntAmp - (dFitParams[0]*((2*xSD+1)*(2*ySD+1)));
+					dIntAmp = dIntAmp - (dNoiseAvrg*((2*xSD+1)*(2*ySD+1)));
 
 					//SD of noise
 					j = (int)(yCentroid-ySD-1);
@@ -501,7 +499,8 @@ public class SMLAnalysis {
 							ptable_lock.unlock();
 							if(fdg.bShowParticles)
 							{
-								spotROI = new OvalRoi((int)(xCentroid-2*fdg.dPSFsigma),(int)(yCentroid-2*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma));
+								//spotROI = new OvalRoi((int)(xCentroid-2*fdg.dPSFsigma),(int)(yCentroid-2*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma));
+								spotROI = new OvalRoi((xCentroid-2*fdg.dPSFsigma),(yCentroid-2*fdg.dPSFsigma),(4.0*fdg.dPSFsigma),(4.0*fdg.dPSFsigma));
 								if(nFalsePositive<0.5)
 									spotROI.setStrokeColor(Color.green);
 								else
