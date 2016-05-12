@@ -1,28 +1,23 @@
 package DOM;
 
 
-
-
-import jaolho.data.lma.LMA;
 import java.awt.Color;
-
 import java.util.Stack;
 
-
 import ij.IJ;
-
+import ij.ImagePlus;
 import ij.gui.OvalRoi;
 import ij.gui.Overlay;
+import ij.gui.Roi;
 import ij.measure.Measurements;
 import ij.measure.ResultsTable;
-
-
 import ij.plugin.filter.GaussianBlur;
 import ij.process.ByteProcessor;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
 import ij.process.TypeConverter;
+import jaolho.data.lma.LMA;
 
 
 public class SMLAnalysis {
@@ -50,7 +45,7 @@ public class SMLAnalysis {
 	// Particle finding routine based on spots enhancement with
 	// 2D PSF Gaussian approximated convolution/backgrounds subtraction, thresholding
 	// and particle filtering
-	void detectParticles(ImageProcessor ip, SMLDialog fdg, int nFrame, Overlay SpotsPositions_)
+	void detectParticles(ImageProcessor ip, SMLDialog fdg, int nFrame, Overlay SpotsPositions_,Roi RoiActive_)
 	{
 		int nThreshold;
 		FloatProcessor dupip = null ; //duplicate of image
@@ -102,7 +97,7 @@ public class SMLAnalysis {
 
 		//dupip.invert();
 		
-		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
+		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
 		
 
 	}
@@ -114,15 +109,13 @@ public class SMLAnalysis {
 	//and in March 2012 available by link
     //http://www.izbi.uni-leipzig.de/izbi/publikationen/publi_2004/IMS2004_JankowskiKuska.pdf
 	
-	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, double dPixelSize_, int nAreaCut, double dPSFsigma_, Overlay SpotsPositions__, boolean bShow)//, boolean bIgnore)//, double dSymmetry_)
+	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, double dPixelSize_, int nAreaCut, double dPSFsigma_, Overlay SpotsPositions__, boolean bShow, Roi RoiAct)
 	{
 		int width = ipBinary.getWidth();
 		int height = ipBinary.getHeight();
 
 		int dBorder; // radius in pixels around center point to fit Gaussian
- 
-		
-		
+ 				
 		int nArea;
 
 		int i,j;
@@ -132,6 +125,7 @@ public class SMLAnalysis {
 
 		double xCentroid, yCentroid;
 		boolean bBorder;
+		boolean bInRoi;
 
 		int lab = 1;
 		int [] pos ;		
@@ -227,36 +221,42 @@ public class SMLAnalysis {
 
 						if ( (xCentroid>dBorder) && (yCentroid>dBorder) && (xCentroid<(width-1-dBorder)) && (yCentroid<(height-1-dBorder)) )
 						{
-							//calculating initial parameters for fitting of spot
-							
-							//creating array of intensity values for fitting
-							dIMin = 1000000;
-							//nCount = 0;
-							for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
-								for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
-								{
-									dVal = ipRaw.getPixel(i,j);
-									if (dVal<dIMin)
-										dIMin = dVal;																	
-								}
-							
-									ptable_lock.lock();
-									ptable.incrementCounter();
-									ptable.addValue("Frame Number", nFrame+1);
-									ptable.addValue("X_centroid_(px)",xCentroid);	
-									ptable.addValue("Y_centroid_(px)",yCentroid);
-									ptable.addValue("MaxInt",dIMax);
-									ptable.addValue("MinInt",dIMin);
-									
-									ptable_lock.unlock();
-									if(bShow)
+							bInRoi = true;
+							if(RoiAct!=null)
+							{
+								if(!RoiAct.contains((int)xCentroid, (int)yCentroid))
+									bInRoi=false;
+							}
+							if(bInRoi)
+							{
+								//find minimum value around peak position
+								dIMin = 1000000;
+								//nCount = 0;
+								for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
+									for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
 									{
-										spotROI = new OvalRoi((int)(0.5+xCentroid-2*dPSFsigma_),(int)(0.5+yCentroid-2*dPSFsigma_),(int)(4.0*dPSFsigma_),(int)(4.0*dPSFsigma_));
-										spotROI.setStrokeColor(Color.yellow);	
-										spotROI.setPosition(nFrame+1);
-										SpotsPositions__.add(spotROI);
-										
+										dVal = ipRaw.getPixel(i,j);
+										if (dVal<dIMin)
+											dIMin = dVal;																	
 									}
+								
+								ptable_lock.lock();
+								ptable.incrementCounter();
+								ptable.addValue("Frame Number", nFrame+1);
+								ptable.addValue("X_centroid_(px)",xCentroid);	
+								ptable.addValue("Y_centroid_(px)",yCentroid);
+								ptable.addValue("MaxInt",dIMax);
+								ptable.addValue("MinInt",dIMin);
+										
+								ptable_lock.unlock();
+								if(bShow)
+								{
+									spotROI = new OvalRoi(0.5+xCentroid-2*dPSFsigma_,0.5+yCentroid-2*dPSFsigma_,4.0*dPSFsigma_,4.0*dPSFsigma_);
+									spotROI.setStrokeColor(Color.yellow);	
+									spotROI.setPosition(nFrame+1);
+									SpotsPositions__.add(spotROI);										
+								}
+							}
 
 					}
 				
@@ -277,6 +277,7 @@ public class SMLAnalysis {
 		int x,y, i,j, nCount, nParticlesCount, nParticlesNumber;		
 		double xCentroid, yCentroid, xSD, ySD;
 		double dIntAmp, dIntNoise;
+		double dIntAverage,dIntDev;
 		double dIMax, dIMin, dInt;
 		double dNoiseAvrg, dNoiseSD;
 		double dSNR;
@@ -307,8 +308,11 @@ public class SMLAnalysis {
 					
 			//creating array of intensity values for fitting
 			nCount = 0;
-			dIMin = 10000000;
+			dIMin = Double.MAX_VALUE;
 			dIMax = -100;
+			
+			dIntAverage =0;
+			
 			for(x = 0, i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; ++x, i++)
 				for(y = 0, j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; ++y, j++)
 				{					
@@ -320,8 +324,20 @@ public class SMLAnalysis {
 						dIMax=dInt;
 					if(dInt<dIMin)
 						dIMin=dInt;
-					nCount++;					
+					nCount++;
+					dIntAverage+=dInt;
 				}
+			//calculate deviation from average intensity 
+			dIntAverage =dIntAverage/nCount;
+			dIntDev=0;
+			for(x = 0, i = (int) (Math.round(particles_[0][nParticlesCount])- dBorder); i <= Math.round(particles_[0][nParticlesCount])+ dBorder; ++x, i++)
+				for(y = 0, j = (int) (Math.round(particles_[1][nParticlesCount])- dBorder); j <= Math.round(particles_[1][nParticlesCount])+ dBorder; ++y, j++)
+				{
+					dIntDev+=Math.pow(ipRaw.getPixel(i,j)-dIntAverage,2);		
+				}			
+			
+			
+			
 			
 			
 				//initial values of fitting parameters				
@@ -340,23 +356,18 @@ public class SMLAnalysis {
 				double[] fitted_parameters = new double[6];
 				double[] fit_errors = new double[6];
 				double chi2_fit = 0.0;
-				//try
-				//{
+		
+				// fitting
 				fitted_parameters = SMLlma.run(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, dFitParams, fdg.nIterations, 0.001);
 				fit_errors = SMLlma.calculateStandardErrors(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
 				chi2_fit = SMLlma.calculateChi2(spotInt, spotXpos, spotYpos, 2*dBorder+1, 2*dBorder+1, fitted_parameters);
-				//}
-				//catch (LMAMatrix.InvertException e) {
-				//	//matrix is inverted
-				//	//it is a bad fit
-				//	nFalsePositive = 1.0;
-				//}				
-				// scaling coefficient for parameters errors estimation 
-				// (Standard deviation of residuals)
+
 				dErrCoeff = Math.sqrt(chi2_fit/(nCount-6));
 				for(i =0;i<6;i++)
 					fit_errors[i] *= dErrCoeff; 
 
+				//checking for false positives
+				
 				//spot is too big or too small
 				xSD = Math.abs(fitted_parameters[4]);
 				ySD = Math.abs(fitted_parameters[5]);
@@ -365,6 +376,11 @@ public class SMLAnalysis {
 				
 				//localization precision is bigger than PSF size
 				if((fit_errors[2] > fdg.dPSFsigma) || (fit_errors[3] > fdg.dPSFsigma))
+					nFalsePositive = 1.0;
+
+				//fitting went out of fitting region
+				if( Math.sqrt(Math.pow(particles_[0][nParticlesCount] -fitted_parameters[2],2) +  
+						      Math.pow(particles_[1][nParticlesCount] -fitted_parameters[3],2))>fdg.dPSFsigma*DOMConstants.FITRADIUS)
 					nFalsePositive = 1.0;
 				
 				
@@ -386,28 +402,34 @@ public class SMLAnalysis {
 						{
 							dIntAmp += ipRaw.getPixel(i,j);
 						}
+							
 						
 
 					//averaged noise around spot
+				
 					j = (int)(yCentroid-ySD-1);
 					for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)	
 					{
 						dIntNoise += ipRaw.getPixel(i,j);
+						
 					}
 					j = (int)(yCentroid+ySD+1);
 					for(i =(int) (xCentroid-xSD-1); i<=(int)(xCentroid+xSD+1); i++)
 					{
 						dIntNoise += ipRaw.getPixel(i,j);
+					
 					}
 					i=(int) (xCentroid-xSD-1);
 					for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 					{
 						dIntNoise += ipRaw.getPixel(i,j);
+						
 					}
 					i=(int) (xCentroid+xSD+1);
 					for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 					{
 						dIntNoise += ipRaw.getPixel(i,j);
+						
 					}
 					dNoiseAvrg = dIntNoise/(4*xSD+4*ySD+8);
 					dIntAmp = dIntAmp - (dNoiseAvrg*((2*xSD+1)*(2*ySD+1)));
@@ -439,53 +461,31 @@ public class SMLAnalysis {
 							ptable_lock.lock();
 							ptable.incrementCounter();
 							
-							ptable.addValue("Amplitude_fit",fitted_parameters[1]);
-
-							//there is already fitted data
-							if (particles_.length==5)
-							{
-								double dist;
-								dist = Math.sqrt(Math.pow(particles_[0][nParticlesCount] -fitted_parameters[2],2) +  Math.pow(particles_[1][nParticlesCount] -fitted_parameters[3],2));
-								//fitting made it out of control
-								if (dist >fdg.dPSFsigma*DOMConstants.FITRADIUS)
-								{
-									ptable.addValue("X_(px)",particles_[0][nParticlesCount]);							
-									ptable.addValue("Y_(px)",particles_[1][nParticlesCount]);
-									ptable.addValue("X_(nm)",particles_[0][nParticlesCount]*fdg.dPixelSize);							
-									ptable.addValue("Y_(nm)",particles_[1][nParticlesCount]*fdg.dPixelSize);
-									
-								}
-								else
-								{
-									ptable.addValue("X_(px)",fitted_parameters[2]);							
-									ptable.addValue("Y_(px)",fitted_parameters[3]);
-									ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
-									ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
-									
-								}
-							}
-							else
-							{
-								ptable.addValue("X_(px)",fitted_parameters[2]);							
-								ptable.addValue("Y_(px)",fitted_parameters[3]);
-								ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
-								ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
-							}
+							ptable.addValue("X_(px)",fitted_parameters[2]);							
+							ptable.addValue("Y_(px)",fitted_parameters[3]);
+							ptable.addValue("Frame Number", nFrame+1);
+							ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
+							ptable.addValue("X_loc_error(nm)", fit_errors[2]*fdg.dPixelSize);							
+							ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
+							ptable.addValue("Y_loc_error(nm)", fit_errors[3]*fdg.dPixelSize);
 							ptable.addValue("Z_(nm)",0);
-							ptable.addValue("False positive", nFalsePositive);
-							ptable.addValue("X_loc_error(px)", fit_errors[2]);
-							ptable.addValue("Y_loc_error(px)", fit_errors[3]);
-	
-							ptable.addValue("BGfit",fitted_parameters[0]);							
+							ptable.addValue("Z_loc_error(nm)",0);							
+							ptable.addValue("Amplitude_fit",fitted_parameters[1]);
+							ptable.addValue("Amp_error",fit_errors[1]);
+							ptable.addValue("BGfit",fitted_parameters[0]);
+							ptable.addValue("BGfit_error",fit_errors[0]);
+							ptable.addValue("SD_X_(nm)",fitted_parameters[4]*fdg.dPixelSize);
+							ptable.addValue("SD_X_error(nm)",fit_errors[4]*fdg.dPixelSize);
+							ptable.addValue("SD_Y_(nm)",fitted_parameters[5]*fdg.dPixelSize);
+							ptable.addValue("SD_Y_error(nm)",fit_errors[5]*fdg.dPixelSize);
+							ptable.addValue("False positive", nFalsePositive);							
 							ptable.addValue("IntegratedInt",dIntAmp);
-							ptable.addValue("SNR", dSNR);
-	
-							ptable.addValue("chi2_fit",chi2_fit);
-							ptable.addValue("Frame Number", nFrame+1);					
-							ptable.addValue("Iterations_fit",fdg.nIterations);
-							ptable.addValue("SD_X_fit_(px)",fitted_parameters[4]);
-							ptable.addValue("SD_Y_fit_(px)",fitted_parameters[5]);
-							ptable.addValue("Amp_loc_error",fit_errors[1]);
+							ptable.addValue("SNR", dSNR);	
+							//ptable.addValue("chi2_fit",chi2_fit);
+							ptable.addValue("R2_fit",(1-(chi2_fit/dIntDev)));												
+							//ptable.addValue("Iterations_fit",fdg.nIterations);
+							ptable.addValue("Iterations_fit",SMLlma.iteration_count);
+
 							//case of importing from MTrackJ
 							//keeping track information
 							if (particles_.length==5)
@@ -499,8 +499,7 @@ public class SMLAnalysis {
 							ptable_lock.unlock();
 							if(fdg.bShowParticles)
 							{
-								//spotROI = new OvalRoi((int)(xCentroid-2*fdg.dPSFsigma),(int)(yCentroid-2*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma),(int)(4.0*fdg.dPSFsigma));
-								spotROI = new OvalRoi((xCentroid-2*fdg.dPSFsigma),(yCentroid-2*fdg.dPSFsigma),(4.0*fdg.dPSFsigma),(4.0*fdg.dPSFsigma));
+								spotROI = new OvalRoi(xCentroid-2*fdg.dPSFsigma,yCentroid-2*fdg.dPSFsigma,4.0*fdg.dPSFsigma,4.0*fdg.dPSFsigma);
 								if(nFalsePositive<0.5)
 									spotROI.setStrokeColor(Color.green);
 								else
@@ -611,6 +610,7 @@ public class SMLAnalysis {
 	{
 		ImageStatistics imgstat;
 		double  [][] dHistogram;
+		double  [] dHistCum;
 		double  [][] dNoiseFit;
 		int nHistSize;
 		int nCount, nMaxCount;
@@ -620,6 +620,8 @@ public class SMLAnalysis {
 		double dMean, dSD;
 		double [] dFitErrors;
 		double dErrCoeff;
+		double dSum=0.0;
+		double dSumFit=0.0;
 		LMA fitlma;
 		
 		
@@ -642,6 +644,7 @@ public class SMLAnalysis {
 			nCount=imgstat.histogram[i];
 			dHistogram[0][i]=imgstat.min + i*imgstat.binSize;			
 			dHistogram[1][i] = (double)nCount;
+			dSum += (double)nCount;
 			if(nMaxCount < nCount)
 			{
 				nMaxCount= nCount;
@@ -686,10 +689,43 @@ public class SMLAnalysis {
 		{
 			dNoiseFit[0][i-nDownCount] = dHistogram[0][i];
 			dNoiseFit[1][i-nDownCount] = dHistogram[1][i];
+			dSumFit +=dHistogram[1][i];
 		}
-		
+		//fitting range is too small, less than 80%
+		if((dSumFit/dSum)<0.8)
+		{
+			//build cumulative distribution
+			dHistCum = new double [nHistSize];
+			dSumFit = 0;
+			for(i =0; i<nHistSize; i++)
+			{
+				dSumFit+=dHistogram[1][i];
+				dHistCum[i] = dSumFit/dSum;	
+			}
+			nUpCount = 0;
+			nDownCount = 0;
+			for(i =0; i<nHistSize; i++)
+			{
+				//10% quantile
+				if(dHistCum[i]<0.11)
+					nDownCount= i;
+				//90% quantile
+				if(dHistCum[i]<0.91)
+					nUpCount= i;			
+			}
+			//preparing histogram range for fitting
+			dNoiseFit = new double [2][nUpCount-nDownCount+1];
+			for(i =nDownCount;i<=nUpCount;i++)
+			{
+				dNoiseFit[0][i-nDownCount] = dHistogram[0][i];
+				dNoiseFit[1][i-nDownCount] = dHistogram[1][i];			
+			}
+			
+		}
+
 		fitlma = new LMA(new SMLOneDGaussian(), new double[] {(double)nMaxCount, dMean, dSD}, dNoiseFit);
 		fitlma.fit();
+
 		dMean = fitlma.parameters[1];
 		dSD = fitlma.parameters[2];
 		

@@ -2,3 +2,4 @@
 *.class
 
 dist/DoM_GPU.jar
+/bin/

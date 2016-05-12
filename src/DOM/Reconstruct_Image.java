@@ -24,19 +24,19 @@ public class Reconstruct_Image implements PlugIn{
 		String imagename; 
 		double [] xloc;	
 		double [] yloc;
-		double [] xpix;
-		double [] ypix;
+		double [] xnm;
+		double [] ynm;
 		double [] falsepos;
 		double [] frames;
 		double xmax, ymax;
-		double xlocavg, ylocavg, pxsize;
+		double xlocavg, ylocavg;
 		double fminframe, fmaxframe;
 		int i, sz;
 		double dPatCount;
 		IJ.register(Reconstruct_Image.class);
 
 		//check that the table is present
-		if (sml.ptable.getCounter()==0 || !sml.ptable.columnExists(13))
+		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
 		{
 			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
 			return;
@@ -45,9 +45,9 @@ public class Reconstruct_Image implements PlugIn{
 		imagename = "Reconstructed Image";
 		
 		//calculate average localization precision 	
-		falsepos = sml.ptable.getColumnAsDoubles(6);
-		xloc = sml.ptable.getColumnAsDoubles(7);
-		yloc = sml.ptable.getColumnAsDoubles(8);		
+		falsepos = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
+		xloc = sml.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errX);
+		yloc = sml.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errY);		
 		sz = xloc.length; 
 		xlocavg=0; ylocavg = 0;
 		dPatCount=0;
@@ -60,19 +60,19 @@ public class Reconstruct_Image implements PlugIn{
 				dPatCount++;
 			}
 		}
-		pxsize =  sml.ptable.getValueAsDouble(3, 0)/sml.ptable.getValueAsDouble(1, 0);
-		xlocavg = pxsize*xlocavg/dPatCount;
-		ylocavg = pxsize*ylocavg/dPatCount;
+		//pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		xlocavg = xlocavg/dPatCount;
+		ylocavg = ylocavg/dPatCount;
 		
 		//calculate min and max frame number		
-		frames = sml.ptable.getColumnAsDoubles(13);
+		frames = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		Arrays.sort(frames);
 		fminframe = frames[0];
 		fmaxframe = frames[frames.length-1];
 		
 		//calculate max x and y coordinates
-		xpix = sml.ptable.getColumnAsDoubles(1);
-		ypix = sml.ptable.getColumnAsDoubles(2);		
+		xnm = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Xnm);
+		ynm = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);		
 		xmax = 0;
 		ymax = 0;
 		for (i=0; i<sz; i++)
@@ -80,35 +80,20 @@ public class Reconstruct_Image implements PlugIn{
 			//use only true positives to estimate image borders
 			if(falsepos[i]<0.2)
 			{
-				if(xpix[i]>xmax)
-					xmax=xpix[i];
-				if(ypix[i]>ymax)
-					ymax=ypix[i];
+				if(xnm[i]>xmax)
+					xmax=xnm[i];
+				if(ynm[i]>ymax)
+					ymax=ynm[i];
 			}
 		}
 		
 		//show dialog with options
-		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, (int)Math.ceil(xmax), (int)Math.ceil(ymax))) return;
+		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax, ymax)) return;
 		
-		//check some parameters for consistency 
+		//add frame interval to image name
 		if(dlg.bFramesInterval)
 		{
-			if(dlg.nFrameMax>fmaxframe ||  dlg.nFrameMax<fminframe)
-			{
-				IJ.error("Maximum frame number is out of range!");
-				return;
-			}
-			if(dlg.nFrameMin>fmaxframe ||  dlg.nFrameMin<fminframe)
-			{
-				IJ.error("Minimum frame number is out of range!");
-				return;
-			}
-			if(dlg.nFrameMin>dlg.nFrameMax)
-			{
-				IJ.error("Minimum frame should be less then maximum frame number!");
-				return;
-			}
-			imagename += " (frames " +dlg.nFrameMin+" till "+dlg.nFrameMax+")";
+			imagename += " (frames " +Math.round(dlg.nFrameMin)+" till "+Math.round(dlg.nFrameMax)+")";
 
 		}
 		
@@ -117,7 +102,8 @@ public class Reconstruct_Image implements PlugIn{
 		
 		
 		//smlViewer.clear();
-		if(dlg.bDrift)
+		
+		/*if(dlg.bDrift)
 		{			
 			smlViewer.sortbyframe();
 			smlViewer.DriftCorrection();
@@ -125,14 +111,17 @@ public class Reconstruct_Image implements PlugIn{
 			//
 			//smlViewer.correctDriftCOM();
 		}	
-
+		 */
+		
 		if(dlg.bAveragePositions)
 		{
-			smlViewer.averagelocalizations();
+			smlViewer.averagelocalizations(sml);
 			
 		}
-		if(!dlg.b3D)//if you don't want a z-stack
-		{
+		
+		
+		//if(!dlg.b3D)//if you don't want a z-stack
+		//{
 			if(dlg.bFramesInterval)
 			{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
 			else
@@ -140,18 +129,18 @@ public class Reconstruct_Image implements PlugIn{
 			
 			if(dlg.bCutoff)
 			{
-				imagename += " (Cutoff localization=" + dlg.dcutoff +"px)";
+				imagename += " (Cutoff localization=" + dlg.dcutoff +" nm)";
 			}
-		}
-		else
-		{//create z-stack
-			int zStep = (int)dlg.dDistBetweenZSlices;
+		//}
+		//else
+		//{//create z-stack
+			//int zStep = (int)dlg.dDistBetweenZSlices;
 			
-			if(dlg.bFramesInterval)
-			{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax,zStep);}
-			else
-			{	smlViewer.draw_zstack(1, smlViewer.nframes,zStep);}
-		}
+//			if(dlg.bFramesInterval)
+	//		{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax,zStep);}
+		//	else
+			//{	smlViewer.draw_zstack(1, smlViewer.nframes,zStep);}
+//		}
 		
 		smlViewer.imp.setTitle(imagename);
 		smlViewer.imp.show();

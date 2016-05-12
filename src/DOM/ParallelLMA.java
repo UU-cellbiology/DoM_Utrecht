@@ -840,35 +840,38 @@ public class ParallelLMA
 					}
 				}
 				
-				// add results to table (no lock needed) if spot is within image dimenions
+				// add results to table (no lock needed) if spot is within image dimensions
 				if(fitted_parameters_f[parameters_index+2] > 0 && fitted_parameters_f[parameters_index+2] < image_width && fitted_parameters_f[parameters_index+3] > 0 && fitted_parameters_f[parameters_index+2] < image_height)
 				{
 					// ignore false positives if requested
 					if(!(ignore_false_positives && false_positive > 0.3))
 					{
 						res_table.incrementCounter();
-						
-						res_table.addValue("Amplitude_fit", fitted_parameters_f[parameters_index+1]);
-						
+																		
 						res_table.addValue("X_(px)", fitted_parameters_f[parameters_index+2]);
 						res_table.addValue("Y_(px)", fitted_parameters_f[parameters_index+3]);
-						res_table.addValue("X_(nm)", fitted_parameters_f[parameters_index+2] * pixel_size);
-						res_table.addValue("Y_(nm)", fitted_parameters_f[parameters_index+3] * pixel_size);
-						res_table.addValue("Z_(nm)", 0.0);
-						res_table.addValue("False positive", false_positive);
-						res_table.addValue("X_loc_error(px)", standard_errors_f[parameters_index+2]);
-						res_table.addValue("Y_loc_error(px)", standard_errors_f[parameters_index+3]);
-						
-						res_table.addValue("BGfit", fitted_parameters_f[parameters_index+0]);
-						res_table.addValue("IntegratedInt", integrated_amplitude);
-						res_table.addValue("SNR", snr_estimate);
-						
-						res_table.addValue("chi2_fit", chi_squared_f[i - ii]);
 						res_table.addValue("Frame Number", frame_numbers[i]);
-						res_table.addValue("Iterations_fit", iterations);
-						res_table.addValue("SD_X_fit_(px)", fitted_parameters_f[parameters_index+4]);
-						res_table.addValue("SD_Y_fit_(px)", fitted_parameters_f[parameters_index+5]);
+						
+						res_table.addValue("X_(nm)", fitted_parameters_f[parameters_index+2] * pixel_size);
+						res_table.addValue("X_loc_error(nm)", standard_errors_f[parameters_index+2]* pixel_size);
+						res_table.addValue("Y_(nm)", fitted_parameters_f[parameters_index+3] * pixel_size);
+						res_table.addValue("Y_loc_error(nm)", standard_errors_f[parameters_index+3]* pixel_size);
+						res_table.addValue("Z_(nm)", 0.0);
+						res_table.addValue("Z_loc_error(nm)", 0.0);
+						res_table.addValue("Amplitude_fit", fitted_parameters_f[parameters_index+1]);
 						res_table.addValue("Amp_loc_error", standard_errors_f[parameters_index+1]);
+						res_table.addValue("BGfit", fitted_parameters_f[parameters_index+0]);
+						res_table.addValue("BGfit_error", standard_errors_f[parameters_index+0]);
+						res_table.addValue("SD_X_(nm)", fitted_parameters_f[parameters_index+4]*pixel_size);
+						res_table.addValue("SD_X_error(nm)", standard_errors_f[parameters_index+4]*pixel_size);
+						res_table.addValue("SD_Y_(nm)", fitted_parameters_f[parameters_index+5]*pixel_size);
+						res_table.addValue("SD_Y_error(nm)", standard_errors_f[parameters_index+5]*pixel_size);
+						res_table.addValue("False positive", false_positive);
+						res_table.addValue("IntegratedInt", integrated_amplitude);
+						res_table.addValue("SNR", snr_estimate);					
+						res_table.addValue("chi2_fit", chi_squared_f[i - ii]);						
+						res_table.addValue("Iterations_fit", iterations);
+						
 						
 						// TODO: show particles in image as ROIs
 					}

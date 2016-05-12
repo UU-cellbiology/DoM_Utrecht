@@ -37,12 +37,12 @@ public class SMLLinker {
 		implnk = imp_;
 			
 		//coordinates
-		x   = smllink.ptable.getColumnAsDoubles(1);		
-		y   = smllink.ptable.getColumnAsDoubles(2);
+		x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
+		y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
 		//frame number
-		f   = smllink.ptable.getColumnAsDoubles(13);
+		f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		//false positive mark
-		fp  = smllink.ptable.getColumnAsDoubles(6);
+		fp  = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
 		
 		//total particles number
 		nPatNumber = f.length;
@@ -77,18 +77,18 @@ public class SMLLinker {
 		smllink = sml_;
 		
 		//coordinates
-		x   = smllink.ptable.getColumnAsDoubles(1);		
-		y   = smllink.ptable.getColumnAsDoubles(2);
+		x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
+		y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
 		//frame number
-		f   = smllink.ptable.getColumnAsDoubles(13);
+		f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		//false positive mark
-		fp  = smllink.ptable.getColumnAsDoubles(6);
+		fp  = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
 		//tracks ID
-		trackid = smllink.ptable.getColumnAsDoubles(18);
+		trackid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
 		//particles ID
-		patid = smllink.ptable.getColumnAsDoubles(19);
+		patid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_ParticleID);
 		//tracks length
-		tracklength = smllink.ptable.getColumnAsDoubles(20);
+		tracklength = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackLength);
 		//total particles number
 		nPatNumber = f.length;	
 	}
@@ -350,8 +350,8 @@ public class SMLLinker {
 		//adding linking information
 		for(nCount = 1; nCount<nPatNumber; nCount++)
 		{
-			smllink.ptable.setValue(18, nCount, trackid[nCount]);
-			smllink.ptable.setValue(19, nCount, patid[nCount]);
+			smllink.ptable.setValue(DOMConstants.Col_TrackID, nCount, trackid[nCount]);
+			smllink.ptable.setValue(DOMConstants.Col_ParticleID, nCount, patid[nCount]);
 		}	
 		
 		
@@ -367,8 +367,8 @@ public class SMLLinker {
 		
 		tracklength = new double [(int) nPatNumber];
 		
-		trackid   = smllink.ptable.getColumnAsDoubles(18);		
-		patid     = smllink.ptable.getColumnAsDoubles(19);
+		trackid   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);		
+		patid     = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_ParticleID);
 		nMaxVal = 0;
 		nCurrTrack = (int) trackid[0];
 		nIniPosition = 0;
@@ -410,7 +410,7 @@ public class SMLLinker {
 		//adding to final table
 		smllink.ptable.setValue("Track_Length", 0, tracklength[0]);
 		for(nCount = 1; nCount<nPatNumber; nCount++)
-			smllink.ptable.setValue(20, nCount, tracklength[nCount]);
+			smllink.ptable.setValue(DOMConstants.Col_TrackLength, nCount, tracklength[nCount]);
 		
 	}
 	//marking particles in each track in reverse order
@@ -423,9 +423,9 @@ public class SMLLinker {
 		long sz;
 						
 		//lengths of tracks
-		tracklength = smllink.ptable.getColumnAsDoubles(20);
+		tracklength = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackLength);
 		//particles ID
-		patid = smllink.ptable.getColumnAsDoubles(19);
+		patid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_ParticleID);
 		
 		sz=(long)trackid.length;
 		
@@ -438,7 +438,7 @@ public class SMLLinker {
 		smllink.ptable.setValue("Reverse_numbering", 0, nReverse[0]);
 
 		for(nCount = 1; nCount<nPatNumber; nCount++)
-			smllink.ptable.setValue(21, nCount, nReverse[nCount]);				
+			smllink.ptable.setValue(DOMConstants.Col_TrackReverseN, nCount, nReverse[nCount]);				
 
 	}
 	
@@ -547,12 +547,12 @@ public class SMLLinker {
 		
 		//table was sorted by track number
 		//so let's update values
-		//frame number
-		x   = smllink.ptable.getColumnAsDoubles(1);		
-		y   = smllink.ptable.getColumnAsDoubles(2);
 		//coordinates
-		f   = smllink.ptable.getColumnAsDoubles(13);
-		trackid = smllink.ptable.getColumnAsDoubles(18);
+		x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
+		y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+		//frame number
+		f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+		trackid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
 		
 		//go through all table
 		while (nCount<nPatNumber)
@@ -599,18 +599,18 @@ public class SMLLinker {
 	{
 		int nCount;
 		Roi spotROI;
-		//frame number
-		x   = smllink.ptable.getColumnAsDoubles(1);		
-		y   = smllink.ptable.getColumnAsDoubles(2);
 		//coordinates
-		f   = smllink.ptable.getColumnAsDoubles(13);
+		x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
+		y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+		//frame number
+		f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		//false positive mark
-		fp  = smllink.ptable.getColumnAsDoubles(6);
+		fp  = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
 		for(nCount = 0; nCount<nPatNumber; nCount++)
 		{
 			if(fp[nCount]<dFPThreshold)
 			{
-				spotROI = new OvalRoi((int)(x[nCount]-4),(int)(y[nCount]-4),8,8);
+				spotROI = new OvalRoi(x[nCount]-4,y[nCount]-4,8,8);
 				if(fp[nCount]<0.5)
 					spotROI.setStrokeColor(Color.green);
 				else

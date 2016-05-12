@@ -25,13 +25,20 @@ public class SMLReconstruct {
 	//ResultsTable table;
 	SMLDialog settings;
 		
-	double [] amp;
+	/** amplitude of fitted particles */
+	//double [] amp;
+	/** integrated intensity of particles */
+//	double [] integrint;
+	/** x coordinates of particles in px*/
 	double [] x;
+	/** y coordinates of particles in px*/
 	double [] y;
 	double [] z_nm;
-	double [] sdx;
-	double [] sdy;
+	double [] loc_errx;
+	double [] loc_erry;
+	/** frame numbers of particle*/
 	double [] f;
+	/** false positive mark */
 	double [] fp;
 	double [] driftx;
 	double [] drifty;
@@ -40,38 +47,50 @@ public class SMLReconstruct {
 
 	double max=0;
 	double min=9999999;
-	double nrange=0;
+	//double nrange=0;
 	int nframes = 0;
 	int nParticlesCount = 0;
 
 	int new_width;
 	int new_height;
 	boolean bFrameSorted;
-	boolean bNormalized;
-	double dFPThreshold; //threshold that determines what particles are used for reconstruction
+	//boolean bNormalized;
+	//boolean bIntegrInt;
+	/** threshold that determines what particles are used for reconstruction */
+	double dFPThreshold; 
 	
 	
 	//parameters of drift correction
-	double dDriftMagn; //magnification of reconstructed images used for drift correction (average precision)
-	int drift_width;  //width of reconstructed images used for drift correction
-	int drift_height; //width of reconstructed images used for drift correction
-	int nIntervalsCount; //number of intervals (and images) used for drift correction
+	/** magnification of reconstructed images used for drift correction (average precision) */
+	double dDriftMagn;
+	/** width of reconstructed images used for drift correction */
+	int drift_width;  
+	/** height of reconstructed images used for drift correction */
+	int drift_height; 
+	/** number of intervals (and images) used for drift correction */
+	int nIntervalsCount; 
 	
 
 	
-	//constructor for image reconstruction 
+	/**
+	 * constructor for image reconstruction 
+	 * @param title title of image
+	 * @param sml_ corresponding analysis object
+	 * @param dlg_  dialog
+	 */
 	
 	SMLReconstruct(java.lang.String title, SMLAnalysis sml_, SMLDialog dlg_)
 	{
 		
 		settings = dlg_;
 		bFrameSorted = false;
-		bNormalized = false;
-		double pixelsize = sml_.ptable.getValueAsDouble(3, 0)/sml_.ptable.getValueAsDouble(1, 0);
-		settings.dMagnification = pixelsize/settings.dRecPixelSize;
+		//bNormalized = false;
+		//double pixelsize = sml_.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml_.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		//settings.dMagnification = pixelsize/settings.dRecPixelSize;
+		settings.dMagnification = 1.0/settings.dRecPixelSize;
 		
-		new_width  = (int) (settings.nRecWidth*settings.dMagnification);
-		new_height = (int) (settings.nRecHeight*settings.dMagnification);
+		new_width  = (int) Math.ceil(settings.nRecWidth*settings.dMagnification);
+		new_height = (int) Math.ceil(settings.nRecHeight*settings.dMagnification);
 
 		imp = new ImagePlus();
 		imp.setTitle("Reconstructed image");
@@ -96,29 +115,42 @@ public class SMLReconstruct {
 		
 		}
 		
+		//sort table by frame if required
+		if(settings.bAveragePositions)
+		{
+			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_FrameN, true);
+			bFrameSorted = true;
+		}
 		
 		// load data
 		sml_.ptable_lock.lock();
-		if(settings.nIntIndex==0 || settings.nIntIndex==1) //integrated spot intensity as amplitude
-			amp = sml_.ptable.getColumnAsDoubles(10);
-		else 					  //fitted Gaussian peak amplitude as amplitude
-			amp = sml_.ptable.getColumnAsDoubles(0);
+		//use integrated spot intensity as area under curve for plotted particles
+//		bIntegrInt = false;
+		//if(settings.nIntIndex==1) 
+//			bIntegrInt = true;
 		//use normalized 2D gaussian to plot each particle 
-		if(settings.nIntIndex==0)
-			bNormalized = true;
+		//if(settings.nIntIndex==0)
+//			bNormalized = true;
+
+		
+		//integrated spot intensity 
+	//	integrint = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_IntegrInt);
+		
+		//fitted Gaussian peak amplitude
+		//amp = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_AmplFit);
 		
 		//frame number
-		f   = sml_.ptable.getColumnAsDoubles(13);
+		f   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		nParticlesCount = f.length;
 		//coordinates
-		x   = sml_.ptable.getColumnAsDoubles(1);		
-		y   = sml_.ptable.getColumnAsDoubles(2);
+		x   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Xnm);		
+		y   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);
 
 		//calculate z-values if necessary
 		if(settings.bCalculateZValues)
 			calcZValues(sml_);
 		
-		z_nm = sml_.ptable.getColumnAsDoubles(5);
+		z_nm = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Znm);
 		
 		if (settings.bTranslation)			
 		{
@@ -130,37 +162,37 @@ public class SMLReconstruct {
 		
 		}
 		//false positive mark
-		fp  = sml_.ptable.getColumnAsDoubles(6);
+		fp  = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
 		//localization precision
-		sdx = sml_.ptable.getColumnAsDoubles(7);
-		sdy = sml_.ptable.getColumnAsDoubles(8);
+		loc_errx = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errX);
+		loc_erry = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errY);
 		
 		sml_.ptable_lock.unlock();
 		
 		
-		// load min & max values
+		// find maximum frame number
 		for (int n=0;n<f.length;n++)
 		{
 			if (f[n]>nframes) nframes=(int) f[n];
-			if (amp[n]>max) max=amp[n];
-			if (amp[n]<min) min=amp[n];
+			//if (amp[n]>max) max=amp[n];
+			//if (amp[n]<min) min=amp[n];
 		}
-		nrange = max-min;
+		//nrange = max-min;
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin.
-	 *  Slow one since it assumes that Results table is not sorted. 
+	 *  Rather slow one, since it assumes that Results table is not sorted. 
 	 * @param fstart show only particle after this frame
 	 * @param fstop show only particle before this frame
 	*/
 	void draw_unsorted(int fstart, int fstop)
 	{	
 		FloatProcessor ipf = new FloatProcessor(new_width, new_height);
-		double old_i, new_i, dErrx, dErry, xpeak, ypeak, sdxmag, sdymag;
+		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j;
-		double preG=0.25*Math.PI;
-		double dCutoff = 1.0;
+		//double preG=0.25*Math.PI;
+		double dCutoff = 1000.0; //default cut-off is 1000 nm
 		double dNorm = 1.0;
 		//double dVerif = 0.0;
 		
@@ -179,26 +211,25 @@ public class SMLReconstruct {
 				ymag=(int) Math.round(y[n]*settings.dMagnification);
 				
 
-				if(sdx[n]<dCutoff && sdy[n]<dCutoff)
+				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
 				{
 					if(settings.nSDIndex>0)
 					{
-						sdx[n] = settings.dFixedSD;
-						sdy[n] = settings.dFixedSD;
+						loc_errx[n] = settings.dFixedSD;
+						loc_erry[n] = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*sdx[n]*settings.dMagnification);
-					ysq = (int) Math.round(3*sdy[n]*settings.dMagnification);
+					xsq = (int) Math.round(3*loc_errx[n]*settings.dMagnification);
+					ysq = (int) Math.round(3*loc_erry[n]*settings.dMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
-					sdxmag=sdx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					sdymag=sdy[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					if(bNormalized)
-					{
-						dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/sdxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/sdxmag);
-						dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/sdymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/sdymag);
-						dNorm = 1/(dErrx*dErry);
-					}
-					//dVerif=0;
+					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+
+					///calculate area under pixelated gaussian
+					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
+					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
+					dNorm = 1/(dErrx*dErry);
+
 					for(i=xmag-xsq;i<xmag+xsq+1;i++)
 						for(j=ymag-ysq;j<ymag+ysq+1;j++)
 						{
@@ -206,14 +237,26 @@ public class SMLReconstruct {
 							{
 								old_i=ipf.getf(i, j);
 		
-								dErrx = ErrorFunction.erf2((i-xpeak)/sdxmag) - ErrorFunction.erf2((1+i-xpeak)/sdxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/sdymag) - ErrorFunction.erf2((1+j-ypeak)/sdymag);
-								if(bNormalized)
-									{new_i = old_i + dNorm*dErrx*dErry;}
-									//dVerif+=dNorm*dErrx*dErry;}
-								else
-									{new_i = old_i + preG*amp[n]*sdxmag*sdymag*dErrx*dErry;}
+								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
 								
+								//dVerif = dNorm*dErrx*dErry;
+								//dVerif = amp[n]*dNorm*dErrx*dErry;
+								//switch (settings.nIntIndex){
+//									case 0:
+										//new_i = old_i + dNorm*dErrx*dErry;
+										//break;
+									//case 1:
+//										new_i = old_i + integrint[n]*dNorm*dErrx*dErry;
+										//break;
+									//case 2:
+//										new_i = old_i + amp[n]*dNorm*dErrx*dErry;
+										//break;
+									//default:
+//										new_i =0;
+											//break;
+//								}
+								new_i = old_i + dNorm*dErrx*dErry;
 								ipf.setf(i, j, (float)new_i);
 							}
 						}
@@ -221,7 +264,8 @@ public class SMLReconstruct {
 			}
 		}
 
-		imp.setProcessor(ipf.convertToShort(true));
+		//imp.setProcessor(ipf.convertToShort(true));
+		imp.setProcessor(ipf);
 		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
 		//imp.addSlice(null, ipf.convertToShort(true));
 		IJ.run(imp, "Enhance Contrast", "saturated=0.35");
@@ -236,10 +280,10 @@ public class SMLReconstruct {
 	*/
 	void draw_zstack(int fstart, int fstop, double zstep)
 	{	
-		double old_i, new_i, dErrx, dErry, xpeak, ypeak, sdxmag, sdymag;
+		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j;
-		double preG=0.25*Math.PI;
+		//double preG=0.25*Math.PI;
 		double dCutoff = 1.0;
 		double dNorm = 1.0;
 		//double dVerif = 0.0;
@@ -296,25 +340,25 @@ public class SMLReconstruct {
 					sliceNumber = nSlices-1;
 				/*DEBUGGING*/
 				
-				if(sdx[n]<dCutoff && sdy[n]<dCutoff)
+				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
 				{
 					if(settings.nSDIndex>0)
 					{
-						sdx[n] = settings.dFixedSD;
-						sdy[n] = settings.dFixedSD;
+						loc_errx[n] = settings.dFixedSD;
+						loc_erry[n] = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*sdx[n]*settings.dMagnification);
-					ysq = (int) Math.round(3*sdy[n]*settings.dMagnification);
+					xsq = (int) Math.round(3*loc_errx[n]*settings.dMagnification);
+					ysq = (int) Math.round(3*loc_erry[n]*settings.dMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
-					sdxmag=sdx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					sdymag=sdy[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					if(bNormalized)
-					{
-						dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/sdxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/sdxmag);
-						dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/sdymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/sdymag);
-						dNorm = 1/(dErrx*dErry);
-					}
+					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					//if(bNormalized)
+					//{
+					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
+					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
+					dNorm = 1/(dErrx*dErry);
+					//}
 					//dVerif=0;
 					for(i=xmag-xsq;i<xmag+xsq+1;i++)
 						for(j=ymag-ysq;j<ymag+ysq+1;j++)
@@ -323,14 +367,14 @@ public class SMLReconstruct {
 							{
 								old_i=ipf[sliceNumber].getf(i, j);
 		
-								dErrx = ErrorFunction.erf2((i-xpeak)/sdxmag) - ErrorFunction.erf2((1+i-xpeak)/sdxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/sdymag) - ErrorFunction.erf2((1+j-ypeak)/sdymag);
-								if(bNormalized)
-									{new_i = old_i + dNorm*dErrx*dErry;}
+								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
+								//if(bNormalized)
+								//	{new_i = old_i + dNorm*dErrx*dErry;}
 									//dVerif+=dNorm*dErrx*dErry;}
-								else
-									{new_i = old_i + preG*amp[n]*sdxmag*sdymag*dErrx*dErry;}
-								
+								//else
+									//{new_i = old_i + preG*amp[n]*loc_errxmag*loc_errymag*dErrx*dErry;}
+								new_i = old_i + dNorm*dErrx*dErry;
 								ipf[sliceNumber].setf(i, j, (float)new_i);
 							}
 						}
@@ -359,10 +403,10 @@ public class SMLReconstruct {
 	void draw_sorted(int fstart, int fstop)
 	{	
 		FloatProcessor ipf = new FloatProcessor(drift_width, drift_height);
-		double old_i, new_i, dErrx, dErry, xpeak, ypeak, sdxmag, sdymag;
+		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j,n;
-		double preG=0.25*Math.PI;
+		//double preG=0.25*Math.PI;
 		boolean bContinue = true;
 		double dCutoff = 1.0;
 		double dNorm = 1.0;
@@ -382,25 +426,25 @@ public class SMLReconstruct {
 				xmag=(int) Math.round(x[n]*dDriftMagn);
 				ymag=(int) Math.round(y[n]*dDriftMagn);
 				
-				if(sdx[n]<dCutoff && sdy[n]<dCutoff)
+				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
 				{
 					if(settings.nSDIndex>0)
 					{
-						sdx[n] = settings.dFixedSD;
-						sdy[n] = settings.dFixedSD;
+						loc_errx[n] = settings.dFixedSD;
+						loc_erry[n] = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*sdx[n]*dDriftMagn);
-					ysq = (int) Math.round(3*sdy[n]*dDriftMagn);
+					xsq = (int) Math.round(3*loc_errx[n]*dDriftMagn);
+					ysq = (int) Math.round(3*loc_erry[n]*dDriftMagn);
 					xpeak=x[n]*dDriftMagn;
 					ypeak=y[n]*dDriftMagn;
-					sdxmag=sdx[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
-					sdymag=sdy[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
-					if(bNormalized)
-					{
-						dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/sdxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/sdxmag);
-						dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/sdymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/sdymag);
-						dNorm = 1/(dErrx*dErry);
-					}					
+					loc_errxmag=loc_errx[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
+					loc_errymag=loc_erry[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
+					//if(bNormalized)
+					//{
+					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
+					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
+					dNorm = 1/(dErrx*dErry);
+					//}					
 					for(i=xmag-xsq;i<xmag+xsq+1;i++)
 						for(j=ymag-ysq;j<ymag+ysq+1;j++)
 						{
@@ -408,14 +452,14 @@ public class SMLReconstruct {
 							{
 								old_i=ipf.getf(i, j);
 		
-								dErrx = ErrorFunction.erf2((i-xpeak)/sdxmag) - ErrorFunction.erf2((1+i-xpeak)/sdxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/sdymag) - ErrorFunction.erf2((1+j-ypeak)/sdymag);
-								if(bNormalized)
-									{new_i = old_i + dNorm*dErrx*dErry;}								
-								else
-									{new_i = old_i + preG*amp[n]*sdxmag*sdymag*dErrx*dErry;}
+								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
+								//if(bNormalized)
+									//{new_i = old_i + dNorm*dErrx*dErry;}								
+								//else
+									//{new_i = old_i + preG*amp[n]*loc_errxmag*loc_errymag*dErrx*dErry;}
 								
-								
+								new_i = old_i + dNorm*dErrx*dErry;
 						
 								ipf.setf(i, j, (float)new_i);
 							}
@@ -435,7 +479,7 @@ public class SMLReconstruct {
 		
 	}
 	
-	/** Main function performing drift correction  */
+	/** Main function performing correlation based drift correction  */
 	void DriftCorrection()
 	{
 		double dXAver, dYAver; //average precision
@@ -455,11 +499,11 @@ public class SMLReconstruct {
 		dXAver=0; dYAver=0;
 		for (i=0;i<nParticlesCount;i++)
 		{
-			if(fp[i]<0.3 && sdx[i]<1.0 && sdy[i]<1.0)
+			if(fp[i]<0.3 && loc_errx[i]<1.0 && loc_erry[i]<1.0)
 			{
 				nCount++;
-				dXAver+=sdx[i];
-				dYAver+=sdy[i];
+				dXAver+=loc_errx[i];
+				dYAver+=loc_erry[i];
 			}
 		}
 		dXAver /=nCount;
@@ -676,16 +720,15 @@ public class SMLReconstruct {
 		nSize = f.length;
 	
 		//put all data together in one array
-		double [][] data = new double[nSize][7];
+		double [][] data = new double[nSize][6];
 		for (i=0; i<nSize; i++)
 		{
 			data[i][0] = f[i];
-			data[i][1] = amp[i];
-			data[i][2] = x[i];
-			data[i][3] = y[i];
-			data[i][4] = sdx[i];
-			data[i][5] = sdy[i];
-			data[i][6] = fp[i];
+			data[i][1] = x[i];
+			data[i][2] = y[i];
+			data[i][3] = loc_errx[i];
+			data[i][4] = loc_erry[i];
+			data[i][5] = fp[i];
 		}
 		//sort
 		Arrays.sort(data, new tableComparator(0, true));
@@ -693,12 +736,11 @@ public class SMLReconstruct {
 		for (i=0; i<nSize; i++)
 		{
 			  f[i] = data[i][0] ;
-			amp[i] = data[i][1];
-			  x[i] = data[i][2];
-		  	  y[i] = data[i][3];
-			sdx[i] = data[i][4];
-			sdy[i] = data[i][5];
-			 fp[i] = data[i][6];
+			  x[i] = data[i][1];
+		  	  y[i] = data[i][2];
+		  	  loc_errx[i] = data[i][3];
+		  	  loc_erry[i] = data[i][4];
+		  	  fp[i] = data[i][5];
 		}		
 		bFrameSorted = true;
 	}
@@ -748,27 +790,41 @@ public class SMLReconstruct {
 	}
 	
 	/** Function averages localizations in consecutive frames within 1 pixel. */	
-	void averagelocalizations()
+	void averagelocalizations(SMLAnalysis sml_)
 	{
-		int nUniqFrames,i;
+		int nUniqFrames,i,j;
 		int nPatNumber = f.length;
-		int nCurrFrame, nCount, nFrameCount, nCurrentParticle, nCompareFrame, nCompareParticle,nFrameCompareCount;
+		int nCount;
+		int nCurrFrame, nFrameCount, nCurrentParticle, nCompareFrame, nCompareParticle,nFrameCompareCount;
 		int nAveragesNumber;
 		int [][] framesstat;
-		double [][] amp_un;
-		double [][] x_un;
-		double [][] y_un;
-		double [][] sdx_un;
-		double [][] sdy_un;
-		double [][] fp_un;
+		double [] temp;
+		double [][][] res_table_unique;
+		double [][] res_table;	
+		
 		boolean bContinue;
-		double dDistance, dAverX, dAverY, dWeightX, dWeightY, dSumWeightX, dSumWeightY, dSumAmp, dWeightAmp, dSumWeightAmp ;
-		ArrayList<double[]> Averaging = new ArrayList<double[]>();
+		double dDistance;
+		/** array containing accumulating values of averaged numbers*/
+		ArrayList<double[]> Averaging_tbl = new ArrayList<double[]>();
 		
 		IJ.showStatus("Averaging single photoactivation events...");
-		//sort table
-		if(!bFrameSorted)
-			this.sortbyframe();
+		
+		//sort table by frame number
+		//should be already sorted in constructor
+
+		sml_.ptable_lock.lock();
+
+		res_table = new double [nPatNumber][DOMConstants.Col_Total_No_Tracks];
+		
+		//read results table to double array with transpose operation (makes later code easier)
+		for (i=0;i<DOMConstants.Col_Total_No_Tracks;i++)
+		{
+			temp = sml_.ptable.getColumnAsDoubles(i);
+			for(j=0;j<nPatNumber;j++)
+				res_table[j][i]=temp[j];
+		}			
+		sml_.ptable_lock.unlock();			
+
 		
 		//calculate number of particles in each frame and
 		//store it for each frame in framesstat array
@@ -777,7 +833,7 @@ public class SMLReconstruct {
 		nCurrFrame = (int) f[0];
 		nCount = 0;
 		nFrameCount = 0;
-		framesstat[nFrameCount][0]=nCurrFrame;
+		framesstat[nFrameCount][0] = nCurrFrame;
 		for (i=0;i<nPatNumber;i++)
 		{
 			if((int)f[i]==nCurrFrame)
@@ -801,21 +857,12 @@ public class SMLReconstruct {
 		//1) allocating arrays with uneven rows 
 		//  for particles from each frame separately
 		
-		amp_un = new double [nUniqFrames][];
-		x_un   = new double [nUniqFrames][];
-		y_un   = new double [nUniqFrames][];
-		sdx_un = new double [nUniqFrames][];
-		sdy_un = new double [nUniqFrames][];
-		fp_un  = new double [nUniqFrames][];
+		res_table_unique = new double [nUniqFrames][][];
 		
 		for(i=0;i<nUniqFrames;i++)
 		{
-			amp_un[i] = new double[framesstat[i][1]];
-			x_un[i]   = new double[framesstat[i][1]];
-			y_un[i]   = new double[framesstat[i][1]];
-			sdx_un[i] = new double[framesstat[i][1]];
-			sdy_un[i] = new double[framesstat[i][1]];
-			fp_un[i]  = new double[framesstat[i][1]];
+			nCount = framesstat[i][1];					
+			res_table_unique[i] = new double [nCount][DOMConstants.Col_Total_No_Tracks];
 		}
 		
 		//2) putting all data to those arrays
@@ -830,12 +877,8 @@ public class SMLReconstruct {
 				nFrameCount++;
 				IJ.showProgress(nFrameCount, nUniqFrames);
 			}
-			amp_un[nFrameCount][nCurrentParticle] = amp[nCount];
-			x_un[nFrameCount][nCurrentParticle]   = x[nCount];
-			y_un[nFrameCount][nCurrentParticle]   = y[nCount];
-			sdx_un[nFrameCount][nCurrentParticle] = sdx[nCount];
-			sdy_un[nFrameCount][nCurrentParticle] = sdy[nCount];
-			fp_un[nFrameCount][nCurrentParticle]  = fp[nCount];					
+			res_table_unique[nFrameCount][nCurrentParticle]= res_table[nCount];
+									
 		}
 		
 		//all right!
@@ -851,12 +894,12 @@ public class SMLReconstruct {
 				nFrameCount++;
 			}
 			
-			
-			if(fp_un[nFrameCount][nCurrentParticle]<dFPThreshold && nFrameCount<(nUniqFrames-1)) 
+			if(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]<dFPThreshold && nFrameCount<(nUniqFrames-1))
+			//if(fp_un[nFrameCount][nCurrentParticle]<dFPThreshold && nFrameCount<(nUniqFrames-1)) 
 			{ 	
 				nCurrFrame = framesstat[nFrameCount][0];
-				//accumulating information
-				Averaging.clear();
+				//accumulating information				
+				Averaging_tbl.clear();
 				
 				bContinue = true;
 				nFrameCompareCount = nFrameCount+1;
@@ -886,20 +929,28 @@ public class SMLReconstruct {
 						}
 							
 					}
+					//in the beginning look the next frame should be just after first
+					if(nAveragesNumber==0 && (nCompareFrame-nCurrFrame>1.5))
+						{bContinue = false;}
 					//ok, let's see if all checks are passed
-					if(bContinue && fp_un[nFrameCompareCount][nCompareParticle]<dFPThreshold)
+					
+					if(bContinue && res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_Fp]<dFPThreshold)
 					{//seems so. let's measure distances between molecules then
-						dDistance = Math.sqrt(Math.pow(x_un[nFrameCount][nCurrentParticle]-x_un[nFrameCompareCount][nCompareParticle], 2) +Math.pow(y_un[nFrameCount][nCurrentParticle]-y_un[nFrameCompareCount][nCompareParticle], 2)); 
+						dDistance = Math.sqrt(Math.pow(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_X] -
+													   res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_X], 2) 
+								             +Math.pow(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Y]-
+								            		   res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_Y], 2)); 
+
 						//they are closer then one pixel
 						if(dDistance<1.0)
 						{
 							//found same photoactivation event
 							//let's store values
-							Averaging.add(new double[] {amp_un[nFrameCompareCount][nCompareParticle], x_un[nFrameCompareCount][nCompareParticle], y_un[nFrameCompareCount][nCompareParticle], sdx_un[nFrameCompareCount][nCompareParticle], sdy_un[nFrameCompareCount][nCompareParticle]});
+							Averaging_tbl.add(res_table_unique[nFrameCompareCount][nCompareParticle]);
 							nAveragesNumber++;
 							//mark it as already used (fp)
 							//debug stub
-							fp_un[nFrameCompareCount][nCompareParticle]+=1.2;//mark it as an averaged one (>1)
+							res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_Fp]+=1.2;//mark it as an averaged one (>1)
 							//exit from current frame (a bit lame one)
 							nCompareParticle = framesstat[nFrameCompareCount][1] -1;
 						}
@@ -909,38 +960,14 @@ public class SMLReconstruct {
 				if(nAveragesNumber>0)
 				{
 					//adding particle itself to the list of averaged values
-					Averaging.add(new double[] {amp_un[nFrameCount][nCurrentParticle], x_un[nFrameCount][nCurrentParticle], y_un[nFrameCount][nCurrentParticle], sdx_un[nFrameCount][nCurrentParticle], sdy_un[nFrameCount][nCurrentParticle]});
+					Averaging_tbl.add(res_table_unique[nFrameCount][nCurrentParticle]);
 					nAveragesNumber++;
-					dAverX=0; dAverY=0; dSumWeightX=0; dSumWeightY=0; dSumAmp=0; dSumWeightAmp=0; dWeightAmp=0; dWeightX=0; dWeightY=0;
-					//let's calculate weighted average 
-					for(double [] item:Averaging)
-					{
-						dWeightX = 1/(item[3]*item[3]);
-						dWeightY = 1/(item[4]*item[4]);
-						dWeightAmp  = 0.5*(dWeightX+dWeightY);
-						dAverX  += dWeightX* item[1];
-						dAverY  += dWeightY* item[2];
-						dSumWeightX += dWeightX;
-						dSumWeightY += dWeightY;
-						dSumWeightAmp += dWeightAmp;
-						dSumAmp += dWeightAmp*item[0];												
-					}
-					//weighted averages final
-					dAverX = dAverX/dSumWeightX;
-					dAverY = dAverY/dSumWeightY;
-					dSumAmp = dSumAmp/dSumWeightAmp;
-					//let's update values for current particle 
-					amp_un[nFrameCount][nCurrentParticle] = dSumAmp;
-					x_un[nFrameCount][nCurrentParticle] = dAverX;
-					y_un[nFrameCount][nCurrentParticle] = dAverY;
-					sdx_un[nFrameCount][nCurrentParticle] = 1/Math.sqrt(dSumWeightX);
-					sdy_un[nFrameCount][nCurrentParticle] = 1/Math.sqrt(dSumWeightY);
-					fp_un[nFrameCount][nCurrentParticle]-=1.2; //mark it as an averaged)
-
+					//calculating weighted average for this particle
+					res_table_unique[nFrameCount][nCurrentParticle] = weightedAverage(Averaging_tbl);					
 				}
 			}//false positive check
 		}
-		//updating initial tables		
+		//updating initial arrays used for rendering picture		
 		nFrameCount = 0;
 		nCurrentParticle = -1;
 		for(nCount = 0; nCount<nPatNumber; nCount++)
@@ -951,45 +978,171 @@ public class SMLReconstruct {
 				nCurrentParticle=0;
 				nFrameCount++;
 			}
-			if(fp_un[nFrameCount][nCurrentParticle]>1)
+			//this one was used in averaging
+			if(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]>1)
 			{
 				fp[nCount]+=1.2;
 			}
-			if(fp_un[nFrameCount][nCurrentParticle]<0)
-			{
-				amp[nCount] = amp_un[nFrameCount][nCurrentParticle];
-				x[nCount]   = x_un[nFrameCount][nCurrentParticle] ;
-				y[nCount]   = y_un[nFrameCount][nCurrentParticle];
-				sdx[nCount] = sdx_un[nFrameCount][nCurrentParticle];
-				sdy[nCount] = sdy_un[nFrameCount][nCurrentParticle];
-				fp[nCount]  = fp_un[nFrameCount][nCurrentParticle];
+			//this one was is the cumulative averaged particle
+			if(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]<0)
+			{				
+				x[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Xnm];
+				y[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Ynm];
+				loc_errx[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errX];
+				loc_erry[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errY];
+				res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2;
+				fp[nCount]  = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp];
 			}
 		}
-		//show table with updated results
-		//show results of drift
-	/*	String sAverData="";
-		TextWindow AverTable;
-				for(i=0;i<nPatNumber;i++)
+		
+		///update results table
+		if(settings.bUpdateAveragePositions)
+		{
+			sml_.ptable_lock.lock();
+			//clear particle table
+			sml_.ptable.reset();
+			nFrameCount = 0;
+			nCurrentParticle = -1;
+			for(nCount = 0; nCount<nPatNumber; nCount++)
+			{
+				nCurrentParticle++;
+				if(nCurrentParticle == framesstat[nFrameCount][1])
 				{
-						sAverData = sAverData + Double.toString(f[i]) + "\t" +Double.toString(amp[i])+"\t"+Double.toString(fp[i])+"\t"+Double.toString(x[i])+"\t"+Double.toString(y[i])+"\t"+Double.toString(sdx[i])+"\t"+Double.toString(sdy[i])+"\n";
+					nCurrentParticle=0;
+					nFrameCount++;
+				}
+				if(res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]<=1)
+				{
+					sml_.ptable.incrementCounter();
 					
+					sml_.ptable.addValue("X_(px)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_X]);							
+					sml_.ptable.addValue("Y_(px)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Y]);
+					sml_.ptable.addValue("Frame Number", res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_FrameN]);
+					sml_.ptable.addValue("X_(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Xnm]);							
+					sml_.ptable.addValue("X_loc_error(nm)", res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errX]);							
+					sml_.ptable.addValue("Y_(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Ynm]);
+					sml_.ptable.addValue("Y_loc_error(nm)", res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errY]);
+					sml_.ptable.addValue("Z_(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Znm]);
+					sml_.ptable.addValue("Z_loc_error(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errZ]);							
+					sml_.ptable.addValue("Amplitude_fit",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_AmplFit]);
+					sml_.ptable.addValue("Amp_error",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Amp_error]);
+					sml_.ptable.addValue("BGfit",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_BGfit]);
+					sml_.ptable.addValue("BGfit_error",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_BGfit_error]);
+					sml_.ptable.addValue("SD_X_(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_SD_X]);
+					sml_.ptable.addValue("SD_X_error(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_SD_X_err]);
+					sml_.ptable.addValue("SD_Y_(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_SD_Y]);
+					sml_.ptable.addValue("SD_Y_error(nm)",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_SD_Y_err]);
+					sml_.ptable.addValue("False positive", res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]);							
+					sml_.ptable.addValue("IntegratedInt",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_IntegrInt]);
+					sml_.ptable.addValue("SNR", res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_SNR]);	
+					//ptable.addValue("chi2_fit",chi2_fit);
+					sml_.ptable.addValue("R2_fit",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_chi]);												
+					//ptable.addValue("Iterations_fit",fdg.nIterations);
+					sml_.ptable.addValue("Iterations_fit",res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_IterN]);
 				}
-				Frame frame = WindowManager.getFrame("After Averaging");
-				if (frame!=null && (frame instanceof TextWindow) )
-				{
-					AverTable = (TextWindow)frame;
-					AverTable.getTextPanel().clear();
-					AverTable.getTextPanel().append(sAverData);
-					AverTable.getTextPanel().updateDisplay();			
-				}
-					else
-						AverTable = new TextWindow("After Averaging", "FrameNumber\tAmplitude\tFalsePositive\tX_px\tY_px\tLocX_px\tLocY_px", sAverData, 450, 300);
-		*/
-		
-		
+
+			}
+			
+			sml_.ptable_lock.unlock();
+			sml_.showTable();
+		}
+					
 	}
 	
-	/** Function caclulating number of unique frames */
+	/** Function calculating weighted average of results
+	 * */
+	double [] weightedAverage(ArrayList<double[]> Averaging_tbl)
+	{
+		double [] dAverW;
+		double dWeight;
+		int nCount=0;
+		dAverW = new double [DOMConstants.Col_Total_No_Tracks];
+		
+		//calculating averaged values
+		for(double [] item:Averaging_tbl)
+		{
+			dWeight = Math.pow(item[DOMConstants.Col_loc_errX], -2);
+			dAverW[DOMConstants.Col_X] += item[DOMConstants.Col_X]*dWeight; 				
+			dAverW[DOMConstants.Col_Xnm] += item[DOMConstants.Col_Xnm]*dWeight;			
+			dAverW[DOMConstants.Col_loc_errX] += dWeight;
+			
+			dWeight = Math.pow(item[DOMConstants.Col_loc_errY], -2);
+			dAverW[DOMConstants.Col_Y] += item[DOMConstants.Col_Y]*dWeight;
+			dAverW[DOMConstants.Col_Ynm] += item[DOMConstants.Col_Ynm]*dWeight;			
+			dAverW[DOMConstants.Col_loc_errY] += dWeight;
+			
+			dWeight = Math.pow(item[DOMConstants.Col_Amp_error], -2);
+			dAverW[DOMConstants.Col_AmplFit] += item[DOMConstants.Col_AmplFit]*dWeight;
+			dAverW[DOMConstants.Col_Amp_error] += dWeight;
+			
+			dWeight = Math.pow(item[DOMConstants.Col_BGfit_error], -2);
+			dAverW[DOMConstants.Col_BGfit] += item[DOMConstants.Col_BGfit]*dWeight;
+			dAverW[DOMConstants.Col_BGfit_error] += dWeight;
+			
+			dWeight = Math.pow(item[DOMConstants.Col_SD_X_err], -2);
+			dAverW[DOMConstants.Col_SD_X] += item[DOMConstants.Col_SD_X]*dWeight;
+			dAverW[DOMConstants.Col_SD_X_err] += dWeight;
+			
+			dWeight = Math.pow(item[DOMConstants.Col_SD_Y_err], -2);
+			dAverW[DOMConstants.Col_SD_Y] += item[DOMConstants.Col_SD_Y]*dWeight;
+			dAverW[DOMConstants.Col_SD_Y_err] += dWeight;
+
+			if(Math.abs(item[DOMConstants.Col_Znm])>0)
+			{
+				dWeight = Math.pow(item[DOMConstants.Col_loc_errZ], -2);
+				dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm]*dWeight;
+				dAverW[DOMConstants.Col_loc_errZ] += dWeight;
+			}
+			
+			dAverW[DOMConstants.Col_IntegrInt] += item[DOMConstants.Col_IntegrInt];
+			dAverW[DOMConstants.Col_SNR] += item[DOMConstants.Col_SNR];
+			dAverW[DOMConstants.Col_chi] += item[DOMConstants.Col_chi];
+			dAverW[DOMConstants.Col_IterN] += item[DOMConstants.Col_IterN];
+			
+			nCount++;
+		}
+
+		//weighted average sum divide by sum of weights 
+		dAverW[DOMConstants.Col_X]/=dAverW[DOMConstants.Col_loc_errX];
+		dAverW[DOMConstants.Col_Xnm]/=dAverW[DOMConstants.Col_loc_errX];
+		//for the SD (SEM) itself it is this formula
+		dAverW[DOMConstants.Col_loc_errX] = 1/Math.sqrt(dAverW[DOMConstants.Col_loc_errX]);
+		
+		dAverW[DOMConstants.Col_Y]/=dAverW[DOMConstants.Col_loc_errY];
+		dAverW[DOMConstants.Col_Ynm]/=dAverW[DOMConstants.Col_loc_errY];
+		dAverW[DOMConstants.Col_loc_errY] = 1/Math.sqrt(dAverW[DOMConstants.Col_loc_errY]);
+		
+		dAverW[DOMConstants.Col_AmplFit]/=dAverW[DOMConstants.Col_Amp_error];		
+		dAverW[DOMConstants.Col_Amp_error] = 1/Math.sqrt(dAverW[DOMConstants.Col_Amp_error]);
+
+		dAverW[DOMConstants.Col_BGfit]/=dAverW[DOMConstants.Col_BGfit_error];		
+		dAverW[DOMConstants.Col_BGfit_error] = 1/Math.sqrt(dAverW[DOMConstants.Col_BGfit_error]);
+		
+		dAverW[DOMConstants.Col_SD_X]/=dAverW[DOMConstants.Col_SD_X_err];		
+		dAverW[DOMConstants.Col_SD_X_err] = 1/Math.sqrt(dAverW[DOMConstants.Col_SD_X_err]);
+		
+		dAverW[DOMConstants.Col_SD_Y]/=dAverW[DOMConstants.Col_SD_Y_err];		
+		dAverW[DOMConstants.Col_SD_Y_err] = 1/Math.sqrt(dAverW[DOMConstants.Col_SD_Y_err]);
+		
+		if(Math.abs(dAverW[DOMConstants.Col_Znm])>0)
+		{
+			dAverW[DOMConstants.Col_Znm]/=dAverW[DOMConstants.Col_loc_errZ];		
+			dAverW[DOMConstants.Col_loc_errZ] = 1/Math.sqrt(dAverW[DOMConstants.Col_loc_errZ]);			
+		}
+
+		//just simple average for these values
+		dAverW[DOMConstants.Col_IntegrInt] /= (double)nCount;
+		dAverW[DOMConstants.Col_SNR] /= (double)nCount;
+		dAverW[DOMConstants.Col_chi] /= (double)nCount;
+		dAverW[DOMConstants.Col_IterN] /= (double)nCount;
+
+		dAverW[DOMConstants.Col_Fp] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_Fp]-1.2;
+		dAverW[DOMConstants.Col_FrameN] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_FrameN];
+
+		return dAverW;
+	}
+	
+	/** Function calculating number of unique frames */
 	int uniqFrames()
 	{
 		int i, nCount=1, nLength = f.length;

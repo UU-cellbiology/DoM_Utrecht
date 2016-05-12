@@ -23,13 +23,14 @@ public class LevenbergMarquardt
 	 *	Members
 	 */
 	//public double[][] 
+	public int iteration_count;
 	
 	/**
 	 *	Constructor
 	 */
 	public LevenbergMarquardt()
 	{
-	
+		
 	}
 	
 	/**
@@ -51,6 +52,7 @@ public class LevenbergMarquardt
 	public double calculateChi2(double[][] image_data, double[][] x_positions, double[][] y_positions, int image_width, int image_height, double[] parameters)
 	{
 		double chi2 = 0.0;
+		double dy;
 		
 		// loop over all pixels in image to sum the product of difference between image and model
 		for(int y = 0; y < image_height; ++y)
@@ -59,7 +61,7 @@ public class LevenbergMarquardt
 			{
 				// calculate sum of squared difference
 				//dy = *px - gaussian2D(x, y, my_parameters);
-				double dy = image_data[y][x] - gaussian2D(x_positions[y][x], y_positions[y][x], parameters); // RSLV: inline Gaussian2D function?
+				dy = image_data[y][x] - gaussian2D(x_positions[y][x], y_positions[y][x], parameters); // RSLV: inline Gaussian2D function?
 				chi2 += dy * dy;
 			}
 		}
@@ -106,12 +108,12 @@ public class LevenbergMarquardt
 		
 		double alpha_res_45 = 0.0f;
 		
-		// loop over all pixel, computating all intermediate values
+		// loop over all pixel, computing all intermediate values
 		for(int y = 0; y < image_height; ++y)
 		{
 			for(int x = 0; x < image_width; ++x)
 			{
-				// calculate derivates for position
+				// calculate derivatives for position
 				double xmxpos = x_positions[y][x]-parameters[PARAM_X_SPOS];
 				double xmxpos2 = xmxpos * xmxpos;
 				double xsig2 = parameters[PARAM_X_SIGMA] * parameters[PARAM_X_SIGMA];
@@ -300,7 +302,7 @@ public class LevenbergMarquardt
 	}
 
 	/**
-	 *	Choleksy decomposition of matrix[R][C] done in place
+	 *	Cholesky decomposition of matrix[R][C] done in place
 	 */
 	public double[][] choleskyDecomposition(double[][] matrix)
 	{
@@ -505,9 +507,11 @@ public class LevenbergMarquardt
 		// calculate chi2 value of current model
 		double current_chi2 = calculateChi2(image_data, x_positions, y_positions, image_width, image_height, initial_parameters);
 		
+		boolean bNotStop = true;
+		
 		// loop for fixed number of iterations
-		int iteration_count = 0;
-		while(iteration_count < num_iterations)
+		iteration_count = 0;
+		while(bNotStop)
 		{
 			// calculate alpha matrix
 			double[][] alpha_matrix = calculateAlphaMatrix(x_positions, y_positions, image_width, image_height, fitted_parameters, lambda);
@@ -527,22 +531,31 @@ public class LevenbergMarquardt
 			double[] updated_parameters = calculateUpdatedParameters(fitted_parameters, da_vector);
 			
 			// calculate updated chi2
-			double updated_chi2 = calculateChi2(image_data, x_positions, y_positions, image_width, image_height, initial_parameters);
+			//double updated_chi2 = calculateChi2(image_data, x_positions, y_positions, image_width, image_height, initial_parameters);
+			double updated_chi2 = calculateChi2(image_data, x_positions, y_positions, image_width, image_height, updated_parameters);
 			
 			// update parameters
 			if(updated_chi2 <= current_chi2)
 			{
 				fitted_parameters = updated_parameters;
+				
+				if(((current_chi2-updated_chi2)/current_chi2)<0.001)
+					bNotStop = false;
 				current_chi2 = updated_chi2;
-				lambda *= LAMBDA_FACTOR_INV; // decrease step size
+				//lambda *= LAMBDA_FACTOR_INV; // decrease step size
+				lambda *= LAMBDA_FACTOR; // increase step size
+				
 			}
 			else
 			{
-				lambda *= LAMBDA_FACTOR; // increase step size
+				//lambda *= LAMBDA_FACTOR;
+				lambda *= LAMBDA_FACTOR_INV; // decrease step size				
 			}
 			
 			// increase number of iterations
 			++iteration_count;
+			if(iteration_count >= num_iterations)
+				bNotStop = false;
 		}
 		
 		return fitted_parameters;

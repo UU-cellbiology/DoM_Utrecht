@@ -20,7 +20,7 @@ public class Link_Particles implements PlugIn {
 		IJ.register(Link_Particles.class);
 		
 		//check that the table is present
-		if (sml.ptable.getCounter()==0 || !sml.ptable.columnExists(13))
+		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
 		{
 			IJ.error("Not able to detect a valid 'Particles Table' for particle linking, please load one.");
 			return;
@@ -31,7 +31,7 @@ public class Link_Particles implements PlugIn {
 		if (!dlg.LinkParticles()) return;
 		
 		//sort table by frame number		
-		Sort_Results.sorting_external_silent(sml, 13, true);
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_FrameN, true);
 		
 		imp = null;
 		ovTracks = null;
@@ -50,7 +50,7 @@ public class Link_Particles implements PlugIn {
 			    IJ.error("8 or 16 bit greyscale image required");
 			    return;
 			}
-			frames = sml.ptable.getColumnAsDoubles(13);
+			frames = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 			if(frames[frames.length-1]>imp.getStackSize())
 			{
 			    IJ.error("Results table is probably different from images stack.\n Maximum frame number in table is bigger than the stack size.");
@@ -75,7 +75,7 @@ public class Link_Particles implements PlugIn {
 		smlLink.Link_Closest();
 		
 		//getting length (number of detections per track)		
-		Sort_Results.sorting_external_silent(sml, 18, true);
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_TrackID, true);
 		
 		smlLink.calculate_Tracks_Lengths();
 		smlLink.add_Tracks_Lengths();	

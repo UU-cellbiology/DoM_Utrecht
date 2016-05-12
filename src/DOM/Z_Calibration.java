@@ -8,48 +8,26 @@ package DOM;
 import java.awt.AWTEvent;
 import java.awt.Button;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Graphics;
-import java.awt.MenuComponent;
-import java.awt.MouseInfo;
 import java.awt.Panel;
-import java.awt.Shape;
 import java.awt.Toolkit;
 import java.awt.event.AWTEventListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
-import java.awt.event.MouseListener;
-import java.text.NumberFormat;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Random;
 
-import javax.swing.JButton;
-import javax.swing.JFormattedTextField;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-
-import org.omg.CORBA.DoubleSeqHelper;
-
 import ij.IJ;
-import ij.ImageListener;
 import ij.ImagePlus;
 import ij.Prefs;
-import ij.gui.GenericDialog;
-import ij.gui.ImageCanvas;
-import ij.gui.ImagePanel;
-import ij.gui.ImageWindow;
-import ij.gui.NonBlockingGenericDialog;
-import ij.gui.PlotCanvas;
+import ij.gui.*;
+//import ij.gui.ImageCanvas;
+//import ij.gui.NonBlockingGenericDialog;
+//import ij.gui.Plot;
 import ij.measure.CurveFitter;
-import ij.measure.Calibration;
-import ij.plugin.EventListener;
 import ij.plugin.PlugIn;
 import ij.plugin.frame.Fitter;
-import ij.gui.Plot;
-import jaolho.data.lma.LMA;
-import jaolho.data.lma.LMAMatrix;
 
 public class Z_Calibration implements PlugIn{
 
@@ -70,13 +48,14 @@ public class Z_Calibration implements PlugIn{
 	
 		if (!dlg.zCalibration()) return;
 		//String [] zcUseOptions = new String [] {"Image stack","Particle table","Polynomial coefficients"};
-		switch(dlg.sZcUse){
+	//1.6 compartibility issue!!!  EUGENE COMMENT
+		/*switch(dlg.sZcUse){
 			case "Image stack": zCal_imageStack(); break;
 			case "Particle table": zCal_particleTable(); break;
 			case "Polynomial coefficients": zCal_polCoef(); break;
-		}
+		}*/
 	}
-	
+		
 	public void zCal_imageStack(){
 		//msg("zCal_imageStack: still have to implement this");
 		
@@ -299,7 +278,9 @@ public class Z_Calibration implements PlugIn{
 				jp.add(ic);
 				
 				nb.pack();
-				nb.revalidate();
+				
+				///WHERE IS THIS METHOD??? EUGENE
+				//nb.revalidate();
 				
 				
 			}
@@ -457,4 +438,5 @@ public class Z_Calibration implements PlugIn{
 		gd.addMessage(String.valueOf(message));
 		gd.showDialog();
 	}
+
 }

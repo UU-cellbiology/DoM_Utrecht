@@ -12,6 +12,7 @@ import java.io.IOException;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.gui.Overlay;
+import ij.gui.Roi;
 import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
 
@@ -40,8 +41,16 @@ public class Detect_Molecules implements PlugIn {
 	int nDetPartNum, nCountThread;
 	int nNumberofDetectedColumns;
 	
+	Roi RoiActive;
+	
 	//launch search of particles 
 	public void run(String arg) {
+		
+		long startTime;
+		long detectionTime=0;
+		long fullTime;
+		// ... the code being measured ...    
+		
 		
 		int nFreeThread = -1;
 		int nSlice = 0;
@@ -91,11 +100,22 @@ public class Detect_Molecules implements PlugIn {
 		else
 			smlthreads = new SMLThread[nStackSize];
 		
-
+		//getting active Roi
+		RoiActive = imp.getRoi();
+		
+		//let's start measuring time		
+		startTime = System.nanoTime();
+		
+		//let's log stuff
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Image title: \"" + imp.getTitle() + "\"");
+		IJ.log("Detection SD of PSF: " + String.format("%.2f",dlg.dPSFsigma) + " pixels");
+		IJ.log("Image pixel size: " + String.format("%.2f",dlg.dPixelSize) + " nm");
+		IJ.log("Kernel size: (detection) " + String.format("%d",dlg.nKernelSize) + " pixels, (fitting) "+String.format("%d",(2*(int)(3.0*dlg.dPSFsigma))+1)+" pixels");
 		nFreeThread = -1;
 		nSlice = 0;
 		bContinue = true;
-		if(dlg.nDetectionType==0 || dlg.nDetectionType==1 || dlg.nDetectionType==2)
+		if(dlg.nDetectionType==0 || dlg.nDetectionType==1)
 		{
 			sml.ptable.reset(); // erase particle table
 			IJ.showStatus("Detecting molecules...");		
@@ -143,7 +163,7 @@ public class Detect_Molecules implements PlugIn {
 						}
 					}
 					smlthreads[nFreeThread] = new SMLThread();
-					smlthreads[nFreeThread].init(ip, sml, dlg, nSlice, SpotsPositions,nStackSize, smlcount);
+					smlthreads[nFreeThread].init(ip, sml, dlg, nSlice, SpotsPositions,nStackSize, smlcount, RoiActive);
 					smlthreads[nFreeThread].start();
 					//IJ.showProgress(nSlice, nStackSize);
 				} //end of if (bContinue)
@@ -163,6 +183,8 @@ public class Detect_Molecules implements PlugIn {
 			}
 			//detection only
 			IJ.showStatus("Detection completed.");
+			detectionTime = System.nanoTime() - startTime;
+			IJ.log("Detection time:" + String.format("%.2f",((double)Math.abs(detectionTime))*0.000000001) + " s");
 		}
 
 		if(dlg.nDetectionType==0)
@@ -183,9 +205,7 @@ public class Detect_Molecules implements PlugIn {
 				imp.show();
 			}			
 			
-			//add width and height of original image to table
-			sml.ptable.addValue("Original_image_size",imp.getWidth());
-			sml.ptable.addValue("Original_image_size",imp.getHeight());
+
 			
 			sml.showTable();
 		}
@@ -229,17 +249,8 @@ public class Detect_Molecules implements PlugIn {
 			sml.ptable.reset();
 						
 			IJ.showStatus("Fitting intensities...");
-			IJ.showProgress(0, nStackSize);
+			IJ.showProgress(0, nStackSize);			
 			
-			//case of BaLM single molecule intensity analysis
-			if(dlg.nDetectionType == 2)
-			{
-				//clearing all molecules that are not at their final bleach step
-				detparticles = BaLMfilter(detparticles, nFrameN);
-				nDetPartNum = detparticles[0].length;
-				nFrameN = new double[nDetPartNum];
-				nFrameN = detparticles[2];
-			}
 			nUniqFrames = uniqFrames(nFrameN, nDetPartNum);
 			
 			/*************************/
@@ -514,9 +525,16 @@ public class Detect_Molecules implements PlugIn {
 			sml.showTable();
 			IJ.showProgress(nStackSize, nStackSize);
 			IJ.showStatus("Fitting completed.");
+			fullTime = System.nanoTime() - startTime;
+			if (dlg.nDetectionType==2)				
+				IJ.log("Fitting time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001)+ " s");
+			else
+			{
+				IJ.log("Fitting time: " + String.format("%.2f", ((double)Math.abs(fullTime-detectionTime))*0.000000001)+ " s");
+				IJ.log("Total time:" + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
+			}
+
 		}
-		
-		
 
 	}
 
@@ -547,135 +565,6 @@ public class Detect_Molecules implements PlugIn {
 		return nCount;
 	}
 
-	private double[][] BaLMfilter(double[][] detparticles_, double[] nFrameN_) 
-	{
-		int nDetPartNum, nCount, nPosBegin, nPosEnd, nPosOneBegin;
-		int nFrameOne, nFrameTwo, nArrayOneL, nArrayTwoL;
-		double[][] filteredparticles_;
-		double[][] firstframe_;
-		double[][] secondframe_;
-		int[] marks;
-		int i,j;
-		boolean bFlag, bContinue;
-		
-		nPosBegin = 0;
-		nPosEnd = 0;
-		nCount = 0;
-		nFrameOne = (int) nFrameN_[0];		
-		nDetPartNum = nFrameN_.length;
-		//whether particle is last bleaching step or not
-		marks = new int [nDetPartNum];
-		
-		//filling first frame
-		bFlag = true;
-		while(bFlag)
-		{
-			nPosEnd++;
-			if(nPosEnd==nDetPartNum )
-				bFlag=false;
-			else
-				if((int)(nFrameN_[nPosEnd])!=nFrameOne)
-					bFlag=false;
-			
-		}
-		firstframe_ = new double[2][nPosEnd-nPosBegin];
-		firstframe_[0] = Arrays.copyOfRange(detparticles_[0], nPosBegin, nPosEnd); //x coordinates
-		firstframe_[1] = Arrays.copyOfRange(detparticles_[1], nPosBegin, nPosEnd); //y coordinates
-		bContinue = true;
-		while (bContinue)
-		{
-			if(nPosEnd == nDetPartNum)
-				bContinue = false;
-			else
-			{
-				//next frame does not contain any particles
-				if((int)nFrameN_[nPosEnd]>nFrameOne+1)
-				{
-					//mark all particles as filtered
-					for(i=nPosBegin; i<nPosEnd; i++)
-					{
-						marks[i]=1;
-						nCount++;
-					}
-					nPosBegin=nPosEnd;
-					nFrameOne = (int) nFrameN_[nPosBegin];	
-					bFlag = true;
-					while(bFlag)
-					{
-						nPosEnd++;
-						if(nPosEnd==nDetPartNum )
-							bFlag=false;
-						else
-							if((int)(nFrameN_[nPosEnd])!=nFrameOne)
-								bFlag=false;
-					}
-					//fill frame one array
-					firstframe_ = new double[2][nPosEnd-nPosBegin];
-					firstframe_[0] = Arrays.copyOfRange(detparticles_[0], nPosBegin, nPosEnd); //x coordinates
-					firstframe_[1] = Arrays.copyOfRange(detparticles_[1], nPosBegin, nPosEnd); //y coordinates
-				}//if((int)nFrameN_[nPosEnd]>nFrameOne+1)
-				//next frame does contains particles
-				else
-				{
-					//let's store those particles
-					nPosOneBegin = nPosBegin;
-					nPosBegin=nPosEnd;
-					nFrameTwo=nFrameOne+1;
-					bFlag = true;
-					while(bFlag)
-					{
-						nPosEnd++;
-						if(nPosEnd==nDetPartNum )
-							bFlag=false;
-						else
-							if((int)(nFrameN_[nPosEnd])!=nFrameTwo)
-								bFlag=false;						
-					}
-					//fill frame two array
-					secondframe_ = new double[2][nPosEnd-nPosBegin];
-					secondframe_[0] = Arrays.copyOfRange(detparticles_[0], nPosBegin, nPosEnd); //x coordinates
-					secondframe_[1] = Arrays.copyOfRange(detparticles_[1], nPosBegin, nPosEnd); //y coordinates
-					nArrayOneL = firstframe_[0].length;
-					nArrayTwoL = secondframe_[0].length;
-					//looking for presence of particle at second frame
-					for(i=0;i<nArrayOneL;i++)
-					{
-						bFlag = true;
-						for(j=0;j<nArrayTwoL;j++)
-							if(Math.sqrt(Math.pow(firstframe_[0][i]-secondframe_[0][j], 2)+Math.pow(firstframe_[1][i]-secondframe_[1][j], 2))<=dlg.dPSFsigma)
-								bFlag = false;
-						if (bFlag)
-						{
-							marks[nPosOneBegin+i]=1;
-							nCount++;
-						}
-					}
-					//done. let's switch arrays
-					firstframe_ = new double[2][nArrayTwoL];
-					firstframe_ = secondframe_;
-					nFrameOne = nFrameTwo;
-					
-				}
-			}
-			
-		}
-		filteredparticles_ = new double[3][nCount];
-		nCount = 0;
-		for(i=0;i<nDetPartNum;i++)
-		{
-			if(marks[i]>0)
-			{
-				filteredparticles_[0][nCount] = detparticles_[0][i];
-				filteredparticles_[1][nCount] = detparticles_[1][i];
-				//filteredparticles_[2][nCount] = detparticles_[2][i];
-				//filteredparticles_[3][nCount] = detparticles_[3][i];
-				filteredparticles_[3][nCount] = nFrameN_[i];
-				nCount++;
-			}
-		}
-		return filteredparticles_;
-	} 
-
 }
 
 class SMLThread extends Thread 
@@ -687,8 +576,9 @@ class SMLThread extends Thread
 	private SMLAnalysis sml;
 	private SMLProgressCount smlcount;
 	private int nStackSize;
+	private Roi RoiActive;
 	
-	public void init(ImageProcessor ip, SMLAnalysis sml, SMLDialog dlg, int nFrame, Overlay SpotsPositions, int nStackSize, SMLProgressCount smlcount)
+	public void init(ImageProcessor ip, SMLAnalysis sml, SMLDialog dlg, int nFrame, Overlay SpotsPositions, int nStackSize, SMLProgressCount smlcount, Roi RoiActive)
 	{
 		this.sml    = sml;
 		this.ip     = ip;
@@ -697,11 +587,12 @@ class SMLThread extends Thread
 		this.SpotsPositions = SpotsPositions;
 		this.nStackSize = nStackSize;
 		this.smlcount = smlcount;
+		this.RoiActive = RoiActive;
 	}
 	
 	public void run()
 	{
-		this.sml.detectParticles(this.ip, this.dlg, this.nFrame, this.SpotsPositions);	
+		this.sml.detectParticles(this.ip, this.dlg, this.nFrame, this.SpotsPositions, this.RoiActive);	
 		smlcount.SMLProgressCountIncrease();
 		IJ.showProgress(smlcount.nSliceLeft-1, nStackSize);
 	}
