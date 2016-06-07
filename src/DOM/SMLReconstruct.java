@@ -207,8 +207,8 @@ public class SMLReconstruct {
 			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
 			{
 				IJ.showProgress(n, nParticlesCount);
-				xmag=(int) Math.round(x[n]*settings.dMagnification);
-				ymag=(int) Math.round(y[n]*settings.dMagnification);
+				xmag=(int) Math.ceil(x[n]*settings.dMagnification);
+				ymag=(int) Math.ceil(y[n]*settings.dMagnification);
 				
 
 				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
