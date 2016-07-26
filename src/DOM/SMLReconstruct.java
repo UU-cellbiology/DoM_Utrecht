@@ -207,8 +207,8 @@ public class SMLReconstruct {
 			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
 			{
 				IJ.showProgress(n, nParticlesCount);
-				xmag=(int) Math.ceil(x[n]*settings.dMagnification);
-				ymag=(int) Math.ceil(y[n]*settings.dMagnification);
+				xmag=(int) Math.round(x[n]*settings.dMagnification);
+				ymag=(int) Math.round(y[n]*settings.dMagnification);
 				
 
 				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
@@ -218,8 +218,8 @@ public class SMLReconstruct {
 						loc_errx[n] = settings.dFixedSD;
 						loc_erry[n] = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*loc_errx[n]*settings.dMagnification);
-					ysq = (int) Math.round(3*loc_erry[n]*settings.dMagnification);
+					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
+					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
 					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
@@ -240,22 +240,6 @@ public class SMLReconstruct {
 								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
 								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
 								
-								//dVerif = dNorm*dErrx*dErry;
-								//dVerif = amp[n]*dNorm*dErrx*dErry;
-								//switch (settings.nIntIndex){
-//									case 0:
-										//new_i = old_i + dNorm*dErrx*dErry;
-										//break;
-									//case 1:
-//										new_i = old_i + integrint[n]*dNorm*dErrx*dErry;
-										//break;
-									//case 2:
-//										new_i = old_i + amp[n]*dNorm*dErrx*dErry;
-										//break;
-									//default:
-//										new_i =0;
-											//break;
-//								}
 								new_i = old_i + dNorm*dErrx*dErry;
 								ipf.setf(i, j, (float)new_i);
 							}
