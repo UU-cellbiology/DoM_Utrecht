@@ -49,9 +49,9 @@ public class SMLDialog {
 	int nRecParticles;       
 	/** pixel size in nm of reconstructed image */
 	double dRecPixelSize;    
-	/** width of original image for reconstruction in nm*/
+	/** width of original image for reconstruction in nm */
 	double nRecWidth;
-	/** height of original image for reconstruction in nm*/
+	/** height of original image for reconstruction in nm */
 	double nRecHeight;          
 	/** parameter of intensity reconstruction */
 	//int nIntIndex;           
@@ -83,11 +83,29 @@ public class SMLDialog {
 	boolean bUpdateAveragePositions; 
 	
 	//drift correction parameters
-	boolean bDrift;   //whether or not make drift correction
-	int nDriftFrames; //number of frames for averaging per one time interval during drift correction
-	int nDriftPixels; //maximal shift in pixels per one time period defined by previous parameter 
-	boolean bShowIntermediate;     //show intermediate reconstructions
-	boolean bShowCrossCorrelation; //show cross-correlation 
+	//
+	/** pixel size of image for drift reconstruction, nm */
+	double nDriftScale;
+	/** what kind of particles use for drift correction */
+	//int nDriftParticles; 
+	
+	/** whether object was created from Drift Correction or Reconstruct Image menus*/
+	boolean bDrift=false;
+	/** number of frames for averaging per one time interval during drift correction */
+	int nDriftFrames; 
+	/** Maximal shift in pixels per one time period defined by previous parameter for drift correction */
+	int nDriftPixels;
+	/** Maximal shift in nm per one time period defined by previous parameter for drift correction */
+	double nDriftMaxDistnm;
+	
+	/** update results table with results of drift correction*/
+	boolean bDriftUpdateTable;     
+	/** make reconstruction after Drift Correction*/
+	boolean bDriftMakeReconstruction;     	
+	/** show intermediate reconstructions during drift correction */
+	boolean bShowIntermediate;     
+	/** show cross-correlation map of drift correction*/
+	boolean bShowCrossCorrelation; 
 	
 	//3D reconstruction parameters
 	boolean b3D;				//whether or not to make 3D stack
@@ -156,10 +174,14 @@ public class SMLDialog {
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		
 		fpDial.setInsets(15, 20, 0); // extra space on top
-		fpDial.addCheckbox("Accelerate using GPU", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
-		fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 4096), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
-		fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
-		//fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
+		
+		//*GPU part -> rewrite to new format of table
+		//fpDial.addCheckbox("Accelerate using GPU", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
+		//fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 4096), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
+		//fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
+		
+		
+		//!!! TODO fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
 		
 		fpDial.setResizable(false);
 		fpDial.showDialog();
@@ -186,14 +208,16 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bShowParticles", bShowParticles);
 		bIgnoreFP = fpDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bIgnoreFP", bIgnoreFP);
-		bUseGPUAcceleration = fpDial.getNextBoolean();
-		Prefs.set("SiMoLoc.bUseGPUAcceleration", bUseGPUAcceleration);
-		nBatchSize = (int)fpDial.getNextNumber();
-		Prefs.set("SiMoLoc.nBatchSize", nBatchSize);
-		nGroupSize = (int)fpDial.getNextNumber();
-		Prefs.set("SiMoLoc.nGroupSize", nGroupSize);
-		bUseMLE = false;// TODO: set to fpDial.getNextBoolean();
-		Prefs.set("SiMoLoc.bUseMLE", bUseMLE);
+		
+		//*GPU part -> rewrite to new format of table
+		//bUseGPUAcceleration = fpDial.getNextBoolean();
+		//Prefs.set("SiMoLoc.bUseGPUAcceleration", bUseGPUAcceleration);
+		//nBatchSize = (int)fpDial.getNextNumber();
+		//Prefs.set("SiMoLoc.nBatchSize", nBatchSize);
+		//nGroupSize = (int)fpDial.getNextNumber();
+		//Prefs.set("SiMoLoc.nGroupSize", nGroupSize);
+		//bUseMLE = false;// TODO: set to fpDial.getNextBoolean();
+		//Prefs.set("SiMoLoc.bUseMLE", bUseMLE);
 		
 		return true;
 	}
@@ -216,27 +240,17 @@ public class SMLDialog {
 		String [] RecSDOptions = new String [] {
 				"Localization precision","Constant value"};
 		String [] RecFPOptions = new String [] {
-				"Only true positives","True and half positives", "All particles"};
+				"Only true positives", "All particles"};
 		
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addNumericField("Pixel size of reconstructed image", Prefs.get("SiMoLoc.Rec_PixSize", 30), 2,6,"nm");
-		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
-		//dgReconstruct.addNumericField("Width of original image, px", xmax, 0);
-		//dgReconstruct.addNumericField("Height of original image, px", ymax, 0);
-		//dgReconstruct.addChoice("Intensity of spots:", RecIntOptions, Prefs.get("SiMoLoc.Rec_Int", "Normalized probability"));
+		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");		
 		dgReconstruct.addChoice("SD of spots:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
-		dgReconstruct.addNumericField("Value of SD in case of constant:", Prefs.get("SiMoLoc.Rec_SDFixed", 100), 2,6," nm");
+		dgReconstruct.addNumericField("Value of SD in case of constant:", Prefs.get("SiMoLoc.Rec_SDFixed", 60), 2,6," nm");
 		dgReconstruct.addCheckbox("Cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
 		dgReconstruct.addNumericField("Cut particles off with localization less than: ", Prefs.get("SiMoLoc.cutoff", 20), 2,4," nm ");
 		//dgReconstruct.addMessage("\n");
 		/*
-		dgReconstruct.addCheckbox("Drift-correction (correlation based):", Prefs.get("SiMoLoc.drift", false));		
-		dgReconstruct.addNumericField("Number of frames for averaging:", Prefs.get("SiMoLoc.drift_frames", 1000), 0);
-		dgReconstruct.addNumericField("Maximum shift in pixels:", Prefs.get("SiMoLoc.drift_pixels", 10), 0);
-		dgReconstruct.addCheckbox("Intermediate reconstructions shown (drift)", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
-		dgReconstruct.addCheckbox("Cross-correlation images shown (drift)", Prefs.get("SiMoLoc.drift_cross_correlation", false));
-		
-		//dgReconstruct.addMessage("\n");
 		dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.create3DStack", false));
 		dgReconstruct.addNumericField("Z-distance between slices (nm):", Prefs.get("SiMoLoc.distZSlices", 25), 0);
@@ -249,10 +263,10 @@ public class SMLDialog {
 		dgReconstruct.addNumericField("Y_Offset:", Prefs.get("SiMoLoc.dTransY", 0), 2,6, "nm");
 		//dgReconstruct.addMessage("\n");
 		dgReconstruct.addCheckbox("Use frame interval:", Prefs.get("SiMoLoc.bFramesInterval", false));
-		//dgReconstruct.addMessage("Current total frame range is from " + new DecimalFormat("#").format(fminframe) + " till " +  new DecimalFormat("#").format(fmaxframe));
-		//dgReconstruct.addNumericField("Initial frame:", Prefs.get("SiMoLoc.nFrameMin", fminframe), 0);
-		//dgReconstruct.addNumericField("Last frame:", Prefs.get("SiMoLoc.nFrameMax", fmaxframe), 0);
-		dgReconstruct.addStringField("Range:", new DecimalFormat("#").format(fminframe) + "-" +  new DecimalFormat("#").format(fmaxframe));		
+		if(Prefs.get("SiMoLoc.bFramesInterval", false))
+			dgReconstruct.addStringField("Range:", Prefs.get("SiMoLoc.sFrameRange", "1 - 2"));		
+		else
+			dgReconstruct.addStringField("Range:", new DecimalFormat("#").format(fminframe) + "-" +  new DecimalFormat("#").format(fmaxframe));		
 		dgReconstruct.addMessage("\n");
 		dgReconstruct.addCheckbox("Average localizations in consecutive frames within 1 pixel?", Prefs.get("SiMoLoc.bAveragePositions", false));
 		dgReconstruct.addCheckbox("Update Results table with average localizations?", Prefs.get("SiMoLoc.bUpdateAveragePositions", false));
@@ -266,17 +280,9 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.Rec_FP", RecFPOptions[nRecParticles]);
         dRecPixelSize = dgReconstruct.getNextNumber();
         Prefs.set("SiMoLoc.Rec_PixSize", dRecPixelSize);
-		//nRecWidth = (int) dgReconstruct.getNextNumber();		
-		//Prefs.set("SiMoLoc.Rec_ImWidth", nRecWidth);
-		//nRecHeight = (int) dgReconstruct.getNextNumber();
-		//Prefs.set("SiMoLoc.Rec_ImHeight", nRecHeight);
-        //nRecWidth = (int)Math.ceil(xmax + xlocavg_*3.0);
-        //nRecHeight = (int)Math.ceil(ymax + ylocavg_*3.0);
         nRecWidth = xmax + xlocavg_*3.0;
         nRecHeight = ymax + ylocavg_*3.0;
 		
-		//nIntIndex = dgReconstruct.getNextChoiceIndex();		
-		//Prefs.set("SiMoLoc.Rec_Int", RecIntOptions[nIntIndex]);
 		nSDIndex = dgReconstruct.getNextChoiceIndex();
 		Prefs.set("SiMoLoc.Rec_SD", RecSDOptions[nSDIndex]);
 		dFixedSD = dgReconstruct.getNextNumber();
@@ -286,19 +292,8 @@ public class SMLDialog {
 		dcutoff = dgReconstruct.getNextNumber();
 		Prefs.set("SiMoLoc.cutoff", dcutoff);
 		
-		//Drift
-		/*
-		bDrift = dgReconstruct.getNextBoolean();
-		Prefs.set("SiMoLoc.drift", bDrift);
-		nDriftFrames = (int) dgReconstruct.getNextNumber();
-		Prefs.set("SiMoLoc.drift_frames", nDriftFrames);
-		nDriftPixels = (int) dgReconstruct.getNextNumber();
-		Prefs.set("SiMoLoc.drift_pixels", nDriftPixels);
-		bShowIntermediate = dgReconstruct.getNextBoolean();
-		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
-		bShowCrossCorrelation = dgReconstruct.getNextBoolean();
-		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
 		
+		/*		
 		//values for 3D reconstruction
 		b3D= dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.create3DStack", b3D);
@@ -307,6 +302,7 @@ public class SMLDialog {
 		bCalculateZValues = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
 		*/
+		
 		bTranslation = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bTranslate", bTranslation);
 		dTranslationX =  dgReconstruct.getNextNumber();
@@ -316,21 +312,18 @@ public class SMLDialog {
 		
 		bFramesInterval = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bFramesInterval", bFramesInterval);			
-		/*nFrameMin =  dgReconstruct.getNextNumber();
-		Prefs.set("SiMoLoc.nFrameMin", nFrameMin);
-		nFrameMax =  dgReconstruct.getNextNumber();
-		Prefs.set("SiMoLoc.nFrameMax", nFrameMax);*/			
+			
 		//range of frames		
-		String[] range = Tools.split(dgReconstruct.getNextString(), " -");
+		String sFrameRange = dgReconstruct.getNextString();
+		Prefs.set("SiMoLoc.sFrameRange", sFrameRange);	
+		String[] range = Tools.split(sFrameRange, " -");
 		double c1 = dgReconstruct.parseDouble(range[0]);
 		double c2 = range.length==2?dgReconstruct.parseDouble(range[1]):Double.NaN;
 		nFrameMin = Double.isNaN(c1)?fminframe:(int)c1;
 		nFrameMax = Double.isNaN(c2)?nFrameMin:(int)c2;
 		if (nFrameMin<fminframe) nFrameMin = fminframe;
 		if (nFrameMax>fmaxframe) nFrameMax = fmaxframe;
-		if (nFrameMin>nFrameMax) {nFrameMin=fminframe; nFrameMax=fmaxframe;}
-				
-		
+		if (nFrameMin>nFrameMax) {nFrameMin=fminframe; nFrameMax=fmaxframe;}				
 		
 		bAveragePositions = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bAveragePositions", bAveragePositions);
@@ -340,6 +333,128 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bUpdateAveragePositions", bUpdateAveragePositions);
 		return true;
 	}
+	
+	/** Dialog showing parameters for drift correction
+	 * 
+	 * 
+	 */
+	public boolean DriftCorrection(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, double xmax, double ymax) 		
+	{
+		
+		
+		GenericDialog dgDriftCorrection = new GenericDialog("Calculate drift correction (correlation based)");
+		dgDriftCorrection.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
+		dgDriftCorrection.addNumericField("Pixel size for intermediate reconstruction: ", Prefs.get("SiMoLoc.nDriftScale", 10), 2,6,"nm");
+		dgDriftCorrection.addNumericField("Window size:", Prefs.get("SiMoLoc.drift_frames", 1000), 0,6," frames");
+		dgDriftCorrection.addNumericField("Maximum shift between windows:", Prefs.get("SiMoLoc.drift_nm", 50), 0, 3, " nm" );
+		dgDriftCorrection.addCheckbox("Apply correction to Results Table", Prefs.get("SiMoLoc.drift_apply", true));
+		dgDriftCorrection.addCheckbox("Show corrected image (using settings from Reconstruct)", Prefs.get("SiMoLoc.drift_reconstruct", true));
+		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~");
+		dgDriftCorrection.addCheckbox("Show intermediate reconstructions", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
+		dgDriftCorrection.addCheckbox("Show cross-correlation maps", Prefs.get("SiMoLoc.drift_cross_correlation", false));
+		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~~~");
+		//Get and show values from "Reconstruct window"
+		String sRenderParameters="Rendering parameters (from Reconstruct menu)\n";
+
+        //Take values of cut-off and false/true positives and SD rendering from ImageJ REGISTRY
+        //also FRAME INTERVAL!!!
+        String sParticles = Prefs.get("SiMoLoc.Rec_FP", "Only true positives");
+        if(sParticles.equals("Only true positives"))
+        {
+        	nRecParticles=0;
+        	sRenderParameters=sRenderParameters+"Use: only true positives\n";
+        }
+        else
+        {
+        	nRecParticles=1;
+        	sRenderParameters=sRenderParameters+"Use: all particles\n";
+        	
+        }
+        
+        bCutoff=Prefs.get("SiMoLoc.applycutoff", false);
+        if(!bCutoff)
+        	sRenderParameters=sRenderParameters+"Cut-off localizations: off\n";        	
+        else
+        {
+        	dcutoff=Prefs.get("SiMoLoc.cutoff", 20);
+        	sRenderParameters=sRenderParameters+"Cut-off localizations: on, by "+new DecimalFormat("#.##").format(dcutoff)+" nm\n";
+        }
+        
+        String sSDoption = Prefs.get("SiMoLoc.Rec_SD", "Localization precision");        
+        if(sSDoption.equals("Localization precision"))
+        {
+        	sRenderParameters=sRenderParameters+ "SD of spots: " + sSDoption + "\n";
+        	nSDIndex=0;
+        }
+        else
+        {        	
+        	nSDIndex=1;
+        	dFixedSD=Prefs.get("SiMoLoc.Rec_SDFixed", 60);
+        	sRenderParameters=sRenderParameters+ "SD of spots: " + sSDoption +", "+new DecimalFormat("#").format(dFixedSD)+ " nm \n";
+        }
+        
+        
+        
+        bFramesInterval=Prefs.get("SiMoLoc.bFramesInterval", false);
+        if(bFramesInterval)
+        {
+        	String sFrameRange = Prefs.get("SiMoLoc.sFrameRange", "1 - 2");
+        	
+        	String[] range = Tools.split(sFrameRange, " -");
+			double c1 = dgDriftCorrection.parseDouble(range[0]);
+			double c2 = range.length==2?dgDriftCorrection.parseDouble(range[1]):Double.NaN;
+			nFrameMin = Double.isNaN(c1)?fminframe:(int)c1;
+			nFrameMax = Double.isNaN(c2)?nFrameMin:(int)c2;
+			if (nFrameMin<fminframe) nFrameMin = fminframe;
+			if (nFrameMax>fmaxframe) nFrameMax = fmaxframe;
+			if (nFrameMin>nFrameMax) {nFrameMin=fminframe; nFrameMax=fmaxframe;}	
+			sRenderParameters=sRenderParameters+ "Frame Interval: " + sFrameRange + " \n";
+        }
+
+		dgDriftCorrection.addMessage(sRenderParameters);		
+		
+		dgDriftCorrection.showDialog();
+		if (dgDriftCorrection.wasCanceled())
+            return false;
+		
+		nDriftScale = (double) dgDriftCorrection.getNextNumber();
+		Prefs.set("SiMoLoc.nDriftScale", nDriftScale);
+		//Prefs.set("SiMoLoc.drift_frames", nDriftFrames);
+		//nDriftParticles = dgDriftCorrection.getNextChoiceIndex();
+		//Prefs.set("SiMoLoc.drift_pattype", RecFPOptions[nDriftParticles]);
+		
+		nDriftFrames = (int) dgDriftCorrection.getNextNumber();
+		Prefs.set("SiMoLoc.drift_frames", nDriftFrames);
+		nDriftMaxDistnm = dgDriftCorrection.getNextNumber();
+		nDriftPixels = (int) Math.ceil(nDriftMaxDistnm /nDriftScale);
+		Prefs.set("SiMoLoc.drift_nm", nDriftMaxDistnm);
+
+
+		bDriftUpdateTable = dgDriftCorrection.getNextBoolean();
+		Prefs.set("SiMoLoc.drift_apply", bDriftUpdateTable);
+		bDriftMakeReconstruction = dgDriftCorrection.getNextBoolean();
+		Prefs.set("SiMoLoc.drift_reconstruct", bDriftMakeReconstruction);
+		
+		bShowIntermediate = dgDriftCorrection.getNextBoolean();
+		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
+		bShowCrossCorrelation = dgDriftCorrection.getNextBoolean();
+		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
+        
+		// width and height of image
+		nRecWidth = xmax + xlocavg_*3.0;
+        nRecHeight = ymax + ylocavg_*3.0;
+        
+        //make sure we are in "Drift correction" mode, i.e. table sorting will happen
+        bDrift = true;
+        
+        //if needed final reconstruction
+        dRecPixelSize=Prefs.get("SiMoLoc.Rec_PixSize", 30);
+        
+		return true;
+	}
+	
+	
+	
 	/** Dialog showing options for linking particles after detection
 	 * 
 	 * 
@@ -351,12 +466,12 @@ public class SMLDialog {
 		String [] Link_Dist = new String [] {
 				"Initial position", "Next detected position"};
 		String [] LinkFPOptions = new String [] {
-				"Only true positives","True and half positives", "All particles"};
+				"Only true positives", "All particles"};
 		
 		dgLink.addChoice("For linking use:", LinkFPOptions, Prefs.get("SiMoLoc.Link_FP", "Only true positives"));
-		dgLink.addNumericField("Distance between particles for linking", Prefs.get("SiMoLoc.LinkDist", 1), 2,4," original pixels");
+		dgLink.addNumericField("Max distance to search over one frame:", Prefs.get("SiMoLoc.LinkDist", 1), 2,4," original pixels");
 		dgLink.addChoice("Measure distance from:", Link_Dist, Prefs.get("SiMoLoc.LinkTrace", "Initial position"));
-		dgLink.addNumericField("Maximum linking closing gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
+		dgLink.addNumericField("Maximum linking gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
 		dgLink.addCheckbox("Display tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
 		dgLink.addCheckbox("Show detected particles?", Prefs.get("SiMoLoc.bShowParticlesLink", false));
 		dgLink.showDialog();

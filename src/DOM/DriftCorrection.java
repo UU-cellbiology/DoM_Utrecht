@@ -1,26 +1,21 @@
 package DOM;
-//in detect molecules on line 329
-//add width and height of original image to the results table
-//sml.ptable.addValue("Original_image_size",imp.getWidth());
-//sml.ptable.addValue("Original_image_size",imp.getHeight());
-
 
 import java.util.Arrays;
 
 import ij.IJ;
 import ij.plugin.PlugIn;
 
+public class DriftCorrection implements PlugIn{
 
-public class Reconstruct_Image implements PlugIn{
 
 	SMLDialog dlg = new SMLDialog();
 	SMLAnalysis sml = new SMLAnalysis();
 	SMLReconstruct smlViewer;
 	
-	
+	@Override
 	public void run(String arg) 
 	{
-		
+
 		String imagename; 
 		double [] xloc;	
 		double [] yloc;
@@ -33,16 +28,14 @@ public class Reconstruct_Image implements PlugIn{
 		double fminframe, fmaxframe;
 		int i, sz;
 		double dPatCount;
-		IJ.register(Reconstruct_Image.class);
-
+		
+		IJ.register(DriftCorrection.class);
 		//check that the table is present
 		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
 		{
-			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
+			IJ.error("Not able to detect a valid 'Particles Table' for drift correction, please load one.");
 			return;
 		}
-
-		imagename = "Reconstructed Image";
 		
 		//calculate average localization precision 	
 		falsepos = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
@@ -88,28 +81,32 @@ public class Reconstruct_Image implements PlugIn{
 		}
 		
 		//show dialog with options
-		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax, ymax)) return;
+		if (!dlg.DriftCorrection(xlocavg,ylocavg,fminframe,fmaxframe, xmax, ymax)) return;
 		
-		//add frame interval to image name
-		if(dlg.bFramesInterval)
-		{
-			imagename += " (frames " +Math.round(dlg.nFrameMin)+" till "+Math.round(dlg.nFrameMax)+")";
-
-		}
 		
+		imagename = "Reconstructed Image (Drift Corrected. Window size: " + String.format("%d",dlg.nDriftFrames)+" frames. Max shift: "+ String.format("%.2f",dlg.nDriftMaxDistnm)+ " nm)";
 		//create reconstruction object
 		smlViewer = new SMLReconstruct(imagename, sml, dlg);
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");		
+		IJ.log("Calculating drift correction ");
+		IJ.log("Window size: "+ String.format("%d",dlg.nDriftFrames)+" frames");
+		IJ.log("Pixel size of intermediate reconstructions: "+ String.format("%.2f",dlg.nDriftScale)+ " nm");
+		IJ.log("Maximum shift between windows: "+ String.format("%.2f",dlg.nDriftMaxDistnm)+ " nm");
+		if(dlg.bDriftUpdateTable)
+			IJ.log("Results Table update: On");
+		else
+			IJ.log("Results Table update: Off");
 		
-				
-		if(dlg.bAveragePositions)
+		
+		//make drift correction
+		// x and y coordinates arrays are updated inside
+		smlViewer.DriftCorrection();
+		// make table update if needed
+		if(dlg.bDriftUpdateTable)
+			smlViewer.DriftUpdateResultTable(sml, dlg);
+		
+		if(dlg.bDriftMakeReconstruction)
 		{
-			smlViewer.averagelocalizations(sml);
-			
-		}
-		
-		
-		//if(!dlg.b3D)//if you don't want a z-stack
-		//{
 			if(dlg.bFramesInterval)
 			{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
 			else
@@ -119,20 +116,10 @@ public class Reconstruct_Image implements PlugIn{
 			{
 				imagename += " (Cutoff localization=" + dlg.dcutoff +" nm)";
 			}
-		//}
-		//else
-		//{//create z-stack
-			//int zStep = (int)dlg.dDistBetweenZSlices;
+			smlViewer.imp.setTitle(imagename);
+			smlViewer.imp.show();
 			
-//			if(dlg.bFramesInterval)
-	//		{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax,zStep);}
-		//	else
-			//{	smlViewer.draw_zstack(1, smlViewer.nframes,zStep);}
-//		}
-		
-		smlViewer.imp.setTitle(imagename);
-		smlViewer.imp.show();
-		
+		}
 		
 	}
 }

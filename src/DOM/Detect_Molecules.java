@@ -37,7 +37,7 @@ public class Detect_Molecules implements PlugIn {
 	SMLDialog dlg = new SMLDialog();
 	SMLAnalysis sml = new SMLAnalysis();
 	SMLProgressCount smlcount = new SMLProgressCount(0);
-	//SMLProgressCount smlfitcount = new SMLProgressCount(0);
+
 	int nDetPartNum, nCountThread;
 	int nNumberofDetectedColumns;
 	
@@ -184,7 +184,7 @@ public class Detect_Molecules implements PlugIn {
 			//detection only
 			IJ.showStatus("Detection completed.");
 			detectionTime = System.nanoTime() - startTime;
-			IJ.log("Detection time:" + String.format("%.2f",((double)Math.abs(detectionTime))*0.000000001) + " s");
+			IJ.log("Detection time: " + String.format("%.2f",((double)Math.abs(detectionTime))*0.000000001) + " s");
 		}
 
 		if(dlg.nDetectionType==0)
@@ -531,7 +531,7 @@ public class Detect_Molecules implements PlugIn {
 			else
 			{
 				IJ.log("Fitting time: " + String.format("%.2f", ((double)Math.abs(fullTime-detectionTime))*0.000000001)+ " s");
-				IJ.log("Total time:" + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
+				IJ.log("Total time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
 			}
 
 		}

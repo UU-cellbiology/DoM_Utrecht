@@ -18,20 +18,19 @@ import ij.text.TextWindow;
 public class SMLReconstruct {
 
 	ImagePlus imp;
+	/** stack with intermediate reconstruction for drift correction */
 	ImageStack driftstack;
+	/** stack containing cross correlation maps of intermediate reconstructions */
 	ImageStack crosscorrstack;
 	ImageStack zstack;
 	ImageProcessor ip;
 	//ResultsTable table;
 	SMLDialog settings;
 		
-	/** amplitude of fitted particles */
-	//double [] amp;
-	/** integrated intensity of particles */
-//	double [] integrint;
-	/** x coordinates of particles in px*/
+	
+	/** x coordinates of particles in nm*/
 	double [] x;
-	/** y coordinates of particles in px*/
+	/** y coordinates of particles in nm*/
 	double [] y;
 	double [] z_nm;
 	double [] loc_errx;
@@ -40,22 +39,26 @@ public class SMLReconstruct {
 	double [] f;
 	/** false positive mark */
 	double [] fp;
+	/** drift x coordinates between reconstructions */
 	double [] driftx;
+	/** drift y coordinates between reconstructions */
 	double [] drifty;
+	/** linearly interpolated drift x coordinates for each frame */
 	double [] approxx;
+	/** linearly interpolated drift x coordinates for each frame */
 	double [] approxy;
 
 	double max=0;
 	double min=9999999;
-	//double nrange=0;
+	/** total number of frames in particle table */
 	int nframes = 0;
+	/** total number of particles in table */
 	int nParticlesCount = 0;
 
 	int new_width;
 	int new_height;
 	boolean bFrameSorted;
-	//boolean bNormalized;
-	//boolean bIntegrInt;
+
 	/** threshold that determines what particles are used for reconstruction */
 	double dFPThreshold; 
 	
@@ -84,9 +87,7 @@ public class SMLReconstruct {
 		
 		settings = dlg_;
 		bFrameSorted = false;
-		//bNormalized = false;
-		//double pixelsize = sml_.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml_.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
-		//settings.dMagnification = pixelsize/settings.dRecPixelSize;
+		
 		settings.dMagnification = 1.0/settings.dRecPixelSize;
 		
 		new_width  = (int) Math.ceil(settings.nRecWidth*settings.dMagnification);
@@ -101,12 +102,8 @@ public class SMLReconstruct {
 			case 0:
 				dFPThreshold = 0.3;
 				break;
-		 //true and half positives
-			case 1:
-				dFPThreshold = 0.7;
-				break;
 		 //all particles
-			case 2:
+			case 1:
 				dFPThreshold = 1.1;
 				break;
 			default:
@@ -116,29 +113,16 @@ public class SMLReconstruct {
 		}
 		
 		//sort table by frame if required
-		if(settings.bAveragePositions)
+		if(settings.bAveragePositions || settings.bDrift)
 		{
 			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_FrameN, true);
 			bFrameSorted = true;
+			sml_.showTable();
 		}
 		
 		// load data
 		sml_.ptable_lock.lock();
-		//use integrated spot intensity as area under curve for plotted particles
-//		bIntegrInt = false;
-		//if(settings.nIntIndex==1) 
-//			bIntegrInt = true;
-		//use normalized 2D gaussian to plot each particle 
-		//if(settings.nIntIndex==0)
-//			bNormalized = true;
-
-		
-		//integrated spot intensity 
-	//	integrint = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_IntegrInt);
-		
-		//fitted Gaussian peak amplitude
-		//amp = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_AmplFit);
-		
+	
 		//frame number
 		f   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
 		nParticlesCount = f.length;
@@ -174,10 +158,9 @@ public class SMLReconstruct {
 		for (int n=0;n<f.length;n++)
 		{
 			if (f[n]>nframes) nframes=(int) f[n];
-			//if (amp[n]>max) max=amp[n];
-			//if (amp[n]<min) min=amp[n];
+			
 		}
-		//nrange = max-min;
+	
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin.
@@ -191,10 +174,10 @@ public class SMLReconstruct {
 		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j;
-		//double preG=0.25*Math.PI;
 		double dCutoff = 1000.0; //default cut-off is 1000 nm
 		double dNorm = 1.0;
-		//double dVerif = 0.0;
+		double loc_errxlocal,loc_errylocal;
+		
 		
 		if(settings.bCutoff)
 			dCutoff = settings.dcutoff;
@@ -215,15 +198,20 @@ public class SMLReconstruct {
 				{
 					if(settings.nSDIndex>0)
 					{
-						loc_errx[n] = settings.dFixedSD;
-						loc_erry[n] = settings.dFixedSD;
+						loc_errxlocal  = settings.dFixedSD;
+						loc_errylocal = settings.dFixedSD;
 					}
-					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
-					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
+					else
+					{
+						loc_errxlocal=loc_errx[n];
+						loc_errylocal=loc_erry[n];
+					}
+					xsq = (int) Math.ceil(3*loc_errxlocal*settings.dMagnification);
+					ysq = (int) Math.ceil(3*loc_errylocal*settings.dMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
-					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errxmag=loc_errxlocal*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errymag=loc_errylocal*settings.dMagnification*1.41421356; //last number is just sqrt(2)
 
 					///calculate area under pixelated gaussian
 					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
@@ -251,7 +239,6 @@ public class SMLReconstruct {
 		//imp.setProcessor(ipf.convertToShort(true));
 		imp.setProcessor(ipf);
 		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
-		//imp.addSlice(null, ipf.convertToShort(true));
 		IJ.run(imp, "Enhance Contrast", "saturated=0.35");
 	}
 	
@@ -390,9 +377,10 @@ public class SMLReconstruct {
 		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j,n;
-		//double preG=0.25*Math.PI;
+		double loc_errxlocal,loc_errylocal;
+	
 		boolean bContinue = true;
-		double dCutoff = 1.0;
+		double dCutoff = 1000.0; //default cut-off is 1000 nm
 		double dNorm = 1.0;
 		
 		if(settings.bCutoff)
@@ -414,15 +402,20 @@ public class SMLReconstruct {
 				{
 					if(settings.nSDIndex>0)
 					{
-						loc_errx[n] = settings.dFixedSD;
-						loc_erry[n] = settings.dFixedSD;
+						loc_errxlocal  = settings.dFixedSD;
+						loc_errylocal = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*loc_errx[n]*dDriftMagn);
-					ysq = (int) Math.round(3*loc_erry[n]*dDriftMagn);
+					else
+					{
+						loc_errxlocal=loc_errx[n];
+						loc_errylocal=loc_erry[n];
+					}
+					xsq = (int) Math.ceil(3*loc_errxlocal*dDriftMagn);
+					ysq = (int) Math.ceil(3*loc_errylocal*dDriftMagn);
 					xpeak=x[n]*dDriftMagn;
 					ypeak=y[n]*dDriftMagn;
-					loc_errxmag=loc_errx[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
-					loc_errymag=loc_erry[n]*dDriftMagn*1.41421356; //number is just sqrt(2)
+					loc_errxmag=loc_errxlocal*dDriftMagn*1.41421356; //number is just sqrt(2)
+					loc_errymag=loc_errylocal*dDriftMagn*1.41421356; //number is just sqrt(2)
 					//if(bNormalized)
 					//{
 					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
@@ -437,12 +430,7 @@ public class SMLReconstruct {
 								old_i=ipf.getf(i, j);
 		
 								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
-								//if(bNormalized)
-									//{new_i = old_i + dNorm*dErrx*dErry;}								
-								//else
-									//{new_i = old_i + preG*amp[n]*loc_errxmag*loc_errymag*dErrx*dErry;}
-								
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);							
 								new_i = old_i + dNorm*dErrx*dErry;
 						
 								ipf.setf(i, j, (float)new_i);
@@ -459,59 +447,68 @@ public class SMLReconstruct {
 		}
 
 		
-		driftstack.addSlice(null, ipf.convertToShort(true));
+		//driftstack.addSlice(null, ipf.convertToShort(true));
+		driftstack.addSlice(null, ipf);
 		
 	}
 	
 	/** Main function performing correlation based drift correction  */
 	void DriftCorrection()
 	{
-		double dXAver, dYAver; //average precision
+				
 		int i;
-		int nCount=0;
+
 		int nIntervalFrames;
 		int [] xymax;
 		String sDriftData ="";
 		TextWindow DriftTable; 
 		
+		//some variables for timing
+		long startTime;
+		long reconstructionTime=0;
+		long fullTime;
+		double [] driftxfull;
+		double [] driftyfull;
+		
 		nIntervalFrames = settings.nDriftFrames;
 		
 		
 		IJ.showStatus("Applying Drift correction...");
-		
-		//determine magnification of reconstructed images 
-		dXAver=0; dYAver=0;
-		for (i=0;i<nParticlesCount;i++)
-		{
-			if(fp[i]<0.3 && loc_errx[i]<1.0 && loc_erry[i]<1.0)
-			{
-				nCount++;
-				dXAver+=loc_errx[i];
-				dYAver+=loc_erry[i];
-			}
-		}
-		dXAver /=nCount;
-		dYAver /=nCount;
-		dDriftMagn = 1.0/Math.max(dXAver, dYAver);
+
+
+		dDriftMagn = 1.0/settings.nDriftScale;
+
 		drift_width  = (int) (settings.nRecWidth*dDriftMagn);
 		drift_height = (int) (settings.nRecHeight*dDriftMagn);
 		driftstack = new ImageStack(drift_width, drift_height);
 		crosscorrstack = new ImageStack(2*settings.nDriftPixels+1, 2*settings.nDriftPixels+1);
+		
 		//calculating number of time intervals
 		if(settings.bFramesInterval)
-			nIntervalsCount = (int) Math.floor((settings.nFrameMax-settings.nFrameMin+1.0)/((double)nIntervalFrames));
+			nIntervalsCount = (int) Math.floor((settings.nFrameMax-settings.nFrameMin+1)/((double)nIntervalFrames));
 		else
 			nIntervalsCount = (int) Math.floor(((double)nframes)/((double)nIntervalFrames));
+
+		//sanity check
+		if(settings.nDriftMaxDistnm<settings.nDriftScale)
+		{
+			IJ.error("Maximum drift displacement is smaller than pixel size, aborting!");
+			return;
+		}			
 		
 		if(nIntervalsCount <= 1)
 		{
-			IJ.error("Drift correction interval is too big. Drift correction is cancelled.");
+			IJ.error("Drift correction window is larger than total number of frames. Drift correction is cancelled.");
 			return;
 		}
 	
-		//the rest of the table is truncated for now			
+		//the rest of the table is truncated for now (Baaaad!)			
 		driftx = new double [nIntervalsCount];
 		drifty = new double [nIntervalsCount];
+		driftxfull =  new double [nframes];
+		driftyfull =  new double [nframes];
+		//let's start measuring time		
+		startTime = System.nanoTime();
 		
 		//reconstructing images for cross-correlation calculation		
 		IJ.showStatus("Applying Drift correction (images reconstruction)...");
@@ -523,8 +520,14 @@ public class SMLReconstruct {
 			else
 				draw_sorted(i*nIntervalFrames+1, (i+1)*nIntervalFrames);			
 		}
+		IJ.showProgress(nIntervalsCount, nIntervalsCount);
+		
+		reconstructionTime = System.nanoTime() - startTime;
+		IJ.log("Intermediate reconstructions time: " + String.format("%.2f",((double)Math.abs(reconstructionTime))*0.000000001) + " s");
+		//show them, if asked
 		if(settings.bShowIntermediate)
-			new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", driftstack).show();
+			new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", driftstack).show();
+		
 		
 		IJ.showStatus("Applying Drift correction (calculating cross-correlation)...");
 		for (i=1; i<nIntervalsCount; i++)
@@ -532,37 +535,81 @@ public class SMLReconstruct {
 			IJ.showProgress(i-1, nIntervalsCount);			
 			crosscorrstack.addSlice(null, crosscorrelation(driftstack.getProcessor(i),driftstack.getProcessor(i+1)));
 		}
+		IJ.showProgress(nIntervalsCount, nIntervalsCount);
+		
+		fullTime = System.nanoTime() - startTime;
+		IJ.log("Cross correlation calculation time: " + String.format("%.2f", ((double)Math.abs(fullTime-reconstructionTime))*0.000000001)+ " s");
+		IJ.log("Total time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
+
 		if(settings.bShowCrossCorrelation)
-			new ImagePlus("Cross Correlation (Drift frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", crosscorrstack).show();
+			new ImagePlus("Cross Correlation (Drift frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", crosscorrstack).show();
 		
 		driftx[0]=0;
 		drifty[0]=0;
-		 
+		
+		//define pixel with highest cross correlation value on correlation map
 		for (i=1; i<nIntervalsCount; i++)
 		{
 			xymax = getmaxpositions(crosscorrstack.getProcessor(i));
-			driftx[i] = driftx[i-1]+((xymax[0]-settings.nDriftPixels)/dDriftMagn);
-			drifty[i] = drifty[i-1]+((xymax[1]-settings.nDriftPixels)/dDriftMagn);
+			driftx[i] = driftx[i-1]+((xymax[0]-settings.nDriftPixels)*settings.nDriftScale);
+			drifty[i] = drifty[i-1]+((xymax[1]-settings.nDriftPixels)*settings.nDriftScale);
 		}
 		//applysimplecorrection();
+		
+		//linear interpolation of drift
 		applylinearapproximationcorrection();		
 		
-		//cut out uncorrected frames
-		nframes = nIntervalsCount*nIntervalFrames;
+		int lastDriftFrame=nIntervalsCount*nIntervalFrames;
 		
+		if(!settings.bFramesInterval)
+		{
+			//get results		
+		
+			for(i=0;i<lastDriftFrame;i++)
+			{
+				driftxfull[i]=approxx[i];
+				driftyfull[i]=approxy[i];
+			}
+			
+			//fill in the rest of correction with last value				
+			if(nframes>lastDriftFrame)
+			{
+				for(i=lastDriftFrame;i<nframes;i++)
+				{
+					driftxfull[i]=approxx[lastDriftFrame-1];
+					driftyfull[i]=approxy[lastDriftFrame-1];
+				}
+			}
+
+		}
+		else
+		{
+			//only corrected segment
+			for(i=(int) settings.nFrameMin;i<=(int)(lastDriftFrame+settings.nFrameMin-1);i++)
+			{
+				driftxfull[i-1]=approxx[(int) (i-settings.nFrameMin)];
+				driftyfull[i-1]=approxy[(int) (i-settings.nFrameMin)];				
+			}
+			//filling the rest with last value
+			if(settings.nFrameMax>lastDriftFrame+settings.nFrameMin-1)
+			{
+				i=(int)(lastDriftFrame+settings.nFrameMin);
+				while (i<=settings.nFrameMax)
+				{
+					driftxfull[i-1]=approxx[lastDriftFrame-1];
+					driftyfull[i-1]=approxy[lastDriftFrame-1];				
+					i++;
+				}
+				
+			}
+
+		}
 		//show results of drift
 		for(i=0;i<nframes;i++)
 		{
-			if(settings.bFramesInterval)
-			{
-				sDriftData = sDriftData + Integer.toString(i+(int)settings.nFrameMin)+"\t"+Double.toString(approxx[i])+"\t"+Double.toString(approxy[i])+"\n";
-			}
-			else
-			{
-				sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(approxx[i])+"\t"+Double.toString(approxy[i])+"\n";				
-			}
+			sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(driftxfull[i])+"\t"+Double.toString(driftyfull[i])+"\n";						
 		}
-		Frame frame = WindowManager.getFrame("Drift Correction (frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")");
+		Frame frame = WindowManager.getFrame("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)");
 		if (frame!=null && (frame instanceof TextWindow) )
 		{
 			DriftTable = (TextWindow)frame;
@@ -571,10 +618,30 @@ public class SMLReconstruct {
 			DriftTable.getTextPanel().updateDisplay();			
 		}
 			else
-				DriftTable = new TextWindow("Drift Correction (frames="+settings.nDriftFrames+" pixels="+settings.nDriftPixels+")", "Frame_Number\tX_drift_(px)\tY_drift_(px)", sDriftData, 450, 300);			
+				DriftTable = new TextWindow("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", "Frame_Number\tX_drift_(nm)\tY_drift_(nm)", sDriftData, 450, 300);			
 		
 		return;
 		
+	}
+	
+	void DriftUpdateResultTable(SMLAnalysis sml_, SMLDialog dlg_)
+	{
+		int i;
+		//let's restore scale
+		double pxscale =  sml_.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml_.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
+		
+		//lock table
+		sml_.ptable_lock.lock();
+		for(i=0;i<nParticlesCount;i++)
+		{
+			sml_.ptable.setValue(DOMConstants.Col_Xnm, i, x[i]);
+			sml_.ptable.setValue(DOMConstants.Col_Ynm, i, y[i]);
+			sml_.ptable.setValue(DOMConstants.Col_X, i, x[i]*pxscale);
+			sml_.ptable.setValue(DOMConstants.Col_Y, i, y[i]*pxscale);
+		}
+		sml_.ptable_lock.unlock();
+		//sml_.ptable.updateResults();
+		sml_.showTable();
 	}
 
 	void applysimplecorrection()
@@ -593,17 +660,21 @@ public class SMLReconstruct {
 			
 		
 	}
-	
+	/** function uses linear approximation on 
+	 * discrete set of drift correction values
+	 * */
 	void applylinearapproximationcorrection()
 	{
 		int i;
 		int dIndex;
 		int nIntervalFrames = settings.nDriftFrames;
 		double coeffx, coeffy;
+		boolean bStop;
 		
+		int lastDriftFrame=nIntervalsCount*nIntervalFrames;
 		
-		approxx = new double [nIntervalsCount*nIntervalFrames];
-		approxy = new double [nIntervalsCount*nIntervalFrames];
+		approxx = new double [lastDriftFrame];
+		approxy = new double [lastDriftFrame];
 		
 		
 		//making linear approximation
@@ -624,32 +695,94 @@ public class SMLReconstruct {
 			
 		}
 		dIndex = nIntervalsCount-1;
-		//last part
-		for(;i<nIntervalFrames*nIntervalsCount; i++)
+		//last segment
+		for(;i<lastDriftFrame; i++)
 		{
 			approxx[i] = driftx[dIndex];
 			approxy[i] = drifty[dIndex];		
 		}
 		
+		//int lastDriftFrame=nIntervalsCount*nIntervalFrames;
+		//for(i=0;i<lastDriftFrame;i++)
+		
+		
 		if(settings.bFramesInterval)
 		{
 			i=0;
+			//skip beginning
 			while(f[i]<settings.nFrameMin)
 				i++;
-			for(;f[i]<(settings.nFrameMin+nIntervalsCount*nIntervalFrames-1);i++)
+			bStop = false;
+			while (!bStop)
 			{
 				dIndex = (int) f[i]-(int)settings.nFrameMin;
 				x[i]+=approxx[dIndex];
 				y[i]+=approxy[dIndex];
-			}						
+				
+				i++;
+				if(i>=nParticlesCount)
+					bStop=true;
+				else
+				{
+					//or the end of drift correction "clean" interval
+					if(f[i]>=(settings.nFrameMin+nIntervalsCount*nIntervalFrames))
+						bStop=true;
+				}
+			}
+			//filling the rest
+			if(settings.nFrameMax>settings.nFrameMin+nIntervalsCount*nIntervalFrames-1)
+			{
+				dIndex = nIntervalsCount-1;
+				bStop = false;
+				while (!bStop)
+				{
+					x[i]+=driftx[dIndex];
+					y[i]+=drifty[dIndex];
+					i++;
+					if(i>=nParticlesCount)
+						bStop=true;
+					else
+					{
+						//or the end of drift correction "clean" interval
+						if(f[i]>(settings.nFrameMax))
+							bStop=true;
+					}
+
+				}
+			}
 		}
 		else
 		{
-			for(i=0;f[i]<nIntervalsCount*nIntervalFrames;i++)
+			
+			bStop = false; 
+			i=0;
+			while (!bStop)
 			{
-				dIndex = (int) f[i];
+				dIndex = (int) (f[i]-1);
 				x[i]+=approxx[dIndex];
 				y[i]+=approxy[dIndex];
+				i++;
+				//let's check whether we reached the end of all particles list
+				if(i>=nParticlesCount)
+					bStop=true;
+				else
+				{
+					//or the end of drift correction "clean" interval
+					if(f[i]>=(lastDriftFrame+1))
+						bStop=true;
+				}
+				
+			}
+
+			//fill in the rest of correction with last value				
+			if(nframes>lastDriftFrame)
+			{
+				dIndex = nIntervalsCount-1;
+				for(;i<nParticlesCount;i++)
+				{
+					x[i]+=driftx[dIndex];
+					y[i]+=drifty[dIndex];
+				}
 			}
 			
 		}
@@ -658,36 +791,50 @@ public class SMLReconstruct {
 		
 	}
 	
+	/** Function calculates cross-correlation between two images */	
 	ShortProcessor crosscorrelation (ImageProcessor ip1, ImageProcessor ip2)
 	{
 		int nMaxPix = settings.nDriftPixels;
 		int i, j, m, n;
 		int tot;
-		int dMaskWidth, dMaskHeight;
-		double dCC;
+		double dCC,dCC1,dCC2;
+		double val1,val2;
 		
 		
 		FloatProcessor resultIP;
 		ShortProcessor returnIP;
-		ImageProcessor driftmask;
+		ImageProcessor extendedip1;
+		
 		
 		tot = 2*nMaxPix+1;
+		extendedip1 = new FloatProcessor(drift_width+tot-1, drift_height+tot-1);
+
+		for (i=0;i<drift_width;i++)
+			for (j=0;j<drift_height;j++)
+				extendedip1.setf(i+nMaxPix, j+nMaxPix, ip1.get(i,j));
+
 		resultIP = new FloatProcessor(tot, tot);
-		dMaskWidth = drift_width-tot+1;
-		dMaskHeight = drift_height-tot+1;
 		
-		ip2.setRoi(nMaxPix,nMaxPix,dMaskWidth, dMaskHeight);
-		driftmask = ip2.crop();
-		ip2.resetRoi();
 		
 		for (i=0;i<tot;i++)
 			for (j=0;j<tot;j++)
 			{
 				dCC=0;
-				for(m=0; m<dMaskWidth; m++)
-					for(n=0; n<dMaskHeight; n++)
-						dCC+=ip1.get(m+i,n+j)*driftmask.get(m, n);
-				resultIP.setf(i,j,(float)dCC);
+				dCC1=0;
+				dCC2=0;
+				for(m=0; m<drift_width; m++)
+					for(n=0; n<drift_height; n++)
+					{
+						val1=extendedip1.get(m+i,n+j);
+						val2=ip2.get(m, n);
+						dCC+=val1*val2;
+						dCC1+=val1;
+						dCC2+=val2;
+					}
+				if(dCC1!=0.0 && dCC2!=0.0)
+					resultIP.setf(i,j,(float)(dCC/(dCC1*dCC2)));
+				else
+					resultIP.setf(i,j,0);
 			}
 		
 		returnIP = (ShortProcessor) resultIP.convertToShort(true);
@@ -698,7 +845,7 @@ public class SMLReconstruct {
 
 	
 	/** Sorts particles data by frame number, ascending. */	
-	void sortbyframe()
+	/*void sortbyframe()
 	{
 		int i, nSize;
 		nSize = f.length;
@@ -727,7 +874,7 @@ public class SMLReconstruct {
 		  	  fp[i] = data[i][5];
 		}		
 		bFrameSorted = true;
-	}
+	}*/
 	
 	/** Cleans the reconstruction viewer image. */
 	void clear()
