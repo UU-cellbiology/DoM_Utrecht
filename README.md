@@ -3,7 +3,7 @@ DoM_Utrecht-GPU
 
 Detection of Molecules (DoM) plugin for ImageJ, Utrecht University
 
-This is <a href="http://www.gnu.org/licenses/gpl.html">open-source</a> <a href='http://rsbweb.nih.gov/ij/'>ImageJ</a> plugin for analysis of single molecule microscopy images (superrsolution PALM/STORM, etc).
+<img src="http://katpyxa.info/software/DoM_logox.png" align="right" style="padding:100px"/>This is <a href="http://www.gnu.org/licenses/gpl.html">open-source</a> <a href='http://rsbweb.nih.gov/ij/'>ImageJ</a> plugin for analysis of single molecule microscopy images (superrsolution PALM/STORM, etc).
 <br />
 <br />
 For description and manual refer to <a href="https://github.com/ekatrukha/DoM_Utrecht/wiki"><strong>Wiki page</strong></a>.
