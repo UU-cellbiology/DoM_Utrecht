@@ -56,12 +56,8 @@ public class SMLLinker {
 			case 0:
 				dFPThreshold = 0.3;
 				break;
-		 //true and half positives
-			case 1:
-			dFPThreshold = 0.7;
-				break;
 		//all particles
-			case 2:
+			case 1:
 				dFPThreshold = 1.1;
 				break;
 			default:

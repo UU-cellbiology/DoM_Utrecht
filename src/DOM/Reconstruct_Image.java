@@ -42,6 +42,7 @@ public class Reconstruct_Image implements PlugIn{
 			return;
 		}
 
+		
 		imagename = "Reconstructed Image";
 		
 		//calculate average localization precision 	
@@ -90,6 +91,10 @@ public class Reconstruct_Image implements PlugIn{
 		//show dialog with options
 		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax, ymax)) return;
 		
+		
+		//print parameters values to Log window
+		LogParameters(dlg);
+		
 		//add frame interval to image name
 		if(dlg.bFramesInterval)
 		{
@@ -134,5 +139,39 @@ public class Reconstruct_Image implements PlugIn{
 		smlViewer.imp.show();
 		
 		
+	}
+	void LogParameters(SMLDialog dlg)
+	{
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Reconstruct image parameters");
+		if(dlg.nRecParticles==0)
+			IJ.log("Use only true positives");
+		else
+			IJ.log("Use all particles");
+		IJ.log("Pixel size: "+ String.format("%.1f",dlg.dRecPixelSize)+ " nm");
+		
+		if(dlg.nSDIndex==0)
+			IJ.log("Plot spots with width of localization precision");
+		else
+			IJ.log("Plot spots with fixed width, SD = "+ String.format("%.1f",dlg.dFixedSD)+" nm");
+		if(dlg.bCutoff)
+			IJ.log("Cut-off localization precision: " + String.format("%.1f",dlg.dcutoff)+" nm");
+		else
+			IJ.log("No localization cut-off");
+		if(dlg.bTranslation)
+		{
+			IJ.log("Translate image in "+ String.format("%.1f",dlg.dTranslationX)+" nm in X and "+String.format("%.1f",dlg.dTranslationY)+" nm in Y");
+		}
+		if(dlg.bFramesInterval)
+		{
+			IJ.log("Use frame interval: "+String.format("%d",(int)dlg.nFrameMin)+"-"+String.format("%d",(int)dlg.nFrameMax));
+		}
+		if(dlg.bAveragePositions)
+		{
+			IJ.log("Average localizations in consecutive frames within 1 pixel: on");
+			if(dlg.bUpdateAveragePositions)
+				IJ.log("Update Results table with average localizations: on");
+			
+		}
 	}
 }

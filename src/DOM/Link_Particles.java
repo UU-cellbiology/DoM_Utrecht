@@ -30,6 +30,8 @@ public class Link_Particles implements PlugIn {
 		//show 'Link Particles' dialog window
 		if (!dlg.LinkParticles()) return;
 		
+		LogLinkParameters(dlg);
+			
 		//sort table by frame number		
 		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_FrameN, true);
 		
@@ -107,6 +109,30 @@ public class Link_Particles implements PlugIn {
 		
 		sml.showTable();
 		
+	}
+	void LogLinkParameters(SMLDialog dlg)
+	{
+		//let's log stuff
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Linking parameters");
+		if(dlg.nLinkFP==0)
+		{
+			IJ.log("For linking use only true positives");
+		}
+		else
+		{
+			IJ.log("For linking use all particles");
+		}
+		IJ.log("Max distance to search over one frame: "+String.format("%d",(int)dlg.dLinkDistance)+" pixels");
+		if(dlg.nLinkTrace==0)
+		{
+			IJ.log("Measure distance from initial position");
+		}
+		else
+		{
+			IJ.log("Measure distance from next detected position");
+		}
+		IJ.log("Maximum linking gap "+String.format("%d",(int)dlg.nLinkFrameGap)+" frames");
 	}
 	
 

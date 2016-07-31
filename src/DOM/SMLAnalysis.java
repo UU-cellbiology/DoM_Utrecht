@@ -463,7 +463,7 @@ public class SMLAnalysis {
 							
 							ptable.addValue("X_(px)",fitted_parameters[2]);							
 							ptable.addValue("Y_(px)",fitted_parameters[3]);
-							ptable.addValue("Frame Number", nFrame+1);
+							ptable.addValue("Frame_Number", nFrame+1);
 							ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
 							ptable.addValue("X_loc_error(nm)", fit_errors[2]*fdg.dPixelSize);							
 							ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
@@ -478,7 +478,7 @@ public class SMLAnalysis {
 							ptable.addValue("SD_X_error(nm)",fit_errors[4]*fdg.dPixelSize);
 							ptable.addValue("SD_Y_(nm)",fitted_parameters[5]*fdg.dPixelSize);
 							ptable.addValue("SD_Y_error(nm)",fit_errors[5]*fdg.dPixelSize);
-							ptable.addValue("False positive", nFalsePositive);							
+							ptable.addValue("False_positive", nFalsePositive);							
 							ptable.addValue("IntegratedInt",dIntAmp);
 							ptable.addValue("SNR", dSNR);	
 							//ptable.addValue("chi2_fit",chi2_fit);

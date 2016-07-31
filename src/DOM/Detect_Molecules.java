@@ -108,9 +108,10 @@ public class Detect_Molecules implements PlugIn {
 		
 		//let's log stuff
 		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Detection parameters");
 		IJ.log("Image title: \"" + imp.getTitle() + "\"");
-		IJ.log("Detection SD of PSF: " + String.format("%.2f",dlg.dPSFsigma) + " pixels");
 		IJ.log("Image pixel size: " + String.format("%.2f",dlg.dPixelSize) + " nm");
+		IJ.log("Detection SD of PSF: " + String.format("%.2f",dlg.dPSFsigma) + " pixels ("+String.format("%.2f",dlg.dPSFsigma*dlg.dPixelSize)+" nm)");
 		IJ.log("Kernel size: (detection) " + String.format("%d",dlg.nKernelSize) + " pixels, (fitting) "+String.format("%d",(2*(int)(3.0*dlg.dPSFsigma))+1)+" pixels");
 		nFreeThread = -1;
 		nSlice = 0;
