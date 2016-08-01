@@ -61,7 +61,7 @@ public class Reconstruct_Image implements PlugIn{
 				dPatCount++;
 			}
 		}
-		//pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
 		xlocavg = xlocavg/dPatCount;
 		ylocavg = ylocavg/dPatCount;
 		
@@ -89,8 +89,11 @@ public class Reconstruct_Image implements PlugIn{
 		}
 		
 		//show dialog with options
-		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax, ymax)) return;
-		
+		//here we provide xmax and ymax in original pixels
+		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax*pxsize, ymax*pxsize)) return;
+		//and here we transform values of rectangle back
+		dlg.nRecWidth=dlg.nRecWidth/pxsize;
+		dlg.nRecHeight=dlg.nRecHeight/pxsize;
 		
 		//print parameters values to Log window
 		LogParameters(dlg);

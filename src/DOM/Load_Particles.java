@@ -64,11 +64,20 @@ public class Load_Particles implements PlugIn{
 		}
 			
 		float pxscale = (float) ip.getf(3,1)*1000/(float) ip.getf(1,1);
-				
+		boolean bQuality;
 		for (int n=0;n<nParticles;n++)
 		{
 			IJ.showProgress(n, nParticles);
-			if((float) ip.getf(6,n)<dFPThreshold)
+			bQuality=true;
+			if((float) ip.getf(6,n)>dFPThreshold)
+				bQuality=false;
+			//localizations make sense
+			if((float) ip.getf(7,n)*pxscale>1000)
+				bQuality=false;
+			if((float) ip.getf(8,n)*pxscale>1000)
+				bQuality=false;
+			
+			if(bQuality)
 			{
 				sml.ptable.incrementCounter();
 				
@@ -90,7 +99,7 @@ public class Load_Particles implements PlugIn{
 				sml.ptable.addValue("SD_X_(nm)",            (float) ip.getf(15,n)*pxscale);
 				sml.ptable.addValue("SD_X_error(nm)",       0.0);
 				sml.ptable.addValue("SD_Y_(nm)",            (float) ip.getf(16,n)*pxscale);
-				sml.ptable.addValue("SD_X_error(nm)",       0.0);
+				sml.ptable.addValue("SD_Y_error(nm)",       0.0);
 				sml.ptable.addValue("False_positive",       (float) ip.getf(6,n));
 				sml.ptable.addValue("IntegratedInt",        (float) ip.getf(10,n));
 				sml.ptable.addValue("SNR",       			(float) ip.getf(11,n));

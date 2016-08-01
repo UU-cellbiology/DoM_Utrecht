@@ -243,8 +243,10 @@ public class SMLDialog {
 				"Only true positives", "All particles"};
 		
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
+		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
 		dgReconstruct.addNumericField("Pixel size of reconstructed image", Prefs.get("SiMoLoc.Rec_PixSize", 30), 2,6,"nm");
-		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");		
+		dgReconstruct.addNumericField("Width of original image", xmax,0, 5, " pixels");
+		dgReconstruct.addNumericField("Height of original image", ymax, 0, 5, " pixels");
 		dgReconstruct.addChoice("SD of spots:", RecSDOptions, Prefs.get("SiMoLoc.Rec_SD", "Localization precision"));
 		dgReconstruct.addNumericField("Value of SD in case of constant:", Prefs.get("SiMoLoc.Rec_SDFixed", 60), 2,6," nm");
 		dgReconstruct.addCheckbox("Cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
@@ -280,8 +282,10 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.Rec_FP", RecFPOptions[nRecParticles]);
         dRecPixelSize = dgReconstruct.getNextNumber();
         Prefs.set("SiMoLoc.Rec_PixSize", dRecPixelSize);
-        nRecWidth = xmax + xlocavg_*3.0;
-        nRecHeight = ymax + ylocavg_*3.0;
+        nRecWidth = (int) dgReconstruct.getNextNumber();
+        Prefs.set("SiMoLoc.Rec_ImWidth", nRecWidth);
+        nRecHeight = (int) dgReconstruct.getNextNumber();
+        Prefs.set("SiMoLoc.Rec_ImHeight", nRecHeight);
 		
 		nSDIndex = dgReconstruct.getNextChoiceIndex();
 		Prefs.set("SiMoLoc.Rec_SD", RecSDOptions[nSDIndex]);
