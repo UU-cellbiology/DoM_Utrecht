@@ -2,7 +2,7 @@ package DOM;
 
 public interface DOMConstants {
 	
-	public static final String DOMversion="1.0.0";
+	public static final String DOMversion="1.0.1";
 	
 	public static final double FITRADIUS=3.0;
 	

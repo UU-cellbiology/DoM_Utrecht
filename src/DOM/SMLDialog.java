@@ -108,23 +108,41 @@ public class SMLDialog {
 	boolean bShowCrossCorrelation; 
 	
 	//3D reconstruction parameters
-	boolean b3D;				//whether or not to make 3D stack
-	double dDistBetweenZSlices;	//z-distance between the slices in the stack
-	boolean bCalculateZValues;	//(re)calculate the z-values based on calibration-file
+	/** whether or not to make 3D reconstruction */
+	boolean b3D;		
+	/** 3D rendering type 0 - stack, 1 - color coded */
+	int n3DRenderType; 
+	/** z-distance between slices in the z rended stack in nm */
+	double dDistBetweenZSlices;	
+	/** (re)calculate the z-values based on calibration-file */
+	boolean bCalculateZValues;
 	
 	//z-calibration curve parameters
-	String sZcUse;       			//what to use for z-calibration 
+	/** what kind of input data  use for z-calibration */ 
+	int sZcUse;
+	/** degree of polynomial used for astigmatism z fitting*/
 	int fitPolynomialDegree;
+	/** distance between frames in calibration z stack, in nm*/
 	int zCalDistBetweenPlanes;
+	/** Rsquared threshold */
+	double zCalRsquareThreshold;
+	/** allow user provided Z zero value */
+	boolean zOverride;
 	
 		
 	//particle linking parameters
-	int nLinkFP;  //what kind of particles use for linking
-	double dLinkDistance; //distance between particles to link then
-	int nLinkTrace; //whether measure distance from initial spot or 'moving'
-	int nLinkFrameGap; //maximum linking gap in frames
-	boolean bShowTracks; //whether to show linked tracks or not
-	boolean bShowParticlesLink; //show detected particles
+	/** what kind of particles use for linking */
+	int nLinkFP; 
+	/** maximum distance between particles to link in one frame */
+	double dLinkDistance; 
+	/** whether to measure distance from initial spot position or 'moving particle' mode */
+	int nLinkTrace; 
+	/** maximum linking gap in frames */
+	int nLinkFrameGap;
+	/** whether to show linked tracks in overlay */
+	boolean bShowTracks;
+	/** add detected particles to overlay after linking*/
+	boolean bShowParticlesLink;
 	
 	/** Dialog showing options for z axis calibration 
 	 * 		
@@ -132,26 +150,29 @@ public class SMLDialog {
 	 */
 		public boolean zCalibration() {
 			String [] zcPolDegreeOptions = new String [] {"1","2","3"};
-			String [] zcUseOptions = new String [] {"Image stack","Particle table","Polynomial coefficients"};
+			String [] zcUseOptions = new String [] {"Image stack","Particle table"};//,"Polynomial coefficients"};
 			
 			GenericDialog zcDial = new GenericDialog("Z Calibration");
-			zcDial.addRadioButtonGroup("Base z-calibration on: ",zcUseOptions,1,3,Prefs.get("SiMoLoc.ZC_Use", zcUseOptions[0]));
+			zcDial.addChoice("Make z-calibration from: ",zcUseOptions, Prefs.get("SiMoLoc.ZC_Use", "Image stack"));
 			zcDial.addChoice("Degree of polynomial fit", zcPolDegreeOptions, Prefs.get("SiMoLoc.ZC_fitPolDegree", "1"));
-			zcDial.addNumericField("Spacing between z-planes (nm): ", Prefs.get("SiMoLoc.ZC_distBetweenPlanes", 20), 0);
-			
-			
+			zcDial.addNumericField("Spacing between Z planes: ", Prefs.get("SiMoLoc.ZC_distBetweenPlanes", 20), 0, 5, " nm");
+			zcDial.addNumericField("Upper R^2 threshold (0 - no filter): ", Prefs.get("SiMoLoc.ZC_zCalRsquareThreshold", 0), 2, 5, " ");
+			zcDial.addCheckbox("Override automatic zero Z detection", Prefs.get("SiMoLoc.ZC_zOverride", false));
 			zcDial.setResizable(false);
 			zcDial.showDialog();
 			if (zcDial.wasCanceled())
 	            return false;
 			
-			sZcUse = zcDial.getNextRadioButton();
-			Prefs.set("SiMoLoc.ZC_Use", sZcUse);
+			sZcUse = zcDial.getNextChoiceIndex();
+			Prefs.set("SiMoLoc.ZC_Use", zcUseOptions[sZcUse]);
 			fitPolynomialDegree = zcDial.getNextChoiceIndex() + 1;//you retrieve the index => add 1 for polynomial degree
-			Prefs.set("SiMoLoc.ZC_fitPolDegree", fitPolynomialDegree);
+			Prefs.set("SiMoLoc.ZC_fitPolDegree", Integer.toString(fitPolynomialDegree));
 			zCalDistBetweenPlanes = (int)zcDial.getNextNumber();
 			Prefs.set("SiMoLoc.ZC_distBetweenPlanes", zCalDistBetweenPlanes);
-			
+			zCalRsquareThreshold = zcDial.getNextNumber();
+			Prefs.set("SiMoLoc.ZC_zCalRsquareThreshold", zCalRsquareThreshold);
+			zOverride = zcDial.getNextBoolean();
+			Prefs.set("SiMoLoc.ZC_zOverride", zOverride);
 			
 			return true;
 		}
@@ -168,8 +189,8 @@ public class SMLDialog {
 		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 2), 2,4," pixels");
 		//fpDial.addNumericField("Gaussial kernel size, \nodd number from 7(fast) till 13 (slow)  ", Prefs.get("SiMoLoc.nKernelSize", 7), 0);		
 		fpDial.addNumericField("Pixel size", Prefs.get("SiMoLoc.dPixelSize", 66), 2, 4, "nm");
-		fpDial.addNumericField("# of parallel threads", Prefs.get("SiMoLoc.nThreads", 50), 0);
-		fpDial.addNumericField("# of fitting iterations", Prefs.get("SiMoLoc.nIterations", 30), 0);
+		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 50), 0);
+		fpDial.addNumericField("Fitting iterations number", Prefs.get("SiMoLoc.nIterations", 30), 0);
 		fpDial.addCheckbox("Mark detected particles in overlay?", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		
@@ -241,6 +262,8 @@ public class SMLDialog {
 				"Localization precision","Constant value"};
 		String [] RecFPOptions = new String [] {
 				"Only true positives", "All particles"};
+		String [] Rec3DOptions = new String [] {
+				"Z-stack", "Colorcoded"};
 		
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
@@ -251,14 +274,9 @@ public class SMLDialog {
 		dgReconstruct.addNumericField("Value of SD in case of constant:", Prefs.get("SiMoLoc.Rec_SDFixed", 60), 2,6," nm");
 		dgReconstruct.addCheckbox("Cut-off for localization precision:", Prefs.get("SiMoLoc.applycutoff", false));
 		dgReconstruct.addNumericField("Cut particles off with localization less than: ", Prefs.get("SiMoLoc.cutoff", 20), 2,4," nm ");
-		//dgReconstruct.addMessage("\n");
-		/*
-		dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.create3DStack", false));
-		dgReconstruct.addNumericField("Z-distance between slices (nm):", Prefs.get("SiMoLoc.distZSlices", 25), 0);
-		dgReconstruct.addCheckbox("Recalculate z-values based on calibration-file", Prefs.get("SiMoLoc.recalZvalues", false));
-		dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-		*/
+		dgReconstruct.addMessage("\n");
+		
+		
 		//dgReconstruct.addMessage("\n");
 		dgReconstruct.addCheckbox("Reconstruct with translation (in nm):", Prefs.get("SiMoLoc.bTranslate", false));
 		dgReconstruct.addNumericField("X_Offset:", Prefs.get("SiMoLoc.dTransX", 0), 2,6, "nm");
@@ -273,6 +291,12 @@ public class SMLDialog {
 		dgReconstruct.addCheckbox("Average localizations in consecutive frames within 1 pixel?", Prefs.get("SiMoLoc.bAveragePositions", false));
 		dgReconstruct.addCheckbox("Update Results table with average localizations?", Prefs.get("SiMoLoc.bUpdateAveragePositions", false));
 		
+		dgReconstruct.addMessage("~~~~~~~~");
+		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.Render3D", false));
+		dgReconstruct.addChoice("Render as:", Rec3DOptions, Prefs.get("SiMoLoc.n3DRenderType", "Z-stack"));
+		dgReconstruct.addNumericField("Z-distance between slices:", Prefs.get("SiMoLoc.distZSlices", 25), 0,4," (nm)");
+		dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
+		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		
 		dgReconstruct.showDialog();
 		if (dgReconstruct.wasCanceled())
@@ -296,16 +320,6 @@ public class SMLDialog {
 		dcutoff = dgReconstruct.getNextNumber();
 		Prefs.set("SiMoLoc.cutoff", dcutoff);
 		
-		
-		/*		
-		//values for 3D reconstruction
-		b3D= dgReconstruct.getNextBoolean();
-		Prefs.set("SiMoLoc.create3DStack", b3D);
-		dDistBetweenZSlices =  dgReconstruct.getNextNumber();
-		Prefs.set("SiMoLoc.distZSlices", dDistBetweenZSlices);
-		bCalculateZValues = dgReconstruct.getNextBoolean();
-		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
-		*/
 		
 		bTranslation = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bTranslate", bTranslation);
@@ -335,6 +349,20 @@ public class SMLDialog {
 		
 		bUpdateAveragePositions= dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bUpdateAveragePositions", bUpdateAveragePositions);
+		
+				
+		//values for 3D reconstruction
+		b3D = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.Render3D", b3D);
+		n3DRenderType = dgReconstruct.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.n3DRenderType", RecFPOptions[n3DRenderType]);
+		dDistBetweenZSlices =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.distZSlices", dDistBetweenZSlices);
+		bCalculateZValues = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
+		
+		
+		
 		return true;
 	}
 	

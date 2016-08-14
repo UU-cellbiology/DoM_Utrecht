@@ -8,6 +8,7 @@ import java.util.Arrays;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.Prefs;
 import ij.WindowManager;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
@@ -32,7 +33,8 @@ public class SMLReconstruct {
 	double [] x;
 	/** y coordinates of particles in nm*/
 	double [] y;
-	double [] z_nm;
+	/** z coordinates of particles in nm*/
+	double [] z;
 	double [] loc_errx;
 	double [] loc_erry;
 	/** frame numbers of particle*/
@@ -94,7 +96,7 @@ public class SMLReconstruct {
 		new_height = (int) Math.ceil(settings.nRecHeight*settings.dMagnification);
 
 		imp = new ImagePlus();
-		imp.setTitle("Reconstructed image");
+		imp.setTitle(title);
 		
 		//threshold for particles reconstruction (include false positives or not)
 		switch (dlg_.nRecParticles)
@@ -115,10 +117,17 @@ public class SMLReconstruct {
 		//sort table by frame if required
 		if(settings.bAveragePositions || settings.bDrift)
 		{
-			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_FrameN, true);
+			IJ.showStatus("Sorting table by frame number (averaging preparation)...");
+			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_FrameN, true);		
 			bFrameSorted = true;
-			sml_.showTable();
+			IJ.showStatus("Sorting table by frame number (averaging preparation)...done");
+			//sml_.showTable();
 		}
+		/*if(settings.b3D)
+		{
+			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_Znm, true);
+			sml_.showTable();
+		}*/
 		
 		// load data
 		sml_.ptable_lock.lock();
@@ -128,13 +137,8 @@ public class SMLReconstruct {
 		nParticlesCount = f.length;
 		//coordinates
 		x   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Xnm);		
-		y   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);
-
-		//calculate z-values if necessary
-		if(settings.bCalculateZValues)
-			calcZValues(sml_);
-		
-		z_nm = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Znm);
+		y   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);	
+		z   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Znm);
 		
 		if (settings.bTranslation)			
 		{
@@ -254,38 +258,35 @@ public class SMLReconstruct {
 		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j;
-		//double preG=0.25*Math.PI;
-		double dCutoff = 1.0;
-		double dNorm = 1.0;
-		//double dVerif = 0.0;
+		
+		double dCutoff = 1000.0; //default cut-off is 1000 nm
+		double dNorm;
+		
 
 		
 		int nSlices;		//total number of slices
 		int sliceNumber;	//slice number of particle
-		double[] zValues;	//array with cloned z values
+		
 		double zmin, zmax;
 		
-		//create new array to sort without changing original
-		zValues = z_nm.clone();
-		Arrays.sort(zValues);
-		//zmin = zValues[0];
-		zmin = 0;
-		zmax = zValues[zValues.length-1];
 		
+		//TODO Sort table by Z to render one dot above another
 		
-		/*DEBUGGING!*/
-		zmin = 0;
-		zmax = 800;
-		/*DEBUGGING!*/
+	
+		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+	
 		
 		nSlices = (int) Math.ceil((zmax-zmin)/zstep);
+		
 		//in case all z-values are zero still one slice has to be drawn
 		if(nSlices==0)
 			nSlices++;
 		
 		FloatProcessor[] ipf = new FloatProcessor[nSlices];
 		
-		for(int k = 0; k<nSlices; k++){
+		for(int k = 0; k<nSlices; k++)
+		{
 			ipf[k] = new FloatProcessor(new_width, new_height);
 		}
 		
@@ -297,14 +298,15 @@ public class SMLReconstruct {
 		
 		for (int n=0;n<nParticlesCount;n++)
 		{
-			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
+			//if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
+			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zmin && z[n]<zmax)
 			{
 				IJ.showProgress(n, nParticlesCount);
 				xmag=(int) Math.round(x[n]*settings.dMagnification);
 				ymag=(int) Math.round(y[n]*settings.dMagnification);
 				
 				//calculate sliceNumber for this particle
-				sliceNumber = (int) Math.floor((z_nm[n]-zmin)/zstep);
+				sliceNumber = (int) Math.floor((z[n]-zmin)/zstep);
 				
 				/*DEBUGGING*/
 				if(sliceNumber>=nSlices)
@@ -318,19 +320,17 @@ public class SMLReconstruct {
 						loc_errx[n] = settings.dFixedSD;
 						loc_erry[n] = settings.dFixedSD;
 					}
-					xsq = (int) Math.round(3*loc_errx[n]*settings.dMagnification);
-					ysq = (int) Math.round(3*loc_erry[n]*settings.dMagnification);
+					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
+					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
 					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
 					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
-					//if(bNormalized)
-					//{
+			
 					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
 					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
 					dNorm = 1/(dErrx*dErry);
-					//}
-					//dVerif=0;
+			
 					for(i=xmag-xsq;i<xmag+xsq+1;i++)
 						for(j=ymag-ysq;j<ymag+ysq+1;j++)
 						{
@@ -339,12 +339,7 @@ public class SMLReconstruct {
 								old_i=ipf[sliceNumber].getf(i, j);
 		
 								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);
-								//if(bNormalized)
-								//	{new_i = old_i + dNorm*dErrx*dErry;}
-									//dVerif+=dNorm*dErrx*dErry;}
-								//else
-									//{new_i = old_i + preG*amp[n]*loc_errxmag*loc_errymag*dErrx*dErry;}
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
 								new_i = old_i + dNorm*dErrx*dErry;
 								ipf[sliceNumber].setf(i, j, (float)new_i);
 							}
@@ -354,11 +349,18 @@ public class SMLReconstruct {
 		}
 		zstack = new ImageStack(new_width, new_height);
 		
-		for(int k=0; k<nSlices; k++){
-			zstack.addSlice(null, ipf[k].convertToShort(true));
+		for(int k=0; k<nSlices; k++)
+		{
+			//zstack.addSlice(null, ipf[k].convertToShort(true));
+			zstack.addSlice(null, ipf[k]);
 		}
-		
-		new ImagePlus("Z-stack (slices@"+zstep+"nm", zstack).show();
+		//previous name
+		String sTitle = imp.getTitle();
+		imp = new ImagePlus(sTitle + " Z-stack (slices@"+zstep+"nm)", zstack);
+		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
+
+		imp.show();
+		//new ImagePlus("Z-stack (slices@"+zstep+"nm)", zstack).show();
 
 		//IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
 		//IJ.run(imp, "Enhance Contrast", "saturated=0.35");
@@ -1119,6 +1121,7 @@ public class SMLReconstruct {
 			{				
 				x[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Xnm];
 				y[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Ynm];
+				z[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Znm];
 				loc_errx[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errX];
 				loc_erry[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errY];
 				res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2;
@@ -1217,13 +1220,16 @@ public class SMLReconstruct {
 			dWeight = Math.pow(item[DOMConstants.Col_SD_Y_err], -2);
 			dAverW[DOMConstants.Col_SD_Y] += item[DOMConstants.Col_SD_Y]*dWeight;
 			dAverW[DOMConstants.Col_SD_Y_err] += dWeight;
-
-			if(Math.abs(item[DOMConstants.Col_Znm])>0)
+			
+			//TODO recalculate Z as weighted when Z error would be present
+			/*if(Math.abs(item[DOMConstants.Col_Znm])>0)
 			{
 				dWeight = Math.pow(item[DOMConstants.Col_loc_errZ], -2);
 				dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm]*dWeight;
 				dAverW[DOMConstants.Col_loc_errZ] += dWeight;
 			}
+			*/
+			dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm];
 			
 			dAverW[DOMConstants.Col_IntegrInt] += item[DOMConstants.Col_IntegrInt];
 			dAverW[DOMConstants.Col_SNR] += item[DOMConstants.Col_SNR];
@@ -1255,13 +1261,15 @@ public class SMLReconstruct {
 		dAverW[DOMConstants.Col_SD_Y]/=dAverW[DOMConstants.Col_SD_Y_err];		
 		dAverW[DOMConstants.Col_SD_Y_err] = 1/Math.sqrt(dAverW[DOMConstants.Col_SD_Y_err]);
 		
-		if(Math.abs(dAverW[DOMConstants.Col_Znm])>0)
+		//TODO recalculate Z as weighted when Z error would be present
+		/*if(Math.abs(dAverW[DOMConstants.Col_Znm])>0)
 		{
 			dAverW[DOMConstants.Col_Znm]/=dAverW[DOMConstants.Col_loc_errZ];		
 			dAverW[DOMConstants.Col_loc_errZ] = 1/Math.sqrt(dAverW[DOMConstants.Col_loc_errZ]);			
-		}
+		}*/
 
 		//just simple average for these values
+		dAverW[DOMConstants.Col_Znm] /= (double)nCount;
 		dAverW[DOMConstants.Col_IntegrInt] /= (double)nCount;
 		dAverW[DOMConstants.Col_SNR] /= (double)nCount;
 		dAverW[DOMConstants.Col_chi] /= (double)nCount;

@@ -33,10 +33,10 @@ public class Z_Calibration implements PlugIn{
 
 	SMLDialog dlg = new SMLDialog();
 	SMLAnalysis sml = new SMLAnalysis();
-	int nCols = 9, maxTracklength, index;
+	int  maxTracklength;
 	
-	double [] falsepos, xloc, yloc, sdx, sdy, trackid, particleid, tl,  tracklength, sortedTracklength, sdDif;
-	double[][] table = new double[nCols][], longestTrack, longestTrackT, temp;
+	double []  f, sdx, sdx_err, sdy,sdy_err, trackid, particleid, tl,  sortedTracklength, sdDif, rsquared;
+	double[][] longestTrack;
 	
 	double maxLocError = 0.5;
 	
@@ -47,197 +47,254 @@ public class Z_Calibration implements PlugIn{
 		IJ.register(Z_Calibration.class);
 	
 		if (!dlg.zCalibration()) return;
-		//String [] zcUseOptions = new String [] {"Image stack","Particle table","Polynomial coefficients"};
-	//1.6 compartibility issue!!!  EUGENE COMMENT
-		/*switch(dlg.sZcUse){
-			case "Image stack": zCal_imageStack(); break;
-			case "Particle table": zCal_particleTable(); break;
-			case "Polynomial coefficients": zCal_polCoef(); break;
-		}*/
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		
+
+		switch(dlg.sZcUse)
+		{
+			case 0: 
+				IJ.log("Creating Z calibration from image stack");
+				IJ.log("Step 1: Detecting molecules");
+				IJ.run("Detect Molecules");
+				IJ.log("Step 2: Linking detections");
+				IJ.run("Link Particles to Tracks", "for=[All particles] max=4 measure=[Initial position] maximum=10 display show");
+				IJ.log("Step 3: Creating Z calibration from Results table");
+				zCal_particleTable(); 
+				//zCal_imageStack(); 
+				break;
+			case 1: 
+				IJ.log("Creating Z calibration from Results table");
+				zCal_particleTable(); 
+				
+				break;
+			case 2:
+				IJ.log("Creating Z calibration from user provided coefficients");
+				zCal_polCoef(); 
+				break;
+		}
 	}
 		
-	public void zCal_imageStack(){
-		//msg("zCal_imageStack: still have to implement this");
-		
-		NonBlockingGenericDialog dlg = new NonBlockingGenericDialog("title");
-		Panel p = new Panel();
-		p.add(new Button("po"));
-		
-		dlg.add(p);
-		dlg.pack();
-		dlg.showDialog();
-		
-		
-	}
 	
-	public void zCal_particleTable(){
+	/** making z-calibration from Particles table,
+	 * link particles if data is not provided*/
+	public void zCal_particleTable()
+	{
+		
+		int i;
+		Plot p;
+		ImagePlus ip;
+		
 		//check that the table is present
-		if (sml.ptable.getCounter()==0 || !sml.ptable.columnExists(13))
+		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
 		{
 			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
 			return;
 		}
 		//check that the particles are linked
-		if ( !sml.ptable.columnExists(18)){
-			IJ.error("Particle table is probably not linked.");
-			return;
+		//TODO add linking stage here
+		if ( !sml.ptable.columnExists(DOMConstants.Col_TrackID))
+		{
+			//IJ.error("Particle table is probably not linked.");
+			IJ.log("WARNING! Particles are not linked in the table, performing automatic linking.");
+			IJ.run("Link Particles to Tracks", "for=[All particles] max=4 measure=[Initial position] maximum=10");;
+			sml = new SMLAnalysis();
+			//return;
 		}
 		
-		falsepos = sml.ptable.getColumnAsDoubles(6);
-		xloc = sml.ptable.getColumnAsDoubles(7);
-		yloc = sml.ptable.getColumnAsDoubles(8);
-		sdx = sml.ptable.getColumnAsDoubles(15);
-		sdy = sml.ptable.getColumnAsDoubles(16);
-		trackid = sml.ptable.getColumnAsDoubles(18);
-		particleid = sml.ptable.getColumnAsDoubles(19);
-		tracklength = sml.ptable.getColumnAsDoubles(20);
+		IJ.log("Polynomial degree: "+Integer.toString(dlg.fitPolynomialDegree));
+		IJ.log("Distance between Z planes: "+Double.toString(dlg.zCalDistBetweenPlanes)+" nm");
+		IJ.log("R^2 threshold: "+ Double.toString(dlg.zCalRsquareThreshold));
 		
-		sortedTracklength = tracklength.clone();
-		Arrays.sort(sortedTracklength);
-		maxTracklength = (int)sortedTracklength[sortedTracklength.length-1];
+		//first, sort data by particle and trackN
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_ParticleID, true);
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_TrackID, true);
 		
-		table[0] = falsepos;
-		table[1] = xloc;
-		table[2] = yloc;
-		table[3] = sdx;
-		table[4] = sdy;
-		table[5] = trackid;
-		table[6] = particleid;
-		table[7] = tracklength;
-		table[8] = new double[table[0].length];
-		//insert relative z-values (based on particleid and distance between z planes)
-		for (int i=0; i<table[0].length; i++) {
-			  table[8][i] = table[6][i] * dlg.zCalDistBetweenPlanes;
-		}
-		table = transpose(table);
-
-		//sort table base on tracklength, then trackid, then particleid
-		Arrays.sort(table, new Comparator<double[]>() {
-		    public int compare(double[] a, double[] b) {
-		    	if(Double.compare(a[7], b[7]) != 0){
-		    		return Double.compare(a[7], b[7]);
-		    	}
-		    	else if(Double.compare(a[5], b[5]) != 0){
-		    		return Double.compare(a[5], b[5]);
-		    	}
-		    	else{
-		    		return Double.compare(a[6], b[6]);
-		    	}
-		    }
-		});
+		//get values
+		sdx = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X);
+		sdx_err = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X_err);
+		sdy = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y);
+		sdy_err = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y_err);
+		f = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+		trackid = sml.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
+		particleid = sml.ptable.getColumnAsDoubles(DOMConstants.Col_ParticleID);
+		rsquared = sml.ptable.getColumnAsDoubles(DOMConstants.Col_chi);
 		
-		longestTrack = new double[maxTracklength][];//=> rows are rows of original particle table
-		System.arraycopy(table,(table.length - maxTracklength),longestTrack,0,maxTracklength);
-		longestTrackT = transpose(longestTrack); //=> rows are columns of original particle table
+		//find longest track taking into account r2 threshold
+		int dLongestTrackID = (int)trackid[0];
+		maxTracklength = 0;
+		int dCurrentLength = 0;
+		double dCurrentTrack = trackid[0];
 		
-		Plot p = new Plot("Width and height of PSF","z-position (nm)","size of PSF (px)");
-		//plot sdx
-		p.addPoints(longestTrackT[8], longestTrackT[3], Plot.CONNECTED_CIRCLES);
-		//plot sdy
-		p.setColor(Color.red);
-		p.addPoints(longestTrackT[8], longestTrackT[4], Plot.CONNECTED_CIRCLES);
-		p.setColor(Color.black);
-		p.setLegend("width	height", Plot.AUTO_POSITION);
-		ImagePlus ip = p.getImagePlus();
-		ip.show();
-		
-		int approxZero = dlgSetZero();
-		ip.close();
-		if(approxZero < 0)
-			return;
-		
-		for(index = 0; index < maxTracklength; index++){
-			if(longestTrackT[8][index] > approxZero)
-				break;
-		}
-		
-		int zRange = 400; //nm
-		int nFrames = (int)(zRange/dlg.zCalDistBetweenPlanes)/2;
-		temp = new double[nFrames*2+1][];
-		
-		System.arraycopy(longestTrack,index - nFrames,temp,0,2*nFrames+1);
-		
-		//find z-offset
-		double dif, minDif = 1000, zOffset = 0;
-		for(index = 0; index<temp.length; index++){
-			dif = Math.abs(temp[index][3]-temp[index][4]);
-			if(dif<minDif){
-				zOffset = temp[index][8];
-				minDif = dif;
+		for(i=0;i<sdx.length;i++)
+		{
+			if((int)trackid[i]==(int)dCurrentTrack)
+			{
+				if(rsquared[i]>=dlg.zCalRsquareThreshold)
+					{dCurrentLength++;}
+			}
+			else
+			{
+				if(dCurrentLength>maxTracklength)
+				{
+					maxTracklength=dCurrentLength;
+					dLongestTrackID=(int)dCurrentTrack;
+				}
+				dCurrentLength=1;
+				dCurrentTrack=trackid[i];
 			}
 		}
+		//check that track has enough point
+		if(maxTracklength<10)
+		{
+			IJ.error("Error! Longest track is less than 10 points. Adjust linking, decrease z-step or choose different calibration stack.");
+			return;			
+		}
+		IJ.log("Longest track length after filtering: "+Integer.toString(maxTracklength) + " particles");
+		
+		//fill in data from the longest track
+		longestTrack = new double[5][maxTracklength];
+		dCurrentLength = 0;
+		for(i=0;i<sdx.length;i++)
+		{
+				if((int)trackid[i]==(int)dLongestTrackID)
+				{
+					if(rsquared[i]>=dlg.zCalRsquareThreshold)
+					{				
+						longestTrack[0][dCurrentLength]=sdx[i];
+						longestTrack[1][dCurrentLength]=sdy[i];
+						longestTrack[2][dCurrentLength]=f[i];
+						longestTrack[3][dCurrentLength]=sdx_err[i];
+						longestTrack[4][dCurrentLength]=sdy_err[i];
+						dCurrentLength++;
+					}
+				}
+		}
+		//subtract first frame
+		for(i=1;i<maxTracklength;i++)
+		{
+			longestTrack[2][i]=(longestTrack[2][i]-longestTrack[2][0])*dlg.zCalDistBetweenPlanes;
+		}
+		//first frame
+		longestTrack[2][0]=0;
+		
+		//calculate difference between SDx and SDy
+		sdDif = new double[maxTracklength];
+
+		for(i = 0; i<maxTracklength;i++)
+		{
+			sdDif[i] = longestTrack[0][i] - longestTrack[1][i];
+			
+		}
+		
+		//Estimate position of zero
+		//let's take middle third
+		int nBeg = (int)Math.round(maxTracklength/3.0);
+		int nEnd = (int)Math.round(2.0*maxTracklength/3.0);
+		double zOffset = 0;
+		double dMin = Double.MAX_VALUE;
+		for (i=nBeg;i<=nEnd;i++)
+		{
+			
+			if(Math.abs(sdDif[i])<dMin)
+			{
+				zOffset = longestTrack[2][i];
+				dMin = sdDif[i];
+			}
+			
+		}
+		//ok, let's see if user-provided estimation of Z required
+
+		if(dlg.zOverride)
+		{
+			p = new Plot("Width and height of PSF","Z position (nm)","size of PSF (nm)");
+			//plot sdx
+			p.setColor(Color.red);
+			//p.addPoints(longestTrack[2], longestTrack[0], Plot.CONNECTED_CIRCLES);	
+			p.addPoints(longestTrack[2], longestTrack[0],longestTrack[3], Plot.CIRCLE);	
+			//plot sdy
+			p.setColor(Color.blue);
+			p.addPoints(longestTrack[2], longestTrack[1],longestTrack[4], Plot.CIRCLE);
+			p.setColor(Color.black);
+	
+			p.setLegend("width	height", Plot.AUTO_POSITION);
+			ip = p.getImagePlus();
+			ip.show();
+	
+
+			zOffset = dlgSetZero(zOffset);
+			ip.close();
+		
+		}
+		IJ.log("Z offset shift: "+Double.toString(zOffset) + " nm");
 		
 		//subtract z-offset from all z-values
-		for(index = 0; index < maxTracklength; index++){
-			longestTrackT[8][index] = longestTrackT[8][index] - zOffset;  
+		for(i = 0; i < maxTracklength; i++)
+		{
+			longestTrack[2][i] = longestTrack[2][i] - zOffset;  
 		}
-		
-		longestTrack = transpose(longestTrackT);
-		
-		sdDif = new double[maxTracklength];
-		for(int i = 0; i<maxTracklength;i++){
-			sdDif[i] = longestTrackT[3][i] - longestTrackT[4][i];
-		}
-		longestTrack = transpose(longestTrackT);
-		
-		p = new Plot("Difference in width and height","z-position (nm)","width-height (px)");
-		
-		p.addPoints(longestTrackT[8], sdDif, Plot.CONNECTED_CIRCLES);
-		
+
+		IJ.log("Fitting results: ");
+		//let's show plot and define range of fitting
+		p = new Plot("Difference in PSF width and height","Z position (nm)","width-height (nm)");
+		p.addPoints(longestTrack[2], sdDif, Plot.CONNECTED_CIRCLES);
 		ip = p.getImagePlus();
 		ip.show();
 		
+
 		//fitPars = fitRangeMin, fitRangeMax, polDegree
-		int[] fitPars = dlgFitRange();
+		int[] fitPars = dlgFitRange((int)longestTrack[2][0],(int)longestTrack[2][maxTracklength-1]);
 		ip.close();
 		if(fitPars[0] == 0 & fitPars[1] == 0)
 			return;
 		
-		int indexMin = findIndex(longestTrackT[8],fitPars[0]);
-		int indexMax = findIndex(longestTrackT[8],fitPars[1]);
+		int indexMin = findIndex(longestTrack[2],fitPars[0]);
+		int indexMax = findIndex(longestTrack[2],fitPars[1]);
 		
 		
-		CurveFitter cf = polyFit(Arrays.copyOfRange(sdDif,indexMin,indexMax),Arrays.copyOfRange(longestTrackT[8],indexMin,indexMax),dlg.fitPolynomialDegree);
+		CurveFitter cf = polyFit(Arrays.copyOfRange(sdDif,indexMin,indexMax),Arrays.copyOfRange(longestTrack[2],indexMin,indexMax),dlg.fitPolynomialDegree);
 		//get plot window (for closing later)
 		ImagePlus impFitPlot = IJ.getImage();
 		
 		double[] fitCoef = cf.getParams();
-		//for(int i=0;i<fitCoef.length;i++){
-		//	msg(fitCoef[i]);
-		//}
+
 
 		if(dlgStoreCal()){
 			Prefs.set("SiMoLOc.ZC_polDegree", dlg.fitPolynomialDegree);
 			switch(dlg.fitPolynomialDegree){
-				case 1: Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
+				case 1: Prefs.set("SiMoLOc.ZC_polCoef0", fitCoef[0]);
+						Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
 						Prefs.set("SiMoLOc.ZC_polCoef2", 0);
 						Prefs.set("SiMoLOc.ZC_polCoef3", 0);
 						Prefs.set("SiMoLOc.ZC_fitRangeMin", fitPars[0]);
 						Prefs.set("SiMoLOc.ZC_fitRangeMax", fitPars[1]);
 						break;
-				case 2: Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
+				case 2: Prefs.set("SiMoLOc.ZC_polCoef0", fitCoef[0]);
+						Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
 						Prefs.set("SiMoLOc.ZC_polCoef2", fitCoef[2]);
 						Prefs.set("SiMoLOc.ZC_polCoef3", 0);
 						Prefs.set("SiMoLOc.ZC_fitRangeMin", fitPars[0]);
 						Prefs.set("SiMoLOc.ZC_fitRangeMax", fitPars[1]);
 						break;
-				case 3: Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
+				case 3: Prefs.set("SiMoLOc.ZC_polCoef0", fitCoef[0]);
+						Prefs.set("SiMoLOc.ZC_polCoef1", fitCoef[1]);
 						Prefs.set("SiMoLOc.ZC_polCoef2", fitCoef[2]);
 						Prefs.set("SiMoLOc.ZC_polCoef3", fitCoef[3]);
 						Prefs.set("SiMoLOc.ZC_fitRangeMin", fitPars[0]);
 						Prefs.set("SiMoLOc.ZC_fitRangeMax", fitPars[1]);
 						break;
+
 			}
 			msg("Calibration stored!");
 		}
 		
 		impFitPlot.close();
-		//msg(fitRange[0]+" "+fitRange[1]);
+		
 	}
 	
 	Plot plot;
 	
-	public void zCal_polCoef(){
+	public void zCal_polCoef()
+	{
 		plot = new Plot("title","x-label","y-label");
 		plot.addPoints(new double[]{1,2,3,4,5,6,7,8,9,10}, new double[]{1,2,3,4,5,6,7,8,9,10}, 2);
 		
@@ -253,7 +310,7 @@ public class Z_Calibration implements PlugIn{
 		jp.add(ic);
 		nb.add(jp);
 		
-		Button b = new Button("test");
+		Button b = new Button("Do Fit");
 		b.addActionListener(new ActionListener(){
 
 			@Override
@@ -355,6 +412,8 @@ public class Z_Calibration implements PlugIn{
 			default: polDegree = ij.measure.Calibration.STRAIGHT_LINE;break;
 		}
 		cf.doFit(polDegree); 
+		//double [] initialParams= new double[5];
+		//cf.doCustomFit("y = b + c*(x-a) + d*(x-a)*(x-a)+e*(x-a)*(x-a)*(x-a)", initialParams, false);
 		Fitter.plot(cf);
 		
 		IJ.log(cf.getResultString());
@@ -364,16 +423,16 @@ public class Z_Calibration implements PlugIn{
 	
 	public int findIndex(double[] array, int value){
 		for(int i=0; i<array.length; i++){
-			if((int)array[i] == value)
+			if((int)array[i] >= value)
 				return i;
 		}
 		return -1;
 	}
 	
 	
-	public int dlgSetZero() {
-		GenericDialog dlg = new GenericDialog("Type approximate zero position");
-		dlg.addNumericField("Zero at approximate: ", 0, 0);
+	public int dlgSetZero(double zOffset) {
+		GenericDialog dlg = new GenericDialog("Set new zero Z position");
+		dlg.addNumericField("New zero at Z = ", (int)zOffset, 1,6," nm");
 		
 		
 		dlg.setResizable(false);
@@ -384,10 +443,10 @@ public class Z_Calibration implements PlugIn{
 		return (int)dlg.getNextNumber();
 	}
 	
-	public int[] dlgFitRange() {
-		GenericDialog dlg = new GenericDialog("Fit Range");
-		dlg.addNumericField("Fit range min (nm): ", -400, 0);
-		dlg.addNumericField("Fit range max (nm): ", 400, 0);
+	public int[] dlgFitRange(int nMin, int nMax) {
+		GenericDialog dlg = new GenericDialog("Define Fit & Detection Z-Range");
+		dlg.addNumericField("Range Z min = ", nMin, 0,5," nm");
+		dlg.addNumericField("Range Z max = ", nMax, 0,5," nm");
 		
 		dlg.setResizable(false);
 		dlg.showDialog();
@@ -405,7 +464,7 @@ public class Z_Calibration implements PlugIn{
 		dlg.showDialog();
 		return dlg.wasOKed();
 	}
-	
+	/*
 	double[][] transpose (double[][] array) {
 	  if (array == null || array.length == 0)//empty or unset array, nothing do to here
 	    return array;
@@ -422,7 +481,8 @@ public class Z_Calibration implements PlugIn{
 	  }
 	  return array_new;
 	}
-
+*/
+	
 	void msg(String message){
 		GenericDialog gd = new GenericDialog("Message");
 		gd.addMessage(message);

@@ -8,6 +8,7 @@ package DOM;
 import java.util.Arrays;
 
 import ij.IJ;
+import ij.measure.ResultsTable;
 import ij.plugin.PlugIn;
 
 
@@ -105,39 +106,55 @@ public class Reconstruct_Image implements PlugIn{
 
 		}
 		
+		if(dlg.b3D && dlg.bCalculateZValues)
+		{
+				//IJ.showStatus("Calculating Z coordinate...");
+				IJ.run("Calculate Z values (astigmatism)");
+				//load updated table to sml object
+				sml = new SMLAnalysis();
+		}
+		
+		
+		
 		//create reconstruction object
 		smlViewer = new SMLReconstruct(imagename, sml, dlg);
 		
 				
 		if(dlg.bAveragePositions)
 		{
+			IJ.showStatus("Averaging 1 pixel localizations...");
 			smlViewer.averagelocalizations(sml);
 			
 		}
+			
 		
+		if(dlg.bCutoff)
+		{
+			imagename += " (Cutoff localization=" + dlg.dcutoff +" nm)";
+		}
 		
-		//if(!dlg.b3D)//if you don't want a z-stack
-		//{
+		if(dlg.b3D)
+		{
+			if(dlg.n3DRenderType==0)
+			{
+				if(dlg.bFramesInterval)
+				{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax, dlg.dDistBetweenZSlices);}
+				else
+				{	smlViewer.draw_zstack(1, smlViewer.nframes, dlg.dDistBetweenZSlices);}
+				
+			}
+		}
+		else
+		{	
+		
+			//drawing in 2D
 			if(dlg.bFramesInterval)
 			{	smlViewer.draw_unsorted((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
 			else
 			{	smlViewer.draw_unsorted(1, smlViewer.nframes);}
 			
-			if(dlg.bCutoff)
-			{
-				imagename += " (Cutoff localization=" + dlg.dcutoff +" nm)";
-			}
-		//}
-		//else
-		//{//create z-stack
-			//int zStep = (int)dlg.dDistBetweenZSlices;
-			
-//			if(dlg.bFramesInterval)
-	//		{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax,zStep);}
-		//	else
-			//{	smlViewer.draw_zstack(1, smlViewer.nframes,zStep);}
-//		}
-		
+		}
+	
 		smlViewer.imp.setTitle(imagename);
 		smlViewer.imp.show();
 		

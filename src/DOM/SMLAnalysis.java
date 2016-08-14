@@ -23,11 +23,14 @@ import jaolho.data.lma.LMA;
 public class SMLAnalysis {
 	
 	ImageStatistics imgstat;
-	GaussianBlur lowpassGauss = new GaussianBlur(); //low pass prefiltering
-	float []		 fConKernel;  				//convolution kernel (Gaussian mexican hat)
-	float []		 fLPKernel;  				//low-pass Gaussian kernel 
-	
-	ResultsTable ptable = ResultsTable.getResultsTable(); // table with particle's approximate center coordinates
+	/** low pass prefiltering */
+	GaussianBlur lowpassGauss = new GaussianBlur(); 
+	/** convolution kernel (Gaussian mexican hat) */
+	float []		 fConKernel;  				
+	/** low-pass Gaussian kernel  */
+	float []		 fLPKernel;  				
+	/** table with results of detection and fitting */
+	ResultsTable ptable;// = ResultsTable.getResultsTable();
 	
 	java.util.concurrent.locks.Lock ptable_lock = new java.util.concurrent.locks.ReentrantLock();
 	
@@ -474,9 +477,9 @@ public class SMLAnalysis {
 							ptable.addValue("Amp_error",fit_errors[1]);
 							ptable.addValue("BGfit",fitted_parameters[0]);
 							ptable.addValue("BGfit_error",fit_errors[0]);
-							ptable.addValue("SD_X_(nm)",fitted_parameters[4]*fdg.dPixelSize);
+							ptable.addValue("SD_X_(nm)",Math.abs(fitted_parameters[4])*fdg.dPixelSize);
 							ptable.addValue("SD_X_error(nm)",fit_errors[4]*fdg.dPixelSize);
-							ptable.addValue("SD_Y_(nm)",fitted_parameters[5]*fdg.dPixelSize);
+							ptable.addValue("SD_Y_(nm)",Math.abs(fitted_parameters[5])*fdg.dPixelSize);
 							ptable.addValue("SD_Y_error(nm)",fit_errors[5]*fdg.dPixelSize);
 							ptable.addValue("False_positive", nFalsePositive);							
 							ptable.addValue("IntegratedInt",dIntAmp);
