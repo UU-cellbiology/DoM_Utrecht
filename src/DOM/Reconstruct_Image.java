@@ -137,6 +137,7 @@ public class Reconstruct_Image implements PlugIn{
 		{
 			if(dlg.n3DRenderType==0)
 			{
+				imagename += " Z-Stack (slices@" + dlg.dDistBetweenZSlices +" nm)";
 				if(dlg.bFramesInterval)
 				{	smlViewer.draw_zstack((int)dlg.nFrameMin, (int)dlg.nFrameMax, dlg.dDistBetweenZSlices);}
 				else

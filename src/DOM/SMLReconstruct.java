@@ -354,16 +354,12 @@ public class SMLReconstruct {
 			//zstack.addSlice(null, ipf[k].convertToShort(true));
 			zstack.addSlice(null, ipf[k]);
 		}
-		//previous name
-		String sTitle = imp.getTitle();
-		imp = new ImagePlus(sTitle + " Z-stack (slices@"+zstep+"nm)", zstack);
-		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
-
-		imp.show();
-		//new ImagePlus("Z-stack (slices@"+zstep+"nm)", zstack).show();
-
+		imp = new ImagePlus("Z-stack" , zstack);
 		//IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
-		//IJ.run(imp, "Enhance Contrast", "saturated=0.35");
+		String sProp = "channels=1 slices="+Integer.toString(nSlices) + " frames=1 unit=nm pixel_width=";
+		sProp = sProp + Double.toString(settings.dRecPixelSize)+"  pixel_height="+ Double.toString(settings.dRecPixelSize);
+		sProp = sProp + " voxel_depth=" + Double.toString(settings.dDistBetweenZSlices);
+		IJ.run(imp, "Properties...", sProp);
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin during drift correction.
@@ -1079,11 +1075,10 @@ public class SMLReconstruct {
 						{
 							//found same photoactivation event
 							//let's store values
+							//mark it as already used (fp)
+							res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_Fp]+=1.2;//mark it as an averaged one (>1), so skip in update
 							Averaging_tbl.add(res_table_unique[nFrameCompareCount][nCompareParticle]);
 							nAveragesNumber++;
-							//mark it as already used (fp)
-							//debug stub
-							res_table_unique[nFrameCompareCount][nCompareParticle][DOMConstants.Col_Fp]+=1.2;//mark it as an averaged one (>1)
 							//exit from current frame (a bit lame one)
 							nCompareParticle = framesstat[nFrameCompareCount][1] -1;
 						}
@@ -1093,13 +1088,18 @@ public class SMLReconstruct {
 				if(nAveragesNumber>0)
 				{
 					//adding particle itself to the list of averaged values
+					//mark it as already used (fp)
+					res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2;//mark it as an averaged one (>1), so skip in update
 					Averaging_tbl.add(res_table_unique[nFrameCount][nCurrentParticle]);
 					nAveragesNumber++;
+					
 					//calculating weighted average for this particle
-					res_table_unique[nFrameCount][nCurrentParticle] = weightedAverage(Averaging_tbl);					
+					res_table_unique[nFrameCount][nCurrentParticle] = weightedAverage(Averaging_tbl);
+					//function will mark it as averaged inside (do subtraction -1.2);
 				}
 			}//false positive check
 		}
+		
 		//updating initial arrays used for rendering picture		
 		nFrameCount = 0;
 		nCurrentParticle = -1;
@@ -1124,8 +1124,9 @@ public class SMLReconstruct {
 				z[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Znm];
 				loc_errx[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errX];
 				loc_erry[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errY];
-				res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2;
+				res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2; //restore averaged value
 				fp[nCount]  = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp];
+				f[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_FrameN];
 			}
 		}
 		
@@ -1229,13 +1230,15 @@ public class SMLReconstruct {
 				dAverW[DOMConstants.Col_loc_errZ] += dWeight;
 			}
 			*/
+			//simple average part
 			dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm];
 			
 			dAverW[DOMConstants.Col_IntegrInt] += item[DOMConstants.Col_IntegrInt];
 			dAverW[DOMConstants.Col_SNR] += item[DOMConstants.Col_SNR];
 			dAverW[DOMConstants.Col_chi] += item[DOMConstants.Col_chi];
 			dAverW[DOMConstants.Col_IterN] += item[DOMConstants.Col_IterN];
-			
+			dAverW[DOMConstants.Col_FrameN] += item[DOMConstants.Col_FrameN];
+			dAverW[DOMConstants.Col_Fp] += item[DOMConstants.Col_Fp]-1.2;//to restore real value
 			nCount++;
 		}
 
@@ -1274,9 +1277,14 @@ public class SMLReconstruct {
 		dAverW[DOMConstants.Col_SNR] /= (double)nCount;
 		dAverW[DOMConstants.Col_chi] /= (double)nCount;
 		dAverW[DOMConstants.Col_IterN] /= (double)nCount;
-
-		dAverW[DOMConstants.Col_Fp] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_Fp]-1.2;
-		dAverW[DOMConstants.Col_FrameN] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_FrameN];
+		
+		dAverW[DOMConstants.Col_Fp] /= (double)nCount;
+		dAverW[DOMConstants.Col_Fp]= Math.round(dAverW[DOMConstants.Col_Fp]);
+		dAverW[DOMConstants.Col_Fp]= dAverW[DOMConstants.Col_Fp] -1.2; //mark it as averaged
+		//dAverW[DOMConstants.Col_Fp] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_Fp]-1.2;
+		dAverW[DOMConstants.Col_FrameN]/= (double)nCount;
+		dAverW[DOMConstants.Col_FrameN] = Math.round(dAverW[DOMConstants.Col_FrameN]);
+		//dAverW[DOMConstants.Col_FrameN] = Averaging_tbl.get(nCount-1)[DOMConstants.Col_FrameN];
 
 		return dAverW;
 	}
