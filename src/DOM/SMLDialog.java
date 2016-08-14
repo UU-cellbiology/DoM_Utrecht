@@ -294,7 +294,7 @@ public class SMLDialog {
 		dgReconstruct.addMessage("~~~~~~~~");
 		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.Render3D", false));
 		dgReconstruct.addChoice("Render as:", Rec3DOptions, Prefs.get("SiMoLoc.n3DRenderType", "Z-stack"));
-		dgReconstruct.addNumericField("Z-distance between slices:", Prefs.get("SiMoLoc.distZSlices", 25), 0,4," (nm)");
+		dgReconstruct.addNumericField("Z-distance between slices:", Prefs.get("SiMoLoc.distZSlices", 100), 0,4," (nm)");
 		dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
 		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		
