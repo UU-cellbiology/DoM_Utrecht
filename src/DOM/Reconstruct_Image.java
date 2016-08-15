@@ -144,6 +144,13 @@ public class Reconstruct_Image implements PlugIn{
 				{	smlViewer.draw_zstack(1, smlViewer.nframes, dlg.dDistBetweenZSlices);}
 				
 			}
+			else
+			{
+				if(dlg.bFramesInterval)
+				{	smlViewer.draw_colorcodedZ((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
+				else
+				{	smlViewer.draw_colorcodedZ(1, smlViewer.nframes);}
+			}
 		}
 		else
 		{	

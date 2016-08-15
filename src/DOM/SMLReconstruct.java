@@ -1,6 +1,7 @@
 package DOM;
 
 
+import java.awt.Color;
 import java.awt.Frame;
 import java.util.ArrayList;
 import ij.IJ;
@@ -8,6 +9,7 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.WindowManager;
+import ij.plugin.LutLoader;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 //import ij.process.ShortProcessor;
@@ -356,6 +358,148 @@ public class SMLReconstruct {
 		sProp = sProp + Double.toString(settings.dRecPixelSize)+"  pixel_height="+ Double.toString(settings.dRecPixelSize);
 		sProp = sProp + " voxel_depth=" + Double.toString(settings.dDistBetweenZSlices);
 		IJ.run(imp, "Properties...", sProp);
+	}
+	
+	/** Renders image in 3D in "non-transparent" mode
+	 * @param fstart show only particle after this frame
+	 * @param fstop show only particle before this frame
+	 * @param 
+	 * @param 
+	*/
+	void draw_colorcodedZ(int fstart, int fstop)
+	{	
+		//table for sorting of data by z-value
+		//double table [][];
+		Color c;
+		int [] reds=new int [256];
+		int [] greens=new int [256];
+		int [] blues=new int [256];
+		for (int i=0; i<256; i++) 
+		{
+			c = Color.getHSBColor(i/255f, 1f, 1f);
+			//reds[i] = (byte)c.getRed();
+			reds[i] = c.getRed();
+			greens[i] = c.getGreen();
+			blues[i] = c.getBlue();
+		}
+		
+		int zInd;
+		
+		/*table = new double[6][nParticlesCount];
+		table[0]= x;
+		table[1]= y;
+		table[2]= z;
+		table[3]= f;
+		table[4]= loc_errx;
+		table[5]= loc_erry;
+		table[6]= fp;
+		
+		LutLoader.
+		*/
+		
+		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
+		int xmag, ymag, xsq, ysq;
+		int i,j;
+		
+		double dCutoff = 1000.0; //default cut-off is 1000 nm
+		double dNorm;
+		
+
+		
+		//int nSlices;		//total number of slices
+		//int sliceNumber;	//slice number of particle
+		
+		double zmin, zmax;
+		
+			
+	
+		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		
+		FloatProcessor[] ipf = new FloatProcessor[3];
+		
+		for(int k = 0; k<3; k++)
+		{
+			ipf[k] = new FloatProcessor(new_width, new_height);
+		}
+		
+		if(settings.bCutoff)
+			dCutoff = settings.dcutoff;
+		
+
+		IJ.showStatus("Reconstructing Z-stack...");
+		
+		for (int n=0;n<nParticlesCount;n++)
+		{
+			//if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
+			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zmin && z[n]<zmax)
+			{
+				IJ.showProgress(n, nParticlesCount);
+				xmag=(int) Math.round(x[n]*settings.dMagnification);
+				ymag=(int) Math.round(y[n]*settings.dMagnification);
+				
+				//calculate sliceNumber for this particle
+				//sliceNumber = (int) Math.floor((z[n]-zmin)/zstep);
+				
+				/*DEBUGGING*/
+				//if(sliceNumber>=nSlices)
+				//	sliceNumber = nSlices-1;
+				/*DEBUGGING*/
+				
+				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
+				{
+					if(settings.nSDIndex>0)
+					{
+						loc_errx[n] = settings.dFixedSD;
+						loc_erry[n] = settings.dFixedSD;
+					}
+					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
+					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
+					xpeak=x[n]*settings.dMagnification;
+					ypeak=y[n]*settings.dMagnification;
+					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+			
+					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
+					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
+					dNorm = 1/(dErrx*dErry);
+			
+					for(i=xmag-xsq;i<xmag+xsq+1;i++)
+						for(j=ymag-ysq;j<ymag+ysq+1;j++)
+						{
+							if((i<new_width) && (j<new_height)&&(i>0)&&(j>0))
+							{
+								
+		
+								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
+								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
+								
+								zInd=(int) Math.round(255*(z[n]-zmin)/(zmax-zmin));
+								//red
+								old_i=ipf[0].getf(i, j);
+								new_i = old_i + dNorm*dErrx*dErry*reds[zInd];
+								ipf[0].setf(i, j, (float)(new_i));
+								//green
+								old_i=ipf[1].getf(i, j);
+								new_i = old_i + dNorm*dErrx*dErry*greens[zInd];
+								ipf[1].setf(i, j, (float)(new_i));
+								//blue
+								old_i=ipf[2].getf(i, j);
+								new_i = old_i + dNorm*dErrx*dErry*blues[zInd];
+								ipf[2].setf(i, j, (float)(new_i));
+							}
+						}
+				}		
+			}
+		}
+		zstack = new ImageStack(new_width, new_height);
+		
+		for(int k=0; k<3; k++)
+		{
+			//zstack.addSlice(null, ipf[k].convertToShort(true));
+			zstack.addSlice(null, ipf[k]);
+		}
+		imp = new ImagePlus("Z-stack" , zstack);
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin during drift correction.
