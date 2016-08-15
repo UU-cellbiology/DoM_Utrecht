@@ -3,8 +3,6 @@ package DOM;
 
 import java.awt.Frame;
 import java.util.ArrayList;
-import java.util.Arrays;
-
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -269,9 +267,7 @@ public class SMLReconstruct {
 		
 		double zmin, zmax;
 		
-		
-		//TODO Sort table by Z to render one dot above another
-		
+			
 	
 		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
 		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);

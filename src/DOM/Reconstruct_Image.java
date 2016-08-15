@@ -109,7 +109,7 @@ public class Reconstruct_Image implements PlugIn{
 		if(dlg.b3D && dlg.bCalculateZValues)
 		{
 				//IJ.showStatus("Calculating Z coordinate...");
-				IJ.run("Calculate Z values (astigmatism)");
+				IJ.run("Calculate Z values");
 				//load updated table to sml object
 				sml = new SMLAnalysis();
 		}

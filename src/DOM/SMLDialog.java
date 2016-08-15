@@ -121,13 +121,13 @@ public class SMLDialog {
 	/** what kind of input data  use for z-calibration */ 
 	int sZcUse;
 	/** degree of polynomial used for astigmatism z fitting*/
-	int fitPolynomialDegree;
+	//int fitPolynomialDegree;
 	/** distance between frames in calibration z stack, in nm*/
 	int zCalDistBetweenPlanes;
 	/** Rsquared threshold */
 	double zCalRsquareThreshold;
 	/** allow user provided Z zero value */
-	boolean zOverride;
+	//boolean zOverride;
 	
 		
 	//particle linking parameters
@@ -154,10 +154,10 @@ public class SMLDialog {
 			
 			GenericDialog zcDial = new GenericDialog("Z Calibration");
 			zcDial.addChoice("Make z-calibration from: ",zcUseOptions, Prefs.get("SiMoLoc.ZC_Use", "Image stack"));
-			zcDial.addChoice("Degree of polynomial fit", zcPolDegreeOptions, Prefs.get("SiMoLoc.ZC_fitPolDegree", "1"));
+			//zcDial.addChoice("Degree of polynomial fit", zcPolDegreeOptions, Prefs.get("SiMoLoc.ZC_fitPolDegree", "1"));
 			zcDial.addNumericField("Spacing between Z planes: ", Prefs.get("SiMoLoc.ZC_distBetweenPlanes", 20), 0, 5, " nm");
 			zcDial.addNumericField("Upper R^2 threshold (0 - no filter): ", Prefs.get("SiMoLoc.ZC_zCalRsquareThreshold", 0), 2, 5, " ");
-			zcDial.addCheckbox("Override automatic zero Z detection", Prefs.get("SiMoLoc.ZC_zOverride", false));
+			//zcDial.addCheckbox("Override automatic zero Z detection", Prefs.get("SiMoLoc.ZC_zOverride", false));
 			zcDial.setResizable(false);
 			zcDial.showDialog();
 			if (zcDial.wasCanceled())
@@ -165,14 +165,14 @@ public class SMLDialog {
 			
 			sZcUse = zcDial.getNextChoiceIndex();
 			Prefs.set("SiMoLoc.ZC_Use", zcUseOptions[sZcUse]);
-			fitPolynomialDegree = zcDial.getNextChoiceIndex() + 1;//you retrieve the index => add 1 for polynomial degree
-			Prefs.set("SiMoLoc.ZC_fitPolDegree", Integer.toString(fitPolynomialDegree));
+			//fitPolynomialDegree = zcDial.getNextChoiceIndex() + 1;//you retrieve the index => add 1 for polynomial degree
+			//Prefs.set("SiMoLoc.ZC_fitPolDegree", Integer.toString(fitPolynomialDegree));
 			zCalDistBetweenPlanes = (int)zcDial.getNextNumber();
 			Prefs.set("SiMoLoc.ZC_distBetweenPlanes", zCalDistBetweenPlanes);
 			zCalRsquareThreshold = zcDial.getNextNumber();
 			Prefs.set("SiMoLoc.ZC_zCalRsquareThreshold", zCalRsquareThreshold);
-			zOverride = zcDial.getNextBoolean();
-			Prefs.set("SiMoLoc.ZC_zOverride", zOverride);
+			//zOverride = zcDial.getNextBoolean();
+			//Prefs.set("SiMoLoc.ZC_zOverride", zOverride);
 			
 			return true;
 		}

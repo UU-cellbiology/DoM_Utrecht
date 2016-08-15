@@ -14,8 +14,8 @@
 	<!-- manifest properties -->
 	<property name="project.name" value="Detection of Molecules" />
 	<property name="vendor.name" value="Utrecht University, Netherlands" />
-	<property name="developer.name" value="Yevhen Katrukha, Bas Cloin, Jalmar Teeuw, Jens den Braber" />
-	<property name="version" value="1.0.1" />
+	<property name="developer.name" value="Yevhen Katrukha, Jalmar Teeuw, Bas Cloin, Jens den Braber, Lukas Kapitein" />
+	<property name="version" value="1.0.2" />
 	
 	<tstamp>
 		<format property="date.today" pattern="yyyy-MM-dd HH:mm:ss" />

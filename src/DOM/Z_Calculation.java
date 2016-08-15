@@ -47,7 +47,7 @@ public class Z_Calculation implements PlugIn
 		IJ.log("Polynomial coeff 1: " + Double.toString(fitCoef[1]));
 		IJ.log("Polynomial coeff 2: " + Double.toString(fitCoef[2]));
 		IJ.log("Polynomial coeff 3: " + Double.toString(fitCoef[3]));
-		
+		IJ.log("Calibration creation date:" + Prefs.get("SiMoLOc.ZC_calDate","not available"));
 		
 		sdx = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X);
 		sdy = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y);
