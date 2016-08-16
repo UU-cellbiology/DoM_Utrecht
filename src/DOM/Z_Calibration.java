@@ -635,6 +635,10 @@ public class Z_Calibration implements PlugIn{
 				dCurrentTrack=trackid[i];
 			}
 		}
+		//case only one track is present
+		
+		if(dCurrentTrack == trackid[0])
+			maxTracklength=dCurrentLength;
 		//check that track has enough point
 		if(maxTracklength<10)
 		{
@@ -790,7 +794,7 @@ public class Z_Calibration implements PlugIn{
 			if(Math.abs(sdDif[i])<dMin)
 			{
 				zOffset = longestTrack[2][i];
-				dMin = sdDif[i];
+				dMin = Math.abs(sdDif[i]);
 			}
 			
 		}

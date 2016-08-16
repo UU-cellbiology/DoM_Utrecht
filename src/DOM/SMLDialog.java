@@ -355,7 +355,7 @@ public class SMLDialog {
 		b3D = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.Render3D", b3D);
 		n3DRenderType = dgReconstruct.getNextChoiceIndex();
-		Prefs.set("SiMoLoc.n3DRenderType", RecFPOptions[n3DRenderType]);
+		Prefs.set("SiMoLoc.n3DRenderType", Rec3DOptions[n3DRenderType]);
 		dDistBetweenZSlices =  dgReconstruct.getNextNumber();
 		Prefs.set("SiMoLoc.distZSlices", dDistBetweenZSlices);
 		bCalculateZValues = dgReconstruct.getNextBoolean();
