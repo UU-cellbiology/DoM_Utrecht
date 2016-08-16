@@ -529,6 +529,17 @@ public class SMLReconstruct {
 				}
 				
 			}
+		ColorProcessor imcolcode = new ColorProcessor(256, 40);
+		for(i=0;i<256;i++)
+			for(j=0;j<40;j++)
+			{
+				c = Color.getHSBColor(i/255f, 1f, 1f);
+				newrgb[0]=c.getRed();
+				newrgb[1]=c.getGreen();
+				newrgb[2]=c.getBlue();
+				imcolcode.putPixel(i, j, newrgb);
+			}
+		new ImagePlus("ColorCode" , imcolcode).show();
 		//imcol.setRGB(pixels_red, pixels_green, pixels_blue);
 		IJ.showProgress(nParticlesCount, nParticlesCount);
 		
