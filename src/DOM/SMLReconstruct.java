@@ -3,6 +3,7 @@ package DOM;
 
 import java.awt.Color;
 import java.awt.Frame;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import ij.IJ;
 import ij.ImagePlus;
@@ -385,6 +386,7 @@ public class SMLReconstruct {
 		table[6]= fp;
 		
 		*/
+		double [] dZcolorScale = getZcumHistogram();
 		
 		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
@@ -401,6 +403,7 @@ public class SMLReconstruct {
 		
 		double zmin, zmax;
 		double zhue;
+		double z_old_hue;
 		//LUT renderLUT;
 		
 		//renderLUT=LutLoader.openLut("spectrum");
@@ -473,28 +476,41 @@ public class SMLReconstruct {
 								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
 								
 								zhue = (z[n]-zmin)/(zmax-zmin);
-								//zInd=(int) Math.round(255*(z[n]-zmin)/(zmax-zmin));
-								//red
-								old_i=ipf[0].getf(i, j);
-								new_i = dNorm*dErrx*dErry;
-								if(new_i>old_i)
+								//recalculate hue for dynamic coloc scale
+								if(settings.bDynamicZscale)
+									zhue = dZcolorScale[(int)Math.round(zhue*255)];
+								
+								
+								if(settings.n3DRenderType==2)
 								{
-									ipf[0].setf(i, j, (float)(new_i));
-									ipf[1].setf(i, j, (float)(zhue));
+									old_i=ipf[0].getf(i, j);
+									new_i = dNorm*dErrx*dErry;
+									if(new_i>old_i)
+									{
+										ipf[0].setf(i, j, (float)(new_i));
+										ipf[1].setf(i, j, (float)(zhue));
+									}
+									
 								}
-								/*
-								//green
-								old_i=ipf[1].getf(i, j);
-								
-								new_i = dNorm*dErrx*dErry*greens[zInd];
-								if(new_i>old_i)
-								ipf[1].setf(i, j, (float)(new_i));
-								//blue
-								
-								old_i=ipf[2].getf(i, j);
-								new_i = dNorm*dErrx*dErry*blues[zInd];
-								if(new_i>old_i)
-								ipf[2].setf(i, j, (float)(new_i));*/
+								else
+								{
+									old_i=ipf[0].getf(i, j);
+									new_i = dNorm*dErrx*dErry;
+									if (old_i>0)
+									{	//brightness is added
+										ipf[0].setf(i, j, (float)(new_i+old_i));
+										z_old_hue=ipf[1].getf(i, j);
+										zhue = (zhue*new_i+z_old_hue*old_i)/(new_i+old_i);
+										ipf[1].setf(i, j, (float)(zhue));
+									}	
+									else
+									{
+										ipf[0].setf(i, j, (float)(new_i));
+										ipf[1].setf(i, j, (float)(zhue));
+										
+									}
+								}
+						
 							}
 						}
 				}		
@@ -529,21 +545,41 @@ public class SMLReconstruct {
 				}
 				
 			}
+		
+		//show colorbar
 		ColorProcessor imcolcode = new ColorProcessor(256, 40);
 		for(i=0;i<256;i++)
-			for(j=0;j<40;j++)
+			for(j=0;j<25;j++)
 			{
-				c = Color.getHSBColor(i/255f, 1f, 1f);
+				zhue = dZcolorScale[i];
+				if(settings.bDynamicZscale)
+					c = Color.getHSBColor((float)zhue, 1f, 1f);
+				else
+					c = Color.getHSBColor(i/255f, 1f, 1f);
+				
+				
 				newrgb[0]=c.getRed();
 				newrgb[1]=c.getGreen();
 				newrgb[2]=c.getBlue();
 				imcolcode.putPixel(i, j, newrgb);
 			}
-		new ImagePlus("ColorCode" , imcolcode).show();
+		newrgb[0]=255;
+		newrgb[1]=255;
+		newrgb[2]=255;
+		for(i=0;i<256;i++)
+			for(j=25;j<40;j++)
+				imcolcode.putPixel(i, j, newrgb);
+		imcolcode.setJustification(ImageProcessor.LEFT_JUSTIFY);
+		imcolcode.drawString(new DecimalFormat("#").format(zmin)+ " nm",0,40);
+		imcolcode.setJustification(ImageProcessor.RIGHT_JUSTIFY);
+		imcolcode.drawString(new DecimalFormat("#").format(zmax)+ " nm",250,40);		
+		new ImagePlus("Z colorbar" , imcolcode).show();
+		
 		//imcol.setRGB(pixels_red, pixels_green, pixels_blue);
 		IJ.showProgress(nParticlesCount, nParticlesCount);
 		
 		imp = new ImagePlus("Z-stack" , imcol);
+		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin during drift correction.
@@ -1023,8 +1059,42 @@ public class SMLReconstruct {
 		returnIP.smooth();
 		return returnIP;		
 	}
+	/** *
+	 * builds cumulative distribution histogram 
+	 * of z coordinate with 256 bins 
+	 */
+	 
+	double [] getZcumHistogram()
+	{
+		double [] cumHist = new double[256];
+		
+		double zmin, zmax;
+		double ztemp;
+		int i;	
 	
-
+		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		
+		//build histogram
+		for (i =0; i<nParticlesCount; i++)
+		{
+			if(z[i]>zmin && z[i]<zmax)
+			{
+				ztemp = (z[i]-zmin)/(zmax-zmin);
+				cumHist[(int)Math.round(ztemp*255)]++;
+			}
+		}
+		
+		//build cumulative hist
+		for(i=1;i<256;i++)
+			cumHist[i]=(cumHist[i]+cumHist[i-1]);
+		//build cumulative normalize
+		for(i=1;i<256;i++)
+			cumHist[i]=cumHist[i]/cumHist[255];
+		
+		return cumHist;
+		
+	}
 	
 	/** Sorts particles data by frame number, ascending. */	
 	/*void sortbyframe()

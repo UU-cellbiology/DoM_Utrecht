@@ -126,8 +126,8 @@ public class SMLDialog {
 	int zCalDistBetweenPlanes;
 	/** Rsquared threshold */
 	double zCalRsquareThreshold;
-	/** allow user provided Z zero value */
-	//boolean zOverride;
+	/** adjust LUT for particle number in Z plane */
+	boolean bDynamicZscale;
 	
 		
 	//particle linking parameters
@@ -263,7 +263,11 @@ public class SMLDialog {
 		String [] RecFPOptions = new String [] {
 				"Only true positives", "All particles"};
 		String [] Rec3DOptions = new String [] {
-				"Z-stack", "Colorcoded"};
+				"Z-stack", "Colorcoded (added colors)", "Colorcoded (max proj)"};
+		String [] sLabelsCheckbox = new String [] {
+				"Calculate z-values based on calibration","Scaled colorcode for depth"};
+		boolean [] sLabelsDefault = new boolean [] {
+				Prefs.get("SiMoLoc.recalZvalues", false), Prefs.get("SiMoLoc.bDynamicZscale", false)};
 		
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
@@ -294,8 +298,9 @@ public class SMLDialog {
 		dgReconstruct.addMessage("~~~~~~~~");
 		dgReconstruct.addCheckbox("3D-reconstruction", Prefs.get("SiMoLoc.Render3D", false));
 		dgReconstruct.addChoice("Render as:", Rec3DOptions, Prefs.get("SiMoLoc.n3DRenderType", "Z-stack"));
-		dgReconstruct.addNumericField("Z-distance between slices:", Prefs.get("SiMoLoc.distZSlices", 100), 0,4," (nm)");
-		dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
+		dgReconstruct.addNumericField("Z-distance between slices (Z-stack):", Prefs.get("SiMoLoc.distZSlices", 100), 0,4," (nm)");
+		dgReconstruct.addCheckboxGroup(1,2,sLabelsCheckbox,sLabelsDefault);
+		//dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
 		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		
 		dgReconstruct.showDialog();
@@ -360,7 +365,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.distZSlices", dDistBetweenZSlices);
 		bCalculateZValues = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
-		
+		bDynamicZscale = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.bDynamicZscale", bDynamicZscale);	
 		
 		
 		return true;

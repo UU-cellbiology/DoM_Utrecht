@@ -146,6 +146,10 @@ public class Reconstruct_Image implements PlugIn{
 			}
 			else
 			{
+				if(dlg.n3DRenderType==0)
+					imagename += " colorcoded Z max projection";
+				else
+					imagename += " colorcoded Z added colors";
 				if(dlg.bFramesInterval)
 				{	smlViewer.draw_colorcodedZ((int)dlg.nFrameMin, (int)dlg.nFrameMax);}
 				else
@@ -201,5 +205,22 @@ public class Reconstruct_Image implements PlugIn{
 				IJ.log("Update Results table with average localizations: on");
 			
 		}
+		if(dlg.b3D)
+		{
+			if(dlg.n3DRenderType==0)
+				IJ.log("Rendering in 3D as Z-stack with distance between slices "+Double.toString(dlg.dDistBetweenZSlices) + " nm");
+			else
+			{
+				if(dlg.n3DRenderType==2)
+					IJ.log("Rendering in 3D as colorcoded Z max projection");
+				else
+					IJ.log("Rendering in 3D as colorcoded Z added colors");
+				if(dlg.bDynamicZscale)
+					IJ.log("Scaled colorcode on");
+				else
+					IJ.log("Scaled colorcode off");
+			}
+		}
+		
 	}
 }
