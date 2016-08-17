@@ -11,6 +11,7 @@ import ij.ImageStack;
 import ij.Prefs;
 import ij.WindowManager;
 import ij.plugin.LutLoader;
+import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
@@ -363,7 +364,7 @@ public class SMLReconstruct {
 		IJ.run(imp, "Properties...", sProp);
 	}
 	
-	/** Renders image in 3D in "non-transparent" mode
+	/** Renders image in 3D color-coded mode
 	 * @param fstart show only particle after this frame
 	 * @param fstop show only particle before this frame
 	 * @param 
@@ -371,43 +372,26 @@ public class SMLReconstruct {
 	*/
 	void draw_colorcodedZ(int fstart, int fstop)
 	{	
-		//table for sorting of data by z-value
-		//double table [][];
+
 		Color c;
 
-		
-		/*table = new double[6][nParticlesCount];
-		table[0]= x;
-		table[1]= y;
-		table[2]= z;
-		table[3]= f;
-		table[4]= loc_errx;
-		table[5]= loc_erry;
-		table[6]= fp;
-		
-		*/
-		double [] dZcolorScale = getZcumHistogram();
+		int [] dZcolorScale = getZcumHistogram();
 		
 		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
 		int xmag, ymag, xsq, ysq;
 		int i,j;
-		//double dTranspCoeff=1;
 		
 		double dCutoff = 1000.0; //default cut-off is 1000 nm
-		double dNorm;
-		
-
-		
-		//int nSlices;		//total number of slices
-		//int sliceNumber;	//slice number of particle
-		
+		double dNorm;		
 		double zmin, zmax;
 		double zhue;
-		double z_old_hue;
-		//LUT renderLUT;
-		
-		//renderLUT=LutLoader.openLut("spectrum");
-		
+
+		int zOldInd;
+		int zInd;
+	
+		float [][] zLUT;
+	
+		zLUT=getHSBLutTable();
 	
 		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
 		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
@@ -435,13 +419,7 @@ public class SMLReconstruct {
 				xmag=(int) Math.round(x[n]*settings.dMagnification);
 				ymag=(int) Math.round(y[n]*settings.dMagnification);
 				
-				//calculate sliceNumber for this particle
-				//sliceNumber = (int) Math.floor((z[n]-zmin)/zstep);
-				
-				/*DEBUGGING*/
-				//if(sliceNumber>=nSlices)
-				//	sliceNumber = nSlices-1;
-				/*DEBUGGING*/
+
 				
 				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
 				{
@@ -452,9 +430,6 @@ public class SMLReconstruct {
 					}
 					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
 					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
-
-					//xsq = (int) Math.ceil(2*loc_errx[n]*settings.dMagnification);
-					//ysq = (int) Math.ceil(2*loc_erry[n]*settings.dMagnification);
 
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
@@ -476,11 +451,10 @@ public class SMLReconstruct {
 								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
 								
 								zhue = (z[n]-zmin)/(zmax-zmin);
-								//recalculate hue for dynamic coloc scale
-								if(settings.bDynamicZscale)
-									zhue = dZcolorScale[(int)Math.round(zhue*255)];
+							
 								
-								
+								zInd = dZcolorScale[(int)Math.round(zhue*255)];
+	
 								if(settings.n3DRenderType==2)
 								{
 									old_i=ipf[0].getf(i, j);
@@ -488,27 +462,21 @@ public class SMLReconstruct {
 									if(new_i>old_i)
 									{
 										ipf[0].setf(i, j, (float)(new_i));
-										ipf[1].setf(i, j, (float)(zhue));
+										ipf[1].setf(i, j, (float)(zInd));
 									}
 									
 								}
 								else
 								{
+							
 									old_i=ipf[0].getf(i, j);
 									new_i = dNorm*dErrx*dErry;
-									if (old_i>0)
-									{	//brightness is added
-										ipf[0].setf(i, j, (float)(new_i+old_i));
-										z_old_hue=ipf[1].getf(i, j);
-										zhue = (zhue*new_i+z_old_hue*old_i)/(new_i+old_i);
-										ipf[1].setf(i, j, (float)(zhue));
-									}	
-									else
-									{
-										ipf[0].setf(i, j, (float)(new_i));
-										ipf[1].setf(i, j, (float)(zhue));
-										
-									}
+									ipf[0].setf(i, j, (float)(new_i+old_i));
+									//calculate new color index
+									//by weighted average
+									zOldInd=(int)Math.round(ipf[1].getf(i, j));
+									zhue = (zInd*new_i+zOldInd*old_i)/(new_i+old_i);
+									ipf[1].setf(i, j, (int)Math.round(zhue));
 								}
 						
 							}
@@ -516,28 +484,19 @@ public class SMLReconstruct {
 				}		
 			}
 		}
-		/*
-		zstack = new ImageStack(new_width, new_height);
-		
-		for(int k=0; k<3; k++)
-		{
-			//zstack.addSlice(null, ipf[k].convertToShort(true));
-			zstack.addSlice(null, ipf[k]);
-		}
-		IJ.showProgress(nParticlesCount, nParticlesCount);
-		*/
-		//y*width+x
 		
 	
 		int [] newrgb = new int[3];
-		
+		//generate final RGB image
 		double intMax = ipf[0].getMax();
 		for(i=0;i<new_width;i++)
 			for(j=0;j<new_height;j++)
 			{
 				if(ipf[0].getf(i, j)>0)
 				{
-					c = Color.getHSBColor(ipf[1].getf(i, j), 1f, (float)(ipf[0].getf(i, j)/intMax));
+					
+					zInd = (int)Math.round(ipf[1].getf(i, j));
+					c = Color.getHSBColor(zLUT[zInd][0], zLUT[zInd][1], (float)(ipf[0].getf(i, j)/intMax));
 					newrgb[0]=c.getRed();
 					newrgb[1]=c.getGreen();
 					newrgb[2]=c.getBlue();
@@ -551,13 +510,8 @@ public class SMLReconstruct {
 		for(i=0;i<256;i++)
 			for(j=0;j<25;j++)
 			{
-				zhue = dZcolorScale[i];
-				if(settings.bDynamicZscale)
-					c = Color.getHSBColor((float)zhue, 1f, 1f);
-				else
-					c = Color.getHSBColor(i/255f, 1f, 1f);
-				
-				
+				zInd = dZcolorScale[i];
+				c = Color.getHSBColor(zLUT[zInd][0], zLUT[zInd][1], 1f);								
 				newrgb[0]=c.getRed();
 				newrgb[1]=c.getGreen();
 				newrgb[2]=c.getBlue();
@@ -575,11 +529,12 @@ public class SMLReconstruct {
 		imcolcode.drawString(new DecimalFormat("#").format(zmax)+ " nm",250,40);		
 		new ImagePlus("Z colorbar" , imcolcode).show();
 		
-		//imcol.setRGB(pixels_red, pixels_green, pixels_blue);
+	
 		IJ.showProgress(nParticlesCount, nParticlesCount);
 		
-		imp = new ImagePlus("Z-stack" , imcol);
+		imp = new ImagePlus("Colorcoded" , imcol);
 		IJ.run(imp, "Set Scale...", "distance=1 known="+settings.dRecPixelSize+" pixel=1 unit=nm");
+		IJ.run(imp, "Enhance Contrast", "saturated=0.35");
 	}
 	
 	/** Reconstruction drawing function used by the "Reconstruct Image" plugin during drift correction.
@@ -1063,11 +1018,10 @@ public class SMLReconstruct {
 	 * builds cumulative distribution histogram 
 	 * of z coordinate with 256 bins 
 	 */
-	 
-	double [] getZcumHistogram()
+	int [] getZcumHistogram()
 	{
 		double [] cumHist = new double[256];
-		
+		int [] cumHistFinal = new int[256];
 		double zmin, zmax;
 		double ztemp;
 		int i;	
@@ -1075,58 +1029,92 @@ public class SMLReconstruct {
 		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
 		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
 		
-		//build histogram
-		for (i =0; i<nParticlesCount; i++)
+		if(settings.bDynamicZscale)
 		{
-			if(z[i]>zmin && z[i]<zmax)
+			//build histogram
+			for (i =0; i<nParticlesCount; i++)
 			{
-				ztemp = (z[i]-zmin)/(zmax-zmin);
-				cumHist[(int)Math.round(ztemp*255)]++;
+				if(z[i]>zmin && z[i]<zmax)
+				{
+					ztemp = (z[i]-zmin)/(zmax-zmin);
+					cumHist[(int)Math.round(ztemp*255)]++;
+				}
 			}
+			
+			//build cumulative hist
+			for(i=1;i<256;i++)
+				cumHist[i]=(cumHist[i]+cumHist[i-1]);
+			//build cumulative normalize
+			for(i=1;i<256;i++)
+				cumHistFinal[i]=(int)Math.round(255*cumHist[i]/cumHist[255]);
 		}
-		
-		//build cumulative hist
-		for(i=1;i<256;i++)
-			cumHist[i]=(cumHist[i]+cumHist[i-1]);
-		//build cumulative normalize
-		for(i=1;i<256;i++)
-			cumHist[i]=cumHist[i]/cumHist[255];
-		
-		return cumHist;
+		//simple linear stuff
+		else
+		{
+			for(i=0;i<256;i++)
+				cumHistFinal[i]=i;
+			
+		}
+		return cumHistFinal;
 		
 	}
 	
-	/** Sorts particles data by frame number, ascending. */	
-	/*void sortbyframe()
+	/** function gets LUT specified by sZLUTName in settings
+	 * and returns 256x3 table map in HSB format */
+	float [][]  getHSBLutTable()
+	//void  getHSBLutTable()
 	{
-		int i, nSize;
-		nSize = f.length;
-	
-		//put all data together in one array
-		double [][] data = new double[nSize][6];
-		for (i=0; i<nSize; i++)
+		int i,j;
+		//ColorProcessor ipLUT;
+		float[] hsbvals = new float[4];
+		//int [][] rgbtable = new int[256][4]; 
+		int [] onepix; 
+		float [][] HSBLutTable = new float[256][3];
+		ByteProcessor ish = new ByteProcessor(256,10);
+		for ( i=0; i<256; i++)
+			for (j=0; j<10; j++)
+				ish.putPixel(i, j, i);
+		ImagePlus ccc = new ImagePlus("test",ish);
+		ccc.show();
+		IJ.run(settings.sZLUTName);
+		IJ.run("RGB Color");
+		//ipLUT= (ColorProcessor) ccc.getProcessor();
+		ccc.setSlice(1);
+		for(i=0;i<256;i++)
 		{
-			data[i][0] = f[i];
-			data[i][1] = x[i];
-			data[i][2] = y[i];
-			data[i][3] = loc_errx[i];
-			data[i][4] = loc_erry[i];
-			data[i][5] = fp[i];
+			
+			onepix= ccc.getPixel(i, 2);
+			//rgbtable[i]=ccc.getPixel(i, 1);
+			java.awt.Color.RGBtoHSB(onepix[0], onepix[1], onepix[2], hsbvals);
+			HSBLutTable[i][0]=hsbvals[0];
+			HSBLutTable[i][1]=hsbvals[1];
+			HSBLutTable[i][2]=hsbvals[2];
 		}
-		//sort
-		Arrays.sort(data, new tableComparator(0, true));
-		//put data back
-		for (i=0; i<nSize; i++)
-		{
-			  f[i] = data[i][0] ;
-			  x[i] = data[i][1];
-		  	  y[i] = data[i][2];
-		  	  loc_errx[i] = data[i][3];
-		  	  loc_erry[i] = data[i][4];
-		  	  fp[i] = data[i][5];
-		}		
-		bFrameSorted = true;
-	}*/
+		/*
+		int [] newrgb= new int[3];
+		Color c;
+		ColorProcessor imcolcode = new ColorProcessor(256, 40);
+		for(i=0;i<256;i++)
+			for(j=0;j<25;j++)
+			{
+				
+					c = Color.getHSBColor(HSBLutTable[i][0], HSBLutTable[i][1], HSBLutTable[i][2]);
+				
+				
+				newrgb[0]=c.getRed();
+				newrgb[1]=c.getGreen();
+				newrgb[2]=c.getBlue();
+				imcolcode.putPixel(i, j, newrgb);
+			}
+		new ImagePlus("testafter",imcolcode).show();
+		
+		*/
+		ccc.changes=false;
+		ccc.close();
+		return HSBLutTable;
+		//return;
+	}
+	
 	
 	/** Cleans the reconstruction viewer image. */
 	void clear()
@@ -1137,15 +1125,6 @@ public class SMLReconstruct {
 				ip.set(i, j, 0);
 	
 	}
-	/** Smoothes correlation images with simple gaussian filter */
-	/*void convolvecorrelation()
-	{
-		GaussianBlur lowpassGauss = new GaussianBlur();
-		for (int i=1; i<nIntervalsCount;i++)
-		lowpassGauss.blurGaussian(crosscorrstack.getProcessor(i), 1.0, 1.0, 0.03);
-		
-		
-	}*/
 	
 	/** Gets x and y coordinates of maximum intensity pixel on image. */	
 	int [] getmaxpositions(ImageProcessor ipp)
@@ -1573,39 +1552,5 @@ public class SMLReconstruct {
 		
 	}
 
-
-	/**function calculating z-values based on calibration curve*/
-	
-	void calcZValues(SMLAnalysis sml_)
-	{
-		double[] SDx = sml_.ptable.getColumnAsDoubles(15);
-		double[] SDy = sml_.ptable.getColumnAsDoubles(16);
-		
-		//double SDx;
-		//double SDy;
-		
-		double z;
-		
-		//calibration values, according to calibration curve: calValues[0]+calValues[1]*(SDx-SDy)+calValues[2]*(SDx-SDy)^2
-		double[] calValues = {389.4,-101.3,-4.075};
-		/*
-		for(int i=0; i<x.length; i++){
-			SDx = sml_.ptable.getValueAsDouble(15, i);
-			SDy = sml_.ptable.getValueAsDouble(16, i);
-			z = calValues[0]+calValues[1]*(SDx-SDy)+calValues[2]*(SDx-SDy)*(SDx-SDy);
-			sml_.ptable.setValue(5,i, z);
-		}
-		*/
-		
-		for(int i=0; i<SDx.length; i++){
-			z = calValues[0]+calValues[1]*(SDx[i]-SDy[i])+calValues[2]*(SDx[i]-SDy[i])*(SDx[i]-SDy[i]);
-			if(z<0)
-				z=0;
-			sml_.ptable.setValue(5,i, z);
-		}
-		
-		sml_.ptable.updateResults();
-		sml_.ptable.show("Results");
-	}
 
 }

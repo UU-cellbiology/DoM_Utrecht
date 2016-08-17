@@ -8,6 +8,7 @@ package DOM;
 import java.util.Arrays;
 
 import ij.IJ;
+import ij.Prefs;
 import ij.measure.ResultsTable;
 import ij.plugin.PlugIn;
 
@@ -146,7 +147,7 @@ public class Reconstruct_Image implements PlugIn{
 			}
 			else
 			{
-				if(dlg.n3DRenderType==0)
+				if(dlg.n3DRenderType==2)
 					imagename += " colorcoded Z max projection";
 				else
 					imagename += " colorcoded Z added colors";
@@ -215,6 +216,7 @@ public class Reconstruct_Image implements PlugIn{
 					IJ.log("Rendering in 3D as colorcoded Z max projection");
 				else
 					IJ.log("Rendering in 3D as colorcoded Z added colors");
+				IJ.log("Used LUT: "+Prefs.get("SiMoLoc.zLutChoice","Fire"));
 				if(dlg.bDynamicZscale)
 					IJ.log("Scaled colorcode on");
 				else

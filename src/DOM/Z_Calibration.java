@@ -281,7 +281,7 @@ public class Z_Calibration implements PlugIn{
 		fitRange[1] = (int)longestTrack[2][maxTracklength-1]);
 		*/
 		PlotSDdiff = new Plot("Difference in PSF width and height (unfitted)","Z position (nm)","width-height (nm)");
-		PlotSDdiff.addPoints(longestTrack[5], sdDif, Plot.CONNECTED_CIRCLES);
+		PlotSDdiff.addPoints(longestTrack[5], sdDif, Plot.CIRCLE);
 		//PlotSDxy.addPoints(new double[]{1,2,3,4,5,6,7,8,9,10}, new double[]{1,2,3,4,5,6,7,8,9,10}, 2);
 		PlotSDdiff.setLegend("not fitted", Plot.AUTO_POSITION);
 		final ImagePlus impDiffSD = new ImagePlus();//plot.getImagePlus();
@@ -309,7 +309,7 @@ public class Z_Calibration implements PlugIn{
 		
 		//final NonBlockingGenericDialog 
 		//nb = new NonBlockingGenericDialog("Fit Z-calibration");
-		nb.setOKLabel("Save calibration");
+		nb.setOKLabel("Store calibration");
 		//nb.setLayout(new GridLayout(2,2));
 		//nb.addNumericField("test value", 10, 4);  //.addCheckbox("clabel", true);
 		//nb.addImage(impDiffSD);

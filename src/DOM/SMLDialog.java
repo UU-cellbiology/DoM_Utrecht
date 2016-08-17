@@ -1,10 +1,16 @@
 package DOM;
 
 
+import java.awt.MenuItem;
+import java.io.File;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 
+import ij.IJ;
+import ij.Menus;
 import ij.Prefs;
 import ij.gui.GenericDialog;
+import ij.util.StringSorter;
 import ij.util.Tools;
 
 public class SMLDialog {
@@ -128,6 +134,8 @@ public class SMLDialog {
 	double zCalRsquareThreshold;
 	/** adjust LUT for particle number in Z plane */
 	boolean bDynamicZscale;
+	/** name of LUT for colorcoded reconstruction of Z*/
+	String sZLUTName;
 	
 		
 	//particle linking parameters
@@ -182,6 +190,7 @@ public class SMLDialog {
 	 * @return
 	 */
 	public boolean findParticles() {
+		
 		String [] DetectionType = new String [] {
 				"Detect molecules (no fitting)","Detect molecules and fit", "Fit detected molecules"};
 		GenericDialog fpDial = new GenericDialog("Find Particles");
@@ -255,6 +264,7 @@ public class SMLDialog {
 	
 	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, double xmax, double ymax) 		
 	{
+		int LutChoice;
 		GenericDialog dgReconstruct = new GenericDialog("Reconstruct Dataset");
 		//String [] RecIntOptions = new String [] {
 				//"Normalized probability", "Integrated spot intensity","Amplitude of Gaussian fitting"};
@@ -268,6 +278,7 @@ public class SMLDialog {
 				"Calculate z-values based on calibration","Scaled colorcode for depth"};
 		boolean [] sLabelsDefault = new boolean [] {
 				Prefs.get("SiMoLoc.recalZvalues", false), Prefs.get("SiMoLoc.bDynamicZscale", false)};
+		String [] luts = IJ.getLuts();
 		
 		dgReconstruct.addChoice("For reconstruction use:", RecFPOptions, Prefs.get("SiMoLoc.Rec_FP", "Only true positives"));
 		dgReconstruct.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
@@ -300,6 +311,8 @@ public class SMLDialog {
 		dgReconstruct.addChoice("Render as:", Rec3DOptions, Prefs.get("SiMoLoc.n3DRenderType", "Z-stack"));
 		dgReconstruct.addNumericField("Z-distance between slices (Z-stack):", Prefs.get("SiMoLoc.distZSlices", 100), 0,4," (nm)");
 		dgReconstruct.addCheckboxGroup(1,2,sLabelsCheckbox,sLabelsDefault);
+		dgReconstruct.addChoice("LUT for colorcode render:",luts,Prefs.get("SiMoLoc.zLutChoice","Fire"));
+		
 		//dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
 		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		
@@ -367,7 +380,9 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.recalZvalues", bCalculateZValues);
 		bDynamicZscale = dgReconstruct.getNextBoolean();
 		Prefs.set("SiMoLoc.bDynamicZscale", bDynamicZscale);	
-		
+		LutChoice = dgReconstruct.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.zLutChoice", luts[LutChoice]);
+		sZLUTName = luts[LutChoice];
 		
 		return true;
 	}
@@ -530,5 +545,45 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bShowParticlesLink", bShowParticlesLink);
 		return true;		
 	}
+	
+	/*
+	String [] getLUTsNames()
+	{
+		ArrayList<String> lutArray= new ArrayList<String>();
+		String [] luts, lutsdef;
+		int i;
+		
+		//Menus.getCommands();
+		lutsdef=IJ.getLuts();
+		String path = IJ.getDirectory("luts");
+		if (path==null) 
+			return lutsdef;
+		File f = new File(path);
+		String[] list = null;
+		if (f.exists() && f.isDirectory())
+			list = f.list();
+		if (list==null) 
+			return lutsdef;
+		if (IJ.isLinux()) StringSorter.sort(list);
+		for (i=0; i<list.length; i++) 
+		{
+ 			String name = list[i];
+ 			if (name.endsWith(".lut")) {
+ 				name = name.substring(0,name.length()-4);
+ 				if (name.contains("_") && !name.contains(" "))
+ 					name = name.replace("_", " ");
+ 				lutArray.add(name);
+			}
+		}
+		luts = new String[lutArray.size()+lutsdef.length];
+		for (i=0;i<lutsdef.length;i++)
+			luts[i]=lutsdef[i];
+		for (i=0;i<lutArray.size();i++)
+		{
+			luts[i+lutsdef.length]=lutArray.get(i);
+		}
+		return luts;
+	}
+	*/
 
 }
