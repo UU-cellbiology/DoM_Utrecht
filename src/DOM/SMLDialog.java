@@ -136,6 +136,7 @@ public class SMLDialog {
 	boolean bDynamicZscale;
 	/** name of LUT for colorcoded reconstruction of Z*/
 	String sZLUTName;
+	boolean bZCalWobbling;
 	
 		
 	//particle linking parameters
@@ -157,7 +158,7 @@ public class SMLDialog {
 	 * @return
 	 */
 		public boolean zCalibration() {
-			String [] zcPolDegreeOptions = new String [] {"1","2","3"};
+		
 			String [] zcUseOptions = new String [] {"Image stack","Particle table"};//,"Polynomial coefficients"};
 			
 			GenericDialog zcDial = new GenericDialog("Z Calibration");
@@ -165,7 +166,7 @@ public class SMLDialog {
 			//zcDial.addChoice("Degree of polynomial fit", zcPolDegreeOptions, Prefs.get("SiMoLoc.ZC_fitPolDegree", "1"));
 			zcDial.addNumericField("Spacing between Z planes: ", Prefs.get("SiMoLoc.ZC_distBetweenPlanes", 20), 0, 5, " nm");
 			zcDial.addNumericField("Upper R^2 threshold (0 - no filter): ", Prefs.get("SiMoLoc.ZC_zCalRsquareThreshold", 0), 2, 5, " ");
-			//zcDial.addCheckbox("Override automatic zero Z detection", Prefs.get("SiMoLoc.ZC_zOverride", false));
+			zcDial.addCheckbox("Account for \"wobbling\" in X and Y", Prefs.get("SiMoLoc.bZCalWobbling", true));
 			zcDial.setResizable(false);
 			zcDial.showDialog();
 			if (zcDial.wasCanceled())
@@ -173,14 +174,12 @@ public class SMLDialog {
 			
 			sZcUse = zcDial.getNextChoiceIndex();
 			Prefs.set("SiMoLoc.ZC_Use", zcUseOptions[sZcUse]);
-			//fitPolynomialDegree = zcDial.getNextChoiceIndex() + 1;//you retrieve the index => add 1 for polynomial degree
-			//Prefs.set("SiMoLoc.ZC_fitPolDegree", Integer.toString(fitPolynomialDegree));
 			zCalDistBetweenPlanes = (int)zcDial.getNextNumber();
 			Prefs.set("SiMoLoc.ZC_distBetweenPlanes", zCalDistBetweenPlanes);
 			zCalRsquareThreshold = zcDial.getNextNumber();
 			Prefs.set("SiMoLoc.ZC_zCalRsquareThreshold", zCalRsquareThreshold);
-			//zOverride = zcDial.getNextBoolean();
-			//Prefs.set("SiMoLoc.ZC_zOverride", zOverride);
+			bZCalWobbling = zcDial.getNextBoolean();
+			Prefs.set("SiMoLoc.bZCalWobbling", bZCalWobbling);
 			
 			return true;
 		}

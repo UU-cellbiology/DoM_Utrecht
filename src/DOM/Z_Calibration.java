@@ -17,6 +17,9 @@ import java.awt.event.AWTEventListener;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -28,6 +31,7 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.Prefs;
 import ij.gui.*;
+import ij.io.SaveDialog;
 //import ij.gui.ImageCanvas;
 //import ij.gui.NonBlockingGenericDialog;
 //import ij.gui.Plot;
@@ -41,11 +45,15 @@ public class Z_Calibration implements PlugIn{
 	SMLAnalysis sml = new SMLAnalysis();
 	int  maxTracklength;
 	
-	double []  f, sdx, sdx_err, sdy,sdy_err, trackid, particleid, tl,  sortedTracklength, sdDif, rsquared;
+	double []  f, sdx, sdx_err, sdy,sdy_err, trackid, particleid, tl,  sortedTracklength, sdDif, rsquared,x,y;
 	/** array storing longest track used for calibration */
 	double[][] longestTrack;
-	/** coefficients of polynomial fittes to z curve */
+	/** coefficients of polynomial fit to Z curve */
 	double[] fitCoefZ;
+	/** coefficients of polynomial fit to X curve */
+	double[] fitCoefX;
+	/** coefficients of polynomial fit to Y curve */
+	double[] fitCoefY;
 	/** fit range of Z curve in nm*/
 	int[] fitRange;
 	/** zero Z offset value */
@@ -54,6 +62,8 @@ public class Z_Calibration implements PlugIn{
 	int [] indexFitRange;
 	/** Main fitting dialog */
 	final NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Fit Z-calibration");  
+	/** fitting button */
+	Button b;
 	
 	/** original range min */
 	int nRefMinZ;
@@ -71,18 +81,45 @@ public class Z_Calibration implements PlugIn{
 	
 	Plot PlotSDdiff;
 	Plot PlotSDxy;
+	Plot PlotX;
+	Plot PlotY;
 	ImagePlus plotIp;
+
 	
-	/** main curve fitter */
+	/** main curve fitter for Z */
 	CurveFitter cf;
+	/** main curve fitter for X and Y */
+	CurveFitter cfXY;
 	
 	public static ImageCanvas icDiff;
 	public static ImageCanvas icSDxy;
+	public static ImageCanvas icX;
+	public static ImageCanvas icY;
 	
 	public void run(String arg) 
 	{
 		IJ.register(Z_Calibration.class);
-	
+		
+		//save calibration
+		if(arg.equals("save"))
+		{
+			saveZcalibration();
+			return;
+		}
+		//save calibration
+		if(arg.equals("load"))
+		{
+			loadZcalibration();
+			return;
+		}
+		
+		//output calibration to IJ.Log
+		if(arg.equals("show"))
+		{
+			logZcalibration();
+			return;
+		}
+		
 		if (!dlg.zCalibration()) return;
 		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
 		
@@ -114,133 +151,7 @@ public class Z_Calibration implements PlugIn{
 	/** making z-calibration from Particles table,
 	 * link particles if data is not provided
 	 * 
-	 * OLD VERSION, DEPRECATED
 	 * */
-	
-	/*
-	
-	public void zCal_particleTable()
-	{
-		
-		int i;
-		Plot p;
-		ImagePlus ip;
-		
-		//check that the table is present
-		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
-		{
-			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
-			return;
-		}
-		//check that the particles are linked
-		if ( !sml.ptable.columnExists(DOMConstants.Col_TrackID))
-		{
-			//IJ.error("Particle table is probably not linked.");
-			IJ.log("WARNING! Particles are not linked in the table, performing automatic linking.");
-			IJ.run("Link Particles to Tracks", "for=[All particles] max=4 measure=[Initial position] maximum=10");;
-			sml = new SMLAnalysis();
-			//return;
-		}
-		
-		IJ.log("Polynomial degree: "+Integer.toString(dlg.fitPolynomialDegree));
-		IJ.log("Distance between Z planes: "+Double.toString(dlg.zCalDistBetweenPlanes)+" nm");
-		IJ.log("R^2 threshold: "+ Double.toString(dlg.zCalRsquareThreshold));
-		
-		//first, sort data by particle and trackN
-		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_ParticleID, true);
-		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_TrackID, true);
-		
-		get_values_from_table();		
-		
-		
-		if(!calculateLongestTrack())
-			return;
-		
-		
-		//Estimate position of zero
-		//let's take middle third
-		int nBeg = (int)Math.round(maxTracklength/3.0);
-		int nEnd = (int)Math.round(2.0*maxTracklength/3.0);
-		double zOffset = 0;
-		double dMin = Double.MAX_VALUE;
-		for (i=nBeg;i<=nEnd;i++)
-		{
-			
-			if(Math.abs(sdDif[i])<dMin)
-			{
-				zOffset = longestTrack[2][i];
-				dMin = sdDif[i];
-			}
-			
-		}
-		//ok, let's see if user-provided estimation of Z required
-
-		if(dlg.zOverride)
-		{
-			p = new Plot("Width and height of PSF","Z position (nm)","size of PSF (nm)");
-			//plot sdx
-			p.setColor(Color.red);
-			//p.addPoints(longestTrack[2], longestTrack[0], Plot.CONNECTED_CIRCLES);	
-			p.addPoints(longestTrack[2], longestTrack[0],longestTrack[3], Plot.CIRCLE);	
-			//plot sdy
-			p.setColor(Color.blue);
-			p.addPoints(longestTrack[2], longestTrack[1],longestTrack[4], Plot.CIRCLE);
-			p.setColor(Color.black);
-	
-			p.setLegend("width	height", Plot.AUTO_POSITION);
-			ip = p.getImagePlus();
-			ip.show();
-	
-
-			zOffset = dlgSetZero(zOffset);
-			ip.close();
-		
-		}
-		IJ.log("Z offset shift: "+Double.toString(zOffset) + " nm");
-		
-		//subtract z-offset from all z-values
-		for(i = 0; i < maxTracklength; i++)
-		{
-			longestTrack[2][i] = longestTrack[2][i] - zOffset;  
-		}
-
-		IJ.log("Fitting results: ");
-		//let's show plot and define range of fitting
-		p = new Plot("Difference in PSF width and height","Z position (nm)","width-height (nm)");
-		p.addPoints(longestTrack[2], sdDif, Plot.CONNECTED_CIRCLES);
-		ip = p.getImagePlus();
-		ip.show();
-		
-
-		//fitPars = fitRangeMin, fitRangeMax, polDegree
-		fitRange = dlgFitRange((int)longestTrack[2][0],(int)longestTrack[2][maxTracklength-1]);
-		ip.close();
-		if(fitRange[0] == 0 & fitRange[1] == 0)
-			return;
-		
-		indexFitRange = new int [2];
-		indexFitRange[0]=findIndex(longestTrack[2],fitRange[0]);
-		indexFitRange[1]=findIndex(longestTrack[2],fitRange[1]);
-
-		
-		
-		CurveFitter cf = polyFit(Arrays.copyOfRange(sdDif,indexFitRange[0],indexFitRange[1]),Arrays.copyOfRange(longestTrack[2],indexFitRange[0],indexFitRange[1]),dlg.fitPolynomialDegree);
-		//get plot window (for closing later)
-		ImagePlus impFitPlot = IJ.getImage();
-		
-		fitCoefZ = cf.getParams();
-
-
-		if(dlgStoreCal())
-		{
-			zCal_storeCalibration();
-		}
-		
-		impFitPlot.close();
-		
-	}
-	
-*/
 	
 	public void zCal_particleTableInteractive()
 	{
@@ -265,6 +176,10 @@ public class Z_Calibration implements PlugIn{
 		
 		IJ.log("Distance between Z planes: "+Double.toString(dlg.zCalDistBetweenPlanes)+" nm");
 		IJ.log("R^2 threshold: "+ Double.toString(dlg.zCalRsquareThreshold));
+		if(dlg.bZCalWobbling)	
+			IJ.log("Account for \"wobbling\" in X and Y: on");
+		else
+			IJ.log("Account for \"wobbling\" in X and Y: off");
 		
 		//first, sort data by particle and trackN
 		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_ParticleID, true);
@@ -276,13 +191,10 @@ public class Z_Calibration implements PlugIn{
 			return;
 		estimateZzeroPosition();
 		indexFitRange = new int [2];
-		/*
-		fitRange[0] = (int)longestTrack[2][0];
-		fitRange[1] = (int)longestTrack[2][maxTracklength-1]);
-		*/
+
+
 		PlotSDdiff = new Plot("Difference in PSF width and height (unfitted)","Z position (nm)","width-height (nm)");
 		PlotSDdiff.addPoints(longestTrack[5], sdDif, Plot.CIRCLE);
-		//PlotSDxy.addPoints(new double[]{1,2,3,4,5,6,7,8,9,10}, new double[]{1,2,3,4,5,6,7,8,9,10}, 2);
 		PlotSDdiff.setLegend("not fitted", Plot.AUTO_POSITION);
 		final ImagePlus impDiffSD = new ImagePlus();//plot.getImagePlus();
 		PlotSDdiff.setImagePlus(impDiffSD);
@@ -291,44 +203,59 @@ public class Z_Calibration implements PlugIn{
 		PlotSDxy = new Plot("Width and height of PSF","Z position (nm)","size of PSF (nm)");
 		//plot sdx
 		PlotSDxy.setColor(Color.red);
-		//p.addPoints(longestTrack[2], longestTrack[0], Plot.CONNECTED_CIRCLES);	
 		PlotSDxy.addPoints(longestTrack[2], longestTrack[0],longestTrack[3], Plot.CIRCLE);	
 		//plot sdy
 		PlotSDxy.setColor(Color.blue);
 		PlotSDxy.addPoints(longestTrack[2], longestTrack[1],longestTrack[4], Plot.CIRCLE);
 		PlotSDxy.setColor(Color.black);
-
 		PlotSDxy.setLegend("width	height", Plot.AUTO_POSITION);
-		
-		//PlotSDdiff.addPoints(longestTrack[2], sdDif, Plot.CONNECTED_CIRCLES);
-		//PlotSDxy.addPoints(new double[]{1,2,3,4,5,6,7,8,9,10}, new double[]{1,2,3,4,5,6,7,8,9,10}, 2);
-		
 		final ImagePlus impSDxy = new ImagePlus();//plot.getImagePlus();
 		PlotSDxy.setImagePlus(impSDxy);
 		PlotSDxy.draw();
 		
-		//final NonBlockingGenericDialog 
-		//nb = new NonBlockingGenericDialog("Fit Z-calibration");
+		PlotX = new Plot("X wobbling","Z position (nm)","X shift (nm)");
+		PlotX.addPoints(longestTrack[5], longestTrack[6], Plot.CIRCLE);
+		PlotX.setLegend("not fitted", Plot.AUTO_POSITION);
+		final ImagePlus impX = new ImagePlus();
+		PlotX.setImagePlus(impX);
+		PlotX.draw();
+
+		PlotY = new Plot("Y wobbling","Z position (nm)","Y shift (nm)");
+		PlotY.addPoints(longestTrack[5], longestTrack[7], Plot.CIRCLE);
+		PlotY.setLegend("not fitted", Plot.AUTO_POSITION);
+		final ImagePlus impY = new ImagePlus();
+		PlotY.setImagePlus(impY);
+		PlotY.draw();
+		
 		nb.setOKLabel("Store calibration");
 		//nb.setLayout(new GridLayout(2,2));
 		//nb.addNumericField("test value", 10, 4);  //.addCheckbox("clabel", true);
 		//nb.addImage(impDiffSD);
 		icDiff = new ImageCanvas(impDiffSD);
 		icSDxy = new ImageCanvas(impSDxy);
+		icX = new ImageCanvas(impX);
+		icY = new ImageCanvas(impY);
+		
 		final Panel jp = new Panel();
-		//final Panel jpParams = new Panel();
 		
-		jp.setLayout(new GridLayout(2,1));
-		//jp.add(icSDxy,0,0);
-		//jp.add(icDiff,1,0);
+		if(dlg.bZCalWobbling)
+		{	
+			jp.setLayout(new GridLayout(2,2));
+			jp.add(icY,0,0);
+			jp.add(icSDxy,1,0);
+			
+			jp.add(icDiff,1,1);
+			jp.add(icX,0,1);
+		}
+		else
+		{
+			jp.setLayout(new GridLayout(2,1));		
+			jp.add(icDiff,0,0);
+			jp.add(icSDxy,1,0);
+		}
 	
-		jp.add(icDiff,0,0);
-		jp.add(icSDxy,1,0);
-	
-		//nb.add(jp);
+		b = new Button("Perform Fit");
 		
-		
-		Button b = new Button("Perform Fit");
 		b.addActionListener(new ActionListener()
 		{
 
@@ -336,15 +263,17 @@ public class Z_Calibration implements PlugIn{
 			public void actionPerformed(ActionEvent arg0) 
 			{
 				
-				double [] dRangeZ;
-				double [] fittedZ;
+				double [] dRangeZ, dRangeX, dRangeY;
+				double [] fittedZ, fittedX, fittedY;
 				double [] dRangeDiff;
-				double dVal;
+
 				//Random rand = new Random();
 				//double[] y = new double[10];
-				int nTemp,k,m;
+				int nTemp;
 				
 				bFitDone = true;
+				b.setLabel("Fitting...");
+				b.setEnabled(false);
 				//reading values
 				Vector parameters;
 				TextField tf1, tf2;
@@ -379,7 +308,6 @@ public class Z_Calibration implements PlugIn{
 				
 				for ( int j = 0 ; j < maxTracklength ; j++ ) 
 				 { 
-		             // y[j] = rand.nextInt((int)Double.parseDouble(tf1.getText()));
 					longestTrack[5][j]=longestTrack[2][j]-zOffset;
 		         }
 				
@@ -401,19 +329,11 @@ public class Z_Calibration implements PlugIn{
 				String sFitResults=cf.getResultString();
 				sFitResultsSplit=sFitResults.split("[\n]+");
 				fitCoefZ = cf.getParams();
-				fittedZ=new double[dRangeZ.length];
-				//int teeest = dRangeZ.length;
-				//calculate fitted approximations
-				for(k=0;k<dRangeZ.length;k++)
-				{
-					dVal =fitCoefZ[0];
-					for (m=1;m<=nPolDegree;m++)
-						dVal+=fitCoefZ[m]*Math.pow(dRangeDiff[k], m);
-					fittedZ[k] = dVal;
-				}
+				
+				fittedZ=calcFittedVals(dRangeDiff,fitCoefZ);
+			
 				
 				PlotSDdiff = new Plot("Difference in PSF width and height","Z position (nm)","width-height (nm)");
-				//PlotSDdiff.setColor(Color.red);
 				PlotSDdiff.addPoints(dRangeZ, dRangeDiff, Plot.CIRCLE);	
 				PlotSDdiff.setColor(Color.blue);
 				PlotSDdiff.addPoints(fittedZ, dRangeDiff, Plot.LINE);
@@ -422,25 +342,85 @@ public class Z_Calibration implements PlugIn{
 				PlotSDdiff.setLimitsToFit(true);
 				PlotSDdiff.setImagePlus(impDiffSD);
 				PlotSDdiff.draw();
-				
-				int nPlot=0;
-				for(int i=0;i<jp.getComponentCount();i++)
-				{
-					if(jp.getComponent(i) instanceof ImageCanvas)
-					{
-						nPlot++;
-						if(nPlot==2)
-							jp.remove(i);
-					}
-				}
-				
 				icDiff = new ImageCanvas(impDiffSD);
 				
-				//jp.add(icDiff,0,0);
+				if(dlg.bZCalWobbling)
+				{
+					
+					
+					int nOffInd = findIndexIni(longestTrack[2],(int)zOffset);
+					
+					double dXShift=longestTrack[6][nOffInd];
+					double dYShift=longestTrack[7][nOffInd];
+					for ( int j = 0 ; j < maxTracklength ; j++ ) 
+					 { 
+						longestTrack[6][j]=longestTrack[6][j]-dXShift;
+						longestTrack[7][j]=longestTrack[7][j]-dYShift;
+			         }
+					
+					dRangeX=Arrays.copyOfRange(longestTrack[6],indexFitRange[0],indexFitRange[1]);
+					dRangeY=Arrays.copyOfRange(longestTrack[7],indexFitRange[0],indexFitRange[1]);
+					
+					double [] iniParam = new double[5];
+					
+					cfXY = new CurveFitter(dRangeZ,dRangeX);
+					cfXY.doCustomFit("y = a + b*(x-e) + c*(x-e)*(x-e)+d*(x-e)*(x-e)*(x-e)",iniParam,false); 
+					//cfXY.doFit(nPolDegree); 
+					fitCoefX = cfXY.getParams();
+					fittedX=calcFittedValsXY(dRangeZ,fitCoefX);
+					sFitResults=cfXY.getResultString();
+					sFitResultsSplit=sFitResults.split("[\n]+");
+					PlotX = new Plot("X wobbling","Z position (nm)","X shift (nm)");
+					PlotX.addPoints(dRangeZ, dRangeX, Plot.CIRCLE);
+					PlotX.setColor(Color.blue);
+					PlotX.addPoints(dRangeZ, fittedX, Plot.LINE);
+					PlotX.setColor(Color.black);
+					PlotX.setLegend("data	X fit ("+sFitResultsSplit[8]+")", Plot.AUTO_POSITION);
+					PlotX.setLimitsToFit(true);
+					PlotX.setImagePlus(impX);
+					PlotX.draw();
+					icX = new ImageCanvas(impX);
+					
+					
+					
+					cfXY = new CurveFitter(dRangeZ,dRangeY);
+					//cfXY.doFit(nPolDegree); 
+					
+					cfXY.doCustomFit("y = a + b*(x-e) + c*(x-e)*(x-e)+d*(x-e)*(x-e)*(x-e)",iniParam,false); 
+					fitCoefY = cfXY.getParams();
+					fittedY=calcFittedValsXY(dRangeZ,fitCoefY);
+					sFitResults=cfXY.getResultString();
+					sFitResultsSplit=sFitResults.split("[\n]+");
+					
+					PlotY = new Plot("Y wobbling","Z position (nm)","Y shift (nm)");
+					PlotY.addPoints(dRangeZ, dRangeY, Plot.CIRCLE);
+					PlotY.setColor(Color.blue);
+					PlotY.addPoints(dRangeZ, fittedY, Plot.LINE);
+					PlotY.setColor(Color.black);
+					PlotY.setLegend("data	Y fit ("+sFitResultsSplit[8]+")", Plot.AUTO_POSITION);
+					PlotY.setLimitsToFit(true);
+					PlotY.setImagePlus(impY);
+					PlotY.draw();
+					icY = new ImageCanvas(impY);
+				}
 				
-				jp.add(icDiff,1);
-				//jp.add(icSDxy,1,0);
+				jp.removeAll();
 				
+				if(dlg.bZCalWobbling)
+				{	
+					jp.add(icY,0,0);
+					jp.add(icSDxy,1,0);
+				
+					jp.add(icDiff,1,1);
+					jp.add(icX,0,1);
+				}
+				else
+				{
+					jp.add(icDiff,0,0);
+					jp.add(icSDxy,1,0);
+				}
+				b.setLabel("Perform Fit");
+				b.setEnabled(true);
 				nb.pack();
 				
 				nb.revalidate();
@@ -570,42 +550,6 @@ public class Z_Calibration implements PlugIn{
 		return -1;
 	}
 	
-	/*
-	public int dlgSetZero(double zOffset) {
-		GenericDialog dlg = new GenericDialog("Set new zero Z position");
-		dlg.addNumericField("New zero at Z = ", (int)zOffset, 1,6," nm");
-		
-		
-		dlg.setResizable(false);
-		dlg.showDialog();
-		if (dlg.wasCanceled())
-            return -1;
-		
-		return (int)dlg.getNextNumber();
-	}
-	
-	public int[] dlgFitRange(int nMin, int nMax) {
-		GenericDialog dlg = new GenericDialog("Define Fit & Detection Z-Range");
-		dlg.addNumericField("Range Z min = ", nMin, 0,5," nm");
-		dlg.addNumericField("Range Z max = ", nMax, 0,5," nm");
-		
-		dlg.setResizable(false);
-		dlg.showDialog();
-		if (dlg.wasCanceled())
-            return new int[]{0,0};
-		
-		return new int[]{(int)dlg.getNextNumber(),(int)dlg.getNextNumber()};
-	}
-	
-	public boolean dlgStoreCal() {
-		GenericDialog dlg = new GenericDialog("Store calibration?");
-		dlg.addMessage("Store the new calibration?");
-
-		dlg.setResizable(false);
-		dlg.showDialog();
-		return dlg.wasOKed();
-	}
-	*/
 	
 	public boolean calculateLongestTrack()
 	{
@@ -648,7 +592,7 @@ public class Z_Calibration implements PlugIn{
 		IJ.log("Longest track length after filtering: "+Integer.toString(maxTracklength) + " particles");
 		
 		//fill in data from the longest track
-		longestTrack = new double[6][maxTracklength];
+		longestTrack = new double[8][maxTracklength];
 		dCurrentLength = 0;
 		for(i=0;i<sdx.length;i++)
 		{
@@ -661,6 +605,9 @@ public class Z_Calibration implements PlugIn{
 						longestTrack[2][dCurrentLength]=f[i];
 						longestTrack[3][dCurrentLength]=sdx_err[i];
 						longestTrack[4][dCurrentLength]=sdy_err[i];
+						/// five is reserved for shifted z axis
+						longestTrack[6][dCurrentLength]=x[i];
+						longestTrack[7][dCurrentLength]=y[i];
 						dCurrentLength++;
 					}
 				}
@@ -721,9 +668,255 @@ public class Z_Calibration implements PlugIn{
 					break;
 
 		}
+		Prefs.set("SiMoLOc.ZC_XYWobbling", dlg.bZCalWobbling);
+		if(dlg.bZCalWobbling)
+		{
+			//fitted values of X polynomial
+			Prefs.set("SiMoLOc.ZC_polCoefX0", fitCoefX[0]);
+			Prefs.set("SiMoLOc.ZC_polCoefX1", fitCoefX[1]);
+			Prefs.set("SiMoLOc.ZC_polCoefX2", fitCoefX[2]);
+			Prefs.set("SiMoLOc.ZC_polCoefX3", fitCoefX[3]);
+			Prefs.set("SiMoLOc.ZC_polCoefX4", fitCoefX[4]);
+			//fitted values of Y polynomial
+			Prefs.set("SiMoLOc.ZC_polCoefY0", fitCoefY[0]);
+			Prefs.set("SiMoLOc.ZC_polCoefY1", fitCoefY[1]);
+			Prefs.set("SiMoLOc.ZC_polCoefY2", fitCoefY[2]);
+			Prefs.set("SiMoLOc.ZC_polCoefY3", fitCoefY[3]);
+			Prefs.set("SiMoLOc.ZC_polCoefY4", fitCoefY[4]);
+
+		}
+			
+		
 		IJ.log("Z calibration stored!");
 		//msg("Calibration stored!");
 	}
+	/** Saves Z calibration to file 
+	 * */
+	public void saveZcalibration()
+	{
+		SaveDialog sd = new SaveDialog("Save Z calibration", "Z_calibration", ".txt");
+        String path = sd.getDirectory();
+        boolean bXYWobble;
+        String calDate;
+        if (path==null)
+        	return;
+        String filename = path+sd.getFileName();
+        
+        
+		
+		//read stored values of calibration
+        fitCoefZ = new double[4];
+        fitRange = new int[2];
+		fitCoefZ[0]=Prefs.get("SiMoLOc.ZC_polCoef0", Double.NaN);
+		if(fitCoefZ[0]==Double.NaN)
+		{
+			IJ.error("There is no valid Z-calibration stored, please make one!");
+			return;
+		}
+		
+		fitCoefZ[1]=Prefs.get("SiMoLOc.ZC_polCoef1", 0);
+		fitCoefZ[2]=Prefs.get("SiMoLOc.ZC_polCoef2", 0);
+		fitCoefZ[3]=Prefs.get("SiMoLOc.ZC_polCoef3", 0);
+		fitRange[0]=(int)Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		fitRange[1]=(int)Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		bXYWobble=Prefs.get("SiMoLOc.ZC_XYWobbling", false);
+		if(bXYWobble)
+		{
+			fitCoefX = new double[5];
+			fitCoefY = new double[5];
+			//get coefficients
+			fitCoefX[0]=Prefs.get("SiMoLOc.ZC_polCoefX0", 0);
+			fitCoefX[1]=Prefs.get("SiMoLOc.ZC_polCoefX1", 0);
+			fitCoefX[2]=Prefs.get("SiMoLOc.ZC_polCoefX2", 0);
+			fitCoefX[3]=Prefs.get("SiMoLOc.ZC_polCoefX3", 0);
+			fitCoefX[4]=Prefs.get("SiMoLOc.ZC_polCoefX4", 0);
+			
+			fitCoefY[0]=Prefs.get("SiMoLOc.ZC_polCoefY0", 0);
+			fitCoefY[1]=Prefs.get("SiMoLOc.ZC_polCoefY1", 0);
+			fitCoefY[2]=Prefs.get("SiMoLOc.ZC_polCoefY2", 0);
+			fitCoefY[3]=Prefs.get("SiMoLOc.ZC_polCoefY3", 0);
+			fitCoefY[4]=Prefs.get("SiMoLOc.ZC_polCoefY4", 0);
+		}
+		
+		//date
+		calDate=Prefs.get("SiMoLOc.ZC_calDate","not available");
+		PrintWriter writer;
+		try {
+			writer = new PrintWriter(filename, "UTF-8");
+			writer.println("Zdate\t"+calDate);
+			writer.println("XYWobble\t"+Boolean.toString(bXYWobble));
+			writer.println("Zmin\t"+Integer.toString(fitRange[0]));
+			writer.println("Zmax\t"+Integer.toString(fitRange[1]));
+			writer.println("Zpolycoeff0\t"+Double.toString(fitCoefZ[0]));
+			writer.println("Zpolycoeff1\t"+Double.toString(fitCoefZ[1]));
+			writer.println("Zpolycoeff2\t"+Double.toString(fitCoefZ[2]));
+			writer.println("Zpolycoeff3\t"+Double.toString(fitCoefZ[3]));
+			if(bXYWobble)
+			{
+				writer.println("Xpolycoeff0\t"+Double.toString(fitCoefX[0]));
+				writer.println("Xpolycoeff1\t"+Double.toString(fitCoefX[1]));
+				writer.println("Xpolycoeff2\t"+Double.toString(fitCoefX[2]));
+				writer.println("Xpolycoeff3\t"+Double.toString(fitCoefX[3]));
+				writer.println("Xpolycoeff4\t"+Double.toString(fitCoefX[4]));
+				
+				writer.println("Ypolycoeff0\t"+Double.toString(fitCoefY[0]));
+				writer.println("Ypolycoeff1\t"+Double.toString(fitCoefY[1]));
+				writer.println("Ypolycoeff2\t"+Double.toString(fitCoefY[2]));
+				writer.println("Ypolycoeff3\t"+Double.toString(fitCoefY[3]));
+				writer.println("Ypolycoeff4\t"+Double.toString(fitCoefY[4]));
+			}
+			writer.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			IJ.log(e.getMessage());
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			//e.printStackTrace();
+			IJ.log(e.getMessage());
+		}
+
+        
+        IJ.log("Z calibration saved.");
+		return;
+	}
+	
+	/** Loads Z calibration from file 
+	 * */
+	public void loadZcalibration()
+	{
+		String sCalibration;
+		String [] sCalSplittedRows;
+		String [] sCalSplittedVals;
+		String delimsn = "[\n]+";
+		String delimst = "[\t]+";
+		boolean bXYWobble;
+		sCalibration = IJ.openAsString("");
+		
+		sCalSplittedRows = sCalibration.split(delimsn);
+		
+		sCalSplittedVals =sCalSplittedRows[0].split(delimst);
+		if(!(sCalSplittedVals[0].equals("Zdate")))
+		{
+			IJ.error("Not able to detect a valid Z calibration, try another file.");
+			return;
+		}
+		Prefs.set("SiMoLOc.ZC_calDate",sCalSplittedVals[1]);
+		sCalSplittedVals =sCalSplittedRows[1].split(delimst);
+		bXYWobble = Boolean.parseBoolean(sCalSplittedVals[1]);
+		Prefs.set("SiMoLOc.ZC_XYWobbling", bXYWobble);
+		sCalSplittedVals =sCalSplittedRows[2].split(delimst);
+		Prefs.set("SiMoLOc.ZC_fitRangeMin",Integer.parseInt(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[3].split(delimst);
+		Prefs.set("SiMoLOc.ZC_fitRangeMax",Integer.parseInt(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[4].split(delimst);
+		Prefs.set("SiMoLOc.ZC_polCoef0",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[5].split(delimst);
+		Prefs.set("SiMoLOc.ZC_polCoef1",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[6].split(delimst);
+		Prefs.set("SiMoLOc.ZC_polCoef2",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[7].split(delimst);
+		Prefs.set("SiMoLOc.ZC_polCoef3",Double.parseDouble(sCalSplittedVals[1]));
+		if(bXYWobble)
+		{
+			sCalSplittedVals =sCalSplittedRows[8].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefX0",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[9].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefX1",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[10].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefX2",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[11].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefX3",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[12].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefX4",Double.parseDouble(sCalSplittedVals[1]));
+			
+			sCalSplittedVals =sCalSplittedRows[13].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefY0",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[14].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefY1",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[15].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefY2",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[16].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefY3",Double.parseDouble(sCalSplittedVals[1]));
+			sCalSplittedVals =sCalSplittedRows[17].split(delimst);
+			Prefs.set("SiMoLOc.ZC_polCoefY4",Double.parseDouble(sCalSplittedVals[1]));
+		}
+		IJ.log("Z calibration loaded.");
+		return;
+	}
+	
+	/** outputs stored Z calibration to IJ.Log window
+	 * */
+	public void logZcalibration()
+	{
+		boolean bXYWobble;
+		String calDate;
+		
+		//read stored values of calibration
+        fitCoefZ = new double[4];
+        fitRange = new int[2];
+		fitCoefZ[0]=Prefs.get("SiMoLOc.ZC_polCoef0", Double.NaN);
+		if(fitCoefZ[0]==Double.NaN)
+		{
+			IJ.error("There is no valid Z-calibration stored, please make one!");
+			return;
+		}
+		
+		fitCoefZ[1]=Prefs.get("SiMoLOc.ZC_polCoef1", 0);
+		fitCoefZ[2]=Prefs.get("SiMoLOc.ZC_polCoef2", 0);
+		fitCoefZ[3]=Prefs.get("SiMoLOc.ZC_polCoef3", 0);
+		fitRange[0]=(int)Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		fitRange[1]=(int)Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		bXYWobble=Prefs.get("SiMoLOc.ZC_XYWobbling", false);
+		if(bXYWobble)
+		{
+			fitCoefX = new double[5];
+			fitCoefY = new double[5];
+			//get coefficients
+			fitCoefX[0]=Prefs.get("SiMoLOc.ZC_polCoefX0", 0);
+			fitCoefX[1]=Prefs.get("SiMoLOc.ZC_polCoefX1", 0);
+			fitCoefX[2]=Prefs.get("SiMoLOc.ZC_polCoefX2", 0);
+			fitCoefX[3]=Prefs.get("SiMoLOc.ZC_polCoefX3", 0);
+			fitCoefX[4]=Prefs.get("SiMoLOc.ZC_polCoefX4", 0);
+			
+			fitCoefY[0]=Prefs.get("SiMoLOc.ZC_polCoefY0", 0);
+			fitCoefY[1]=Prefs.get("SiMoLOc.ZC_polCoefY1", 0);
+			fitCoefY[2]=Prefs.get("SiMoLOc.ZC_polCoefY2", 0);
+			fitCoefY[3]=Prefs.get("SiMoLOc.ZC_polCoefY3", 0);
+			fitCoefY[4]=Prefs.get("SiMoLOc.ZC_polCoefY4", 0);
+		}
+		
+		//date
+		calDate=Prefs.get("SiMoLOc.ZC_calDate","not available");
+		
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Calibration creation date: "+ calDate);
+		if(bXYWobble)	
+			IJ.log("Account for \"wobbling\" in X and Y: on");
+		else
+			IJ.log("Account for \"wobbling\" in X and Y: off");
+		
+		IJ.log("Zmin: " + Integer.toString(fitRange[0]) + " nm");
+		IJ.log("Zmax: " + Integer.toString(fitRange[1]) + " nm");
+		IJ.log("Z polynomial coeff 0: " + Double.toString(fitCoefZ[0]));
+		IJ.log("Z polynomial coeff 1: " + Double.toString(fitCoefZ[1]));
+		IJ.log("Z polynomial coeff 2: " + Double.toString(fitCoefZ[2]));
+		IJ.log("Z polynomial coeff 3: " + Double.toString(fitCoefZ[3]));
+		if(bXYWobble)
+		{
+			IJ.log("X polynomial coeff 0: " + Double.toString(fitCoefX[0]));
+			IJ.log("X polynomial coeff 1: " + Double.toString(fitCoefX[1]));
+			IJ.log("X polynomial coeff 2: " + Double.toString(fitCoefX[2]));
+			IJ.log("X polynomial coeff 3: " + Double.toString(fitCoefX[3]));
+			IJ.log("X polynomial coeff 4: " + Double.toString(fitCoefX[4]));
+			
+			IJ.log("Y polynomial coeff 0: " + Double.toString(fitCoefY[0]));
+			IJ.log("Y polynomial coeff 1: " + Double.toString(fitCoefY[1]));
+			IJ.log("Y polynomial coeff 2: " + Double.toString(fitCoefY[2]));
+			IJ.log("Y polynomial coeff 3: " + Double.toString(fitCoefY[3]));
+			IJ.log("Y polynomial coeff 4: " + Double.toString(fitCoefY[4]));
+		}
+	}
+	
 	public void get_values_from_table()
 	{
 		//get values
@@ -735,6 +928,8 @@ public class Z_Calibration implements PlugIn{
 		trackid = sml.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
 		particleid = sml.ptable.getColumnAsDoubles(DOMConstants.Col_ParticleID);
 		rsquared = sml.ptable.getColumnAsDoubles(DOMConstants.Col_chi);
+		x=sml.ptable.getColumnAsDoubles(DOMConstants.Col_Xnm);
+		y=sml.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);
 
 	}
 	/*
@@ -755,6 +950,36 @@ public class Z_Calibration implements PlugIn{
 	  return array_new;
 	}
 */
+	double [] calcFittedVals(double [] dRangeDiff, double fitCoef[])
+	{
+		double [] fittedZ = new double [dRangeDiff.length];
+		int k, m;
+		double dVal;
+		for(k=0;k<dRangeDiff.length;k++)
+		{
+			dVal =fitCoef[0];
+			for (m=1;m<=nPolDegree;m++)
+				dVal+=fitCoef[m]*Math.pow(dRangeDiff[k], m);
+			fittedZ[k] = dVal;
+		}
+		return fittedZ;
+	}
+	
+	double [] calcFittedValsXY(double [] dRangeDiff, double fitCoef[])
+	{
+		double [] fittedZ = new double [dRangeDiff.length];
+		int k, m;
+		double dVal;
+		for(k=0;k<dRangeDiff.length;k++)
+		{
+			dVal =fitCoef[0];
+			for (m=1;m<=3;m++)
+				dVal+=fitCoef[m]*Math.pow(dRangeDiff[k]-fitCoef[4], m);
+			fittedZ[k] = dVal;
+		}
+		return fittedZ;
+	}
+	
 	/** check border position for offset */
 	public int borderCheckOffset(int inParam)
 	{
@@ -786,7 +1011,10 @@ public class Z_Calibration implements PlugIn{
 		int nBeg = (int)Math.round(maxTracklength/3.0);
 		int nEnd = (int)Math.round(2.0*maxTracklength/3.0);
 		int i;
+		int zOffind;
+		double xOffset,yOffset;
 		zOffset = 0;
+		zOffind=nBeg;
 		double dMin = Double.MAX_VALUE;
 		for (i=nBeg;i<=nEnd;i++)
 		{
@@ -795,6 +1023,7 @@ public class Z_Calibration implements PlugIn{
 			{
 				zOffset = longestTrack[2][i];
 				dMin = Math.abs(sdDif[i]);
+				zOffind = i;
 			}
 			
 		}
@@ -803,11 +1032,15 @@ public class Z_Calibration implements PlugIn{
 		nRefMaxZ=(int)longestTrack[2][maxTracklength-1];
 		fitRange[0] = nRefMinZ;
 		fitRange[1] = nRefMaxZ;
-		
+		xOffset = longestTrack[6][zOffind];
+		yOffset = longestTrack[7][zOffind];
 		//subtract z-offset from all z-values and store it separately
 		for(i = 0; i < maxTracklength; i++)
 		{
 			longestTrack[5][i] = longestTrack[2][i] - zOffset;  
+			//correct X and Y
+			longestTrack[6][i] = longestTrack[6][i] - xOffset;  
+			longestTrack[7][i] = longestTrack[7][i] - yOffset;  
 		}
 		nUpdMinZ= (int) (nRefMinZ-zOffset);
 		nUpdMaxZ= (int) (nRefMaxZ-zOffset);
