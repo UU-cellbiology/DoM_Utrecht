@@ -138,6 +138,15 @@ public class SMLDialog {
 	String sZLUTName;
 	boolean bZCalWobbling;
 	
+	//color calibration parameters
+	/** maximum distance between particle image in both channel
+	 * */
+	double dCCDist;
+	/** SNR threshold for particles used for color calibration
+	 * */
+	double dCCSNR;
+	
+	
 		
 	//particle linking parameters
 	/** what kind of particles use for linking */
@@ -385,7 +394,28 @@ public class SMLDialog {
 		
 		return true;
 	}
+	/** Dialog showing parameters for color correction
+	 * 
+	 * 
+	 */
 	
+	public boolean dglColorCalibration() 
+	{
+		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
+		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 7),0,3," original pixels");
+		ccDial.addNumericField("SNR threshold:",Prefs.get("SiMoLoc.dCCSNR", 3),1,4," ");
+		
+		ccDial.showDialog();
+		if (ccDial.wasCanceled())
+            return false;
+		
+		dCCDist =  ccDial.getNextNumber();
+		Prefs.set("SiMoLoc.dCCDist", dCCDist);
+		dCCSNR =  ccDial.getNextNumber();
+		Prefs.set("SiMoLoc.dCCSNR", dCCSNR);
+		   return true;
+	
+	}
 	/** Dialog showing parameters for drift correction
 	 * 
 	 * 
