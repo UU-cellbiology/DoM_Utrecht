@@ -127,6 +127,10 @@ public class Reconstruct_Image implements PlugIn{
 			smlViewer.averagelocalizations(sml);
 			
 		}
+		if(dlg.bTranslation)
+		{
+			smlViewer.addTranslation();
+		}
 			
 		
 		if(dlg.bCutoff)

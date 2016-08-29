@@ -93,11 +93,14 @@ public class SMLAnalysis {
 		//dubyte.dilate(2, 0);
 		//dubyte.erode(2, 0);
 		
-		dubyte.dilate();		
-		//new ImagePlus("dilated", dubyte.duplicate()).show();
-		dubyte.erode();
-		//new ImagePlus("erosion", dubyte.duplicate()).show();
-
+		//cleaning up image a bit
+		if(fdg.nKernelSize>3)
+		{
+			dubyte.dilate();		
+			//new ImagePlus("dilated", dubyte.duplicate()).show();
+			dubyte.erode();
+			//new ImagePlus("erosion", dubyte.duplicate()).show();
+		}
 		//dupip.invert();
 		
 		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
@@ -464,12 +467,12 @@ public class SMLAnalysis {
 							ptable_lock.lock();
 							ptable.incrementCounter();
 							
-							ptable.addValue("X_(px)",fitted_parameters[2]);							
-							ptable.addValue("Y_(px)",fitted_parameters[3]);
+							ptable.addValue("X_(px)",fitted_parameters[2]+0.5);							
+							ptable.addValue("Y_(px)",fitted_parameters[3]+0.5);
 							ptable.addValue("Frame_Number", nFrame+1);
-							ptable.addValue("X_(nm)",fitted_parameters[2]*fdg.dPixelSize);							
+							ptable.addValue("X_(nm)",(fitted_parameters[2]+0.5)*fdg.dPixelSize);							
 							ptable.addValue("X_loc_error(nm)", fit_errors[2]*fdg.dPixelSize);							
-							ptable.addValue("Y_(nm)",fitted_parameters[3]*fdg.dPixelSize);
+							ptable.addValue("Y_(nm)",(fitted_parameters[3]+0.5)*fdg.dPixelSize);
 							ptable.addValue("Y_loc_error(nm)", fit_errors[3]*fdg.dPixelSize);
 							ptable.addValue("Z_(nm)",0);
 							ptable.addValue("Z_loc_error(nm)",0);							

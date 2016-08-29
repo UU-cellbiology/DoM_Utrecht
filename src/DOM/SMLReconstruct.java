@@ -10,13 +10,10 @@ import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
 import ij.WindowManager;
-import ij.plugin.LutLoader;
 import ij.process.ByteProcessor;
 import ij.process.ColorProcessor;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
-import ij.process.LUT;
-//import ij.process.ShortProcessor;
 import ij.process.ShortProcessor;
 import ij.text.TextWindow;
 
@@ -144,15 +141,6 @@ public class SMLReconstruct {
 		y   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);	
 		z   = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Znm);
 		
-		if (settings.bTranslation)			
-		{
-			for (int i=0; i<nParticlesCount; i++)
-			{
-				x[i] += settings.dTranslationX;
-				y[i] += settings.dTranslationY;
-			}
-		
-		}
 		//false positive mark
 		fp  = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_Fp);
 		//localization precision
@@ -1564,6 +1552,17 @@ public class SMLReconstruct {
 		return nCount;
 		
 	}
+	/** function updating arrays of x and y with translation value */
+	void addTranslation()
+	{
+		nParticlesCount = x.length;
+		for (int i=0; i<nParticlesCount; i++)
+		{
+			x[i] += settings.dTranslationX;
+			y[i] += settings.dTranslationY;
+		}	
+		IJ.log("Coordinates translated " + Double.toString(settings.dTranslationX) +" nm in X and "+ Double.toString(settings.dTranslationY) +" in Y");
 
+	}
 
 }
