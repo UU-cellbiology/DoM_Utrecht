@@ -1,6 +1,7 @@
 package DOM;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -32,8 +33,12 @@ public class ColorCorrection implements PlugIn{
 	SMLAnalysis sml;
 	SMLDialog dlg = new SMLDialog();
 	
-	double [] xref, yref, SNRref, fref;
-	double [] xwarp, ywarp, SNRwarp, fwarp;
+	double [][] xyref; 
+	double [][] xystat;
+	double [][] xymov;
+	double [] SNRref, fref;
+	double [][] xywarp; 
+	double [] SNRwarp, fwarp;
 	double [] dXYShift;
 	/** list of colocalized particles coordinates 
 	 * */
@@ -42,6 +47,11 @@ public class ColorCorrection implements PlugIn{
 	double dCCSNR;
 	/** Max distance between particles in pixels */
 	double dCCDist;
+	/**number of colocalized particles
+	 * */
+	int nColocPatN;
+	
+	double dMheight, dMwidth;
 	
 	//final NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Fit Z-calibration"); 
 	@Override
@@ -99,10 +109,12 @@ public class ColorCorrection implements PlugIn{
 		
 		sml = new SMLAnalysis();
 		//get detection results
-		xref = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
-		yref = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
 		SNRref = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SNR);
 		fref = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+		xyref = new double [2][fref.length];
+		xyref[0] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
+		xyref[1] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+
 		
 		nb = new NonBlockingGenericDialog("Choose image and ROI of WARPED channel");
 		nb.addMessage("Choose calibration image and ROI region for WARPED channel");
@@ -138,23 +150,23 @@ public class ColorCorrection implements PlugIn{
 		//imp_warpMax.show();
 		sml = new SMLAnalysis();
 		//get detection results
-		xwarp = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
-		ywarp = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
 		SNRwarp = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SNR);
 		fwarp = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+		xywarp = new double [2][fwarp.length];
+		xywarp[0] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
+		xywarp[1] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+		
 		
 
 		IJ.log("Aligning maximum projection pictures...");
 		
 		//TODO make sizes of images equal
+		
+		dMheight = imp_refMax.getHeight();
+		dMwidth = imp_refMax.getWidth();
 		dXYShift = calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
 		
-		//update warped particles coordinates
-		for(i=0;i<xwarp.length;i++)
-		{
-			xwarp[i]+=dXYShift[0];
-			ywarp[i]+=dXYShift[1];
-		}
+
 		
 		IJ.showProgress(1.0);
 		
@@ -162,11 +174,215 @@ public class ColorCorrection implements PlugIn{
 		IJ.log("Y shift: "+Double.toString(dXYShift[1]) + " px");
 		IJ.log("Finding corresponding images of particles in both channels...");
 		
-		IJ.log("In total "+Integer.toString(CCfindParticles())+" particles found.");
+		//update warped particles coordinates
+		for(i=0;i<nColocPatN;i++)
+		{
+			
+			xywarp[0][i]+=dXYShift[0];
+			xywarp[1][i]+=dXYShift[1];
+			//xymov[0][i]+=dXYShift[0];
+			//xymov[1][i]+=dXYShift[1];
+			
+		}		
+		CCfindParticles();
+		IJ.log("In total "+Integer.toString(nColocPatN)+" particles found.");
+		
+		//update warped particles coordinates
+		for(i=0;i<nColocPatN;i++)
+		{
+			
+			//xywarp[0][i]+=dXYShift[0];
+			//xywarp[1][i]+=dXYShift[1];
+			//xymov[0][i]+=dXYShift[0];
+			//xymov[1][i]+=dXYShift[1];
+			
+		}
 		
 		IJ.log("Calculating B-spline transform...");
+		calculateBsplineTransform(5.0);
+		
 	}
 	
+	/** function calculating b-spline transform
+	 * using provided coordinates
+	 * based on matlab code of
+	 *  D.Kroon University of Twente (August 2010)
+	 * */
+	void calculateBsplineTransform(double MaxRef)
+	{
+		int MaxItt;
+		int [] Spacing = new int [2];
+		int dx,dy;
+		
+		double [][][] O_ref;
+		double [][][] O_add;
+		double [][] R;
+		int dimX,dimY;
+		int i,j;
+		
+		 // Calculate max refinements steps
+	     MaxItt=Math.min((int)Math.floor(Math.log(dMheight*0.5)/Math.log(2.0)), (int)Math.floor(Math.log(dMwidth*0.5)/Math.log(2.0))); 
+	     // set b-spline grid spacing in x and y direction
+	     
+	     Spacing[0]=(int) Math.pow(2,MaxItt);
+	     Spacing[1]=(int) Math.pow(2,MaxItt);
+	     // Make an initial uniform b-spline grid
+		
+	     // Determine grid spacing
+	     dx=Spacing[0]; 
+	     dy=Spacing[1];
+	     dimX=(int) ((dMwidth+(dx*3))/dx)+1;
+	     dimY=(int) ((dMheight+(dy*3))/dy)+1;
+	     
+	     
+	     //[X,Y]=ndgrid(-dx:dx:(sizeI(1)+(dx*2)),-dy:dy:(sizeI(2)+(dy*2)));
+	     O_ref =new double [2][dimX][dimY];
+	     O_add =new double [2][dimX][dimY];
+	     for(i=0;i<dimX;i++)
+	    	 for(j=0;j<dimY;j++)
+	    	 {
+	    		 O_ref[0][i][j]=(i-1)*dx;
+	    		 O_ref[1][i][j]=(j-1)*dy;
+	    	 }
+	     R= new double[2][nColocPatN];
+	     for(i=0;i<nColocPatN;i++)
+	     {
+	    	 R[0][i]=xystat[0][i]-xymov[0][i];
+	    	 R[1][i]=xystat[1][i]-xymov[1][i];
+	     }
+	     O_add= bspline_grid_fitting_2d(O_add, Spacing, R, xymov);
+	   
+	}
+	
+	double[][][] bspline_grid_fitting_2d(double[][][] O, int [] Spacing, double [][] R, double [][] X)
+	{
+		double[][][] O_trans;
+		int [] gx = new int [nColocPatN];
+		int [] gy = new int [nColocPatN];
+		double [] ax = new double [nColocPatN];
+		double [] ay = new double [nColocPatN];
+		int [] ix, iy;
+		//int [][] indexx = new int [16][nColocPatN];
+		int [] indexx = new int [16*nColocPatN];
+		//int [][] indexy = new int [16][nColocPatN];
+		int [] indexy = new int [16*nColocPatN];
+		int i,j;
+		// calculate which is the closest point on the lattic to the top-left
+		// corner and find ratio's of influence between lattice point.
+		for(i=0;i<nColocPatN;i++)
+		{
+			gx[i]=(int) Math.floor(X[0][i]/Spacing[0]);
+			gy[i]=(int) Math.floor(X[1][i]/Spacing[1]);
+			//gx  = floor(X(:,1)/Spacing(1)); 
+			//gy  = floor(X(:,2)/Spacing(2)); 
+		}
+
+		// Calculate b-spline coordinate within b-spline cell, range 0..1
+		for(i=0;i<nColocPatN;i++)
+		{
+			ax[i]=(X[0][i]-gx[i]*Spacing[0])/Spacing[0];
+			ay[i]=(X[1][i]-gy[i]*Spacing[1])/Spacing[1];
+			//ax  = (X(:,1)-gx*Spacing(1))/Spacing(1);
+			//ay  = (X(:,2)-gy*Spacing(2))/Spacing(2); 
+		}
+		for(i=0;i<nColocPatN;i++)
+		{
+			gx[i]+=2;
+			gy[i]+=2;
+		}
+		//TODO add verification
+		//if(any(ax<0)||any(ax>1)||any(ay<0)||any(ay>1)), error('grid error'), end;
+		double [][] W;
+		W = bspline_coefficients_2d(ax, ay);
+		
+		//TODO not checked from this point
+		
+		// Make indices of all neighborgh knots to every point
+		ix = new int [16];
+		iy = new int [16];
+		
+		for (i=-1;i<3;i++)
+			for (j=0;j<4;j++)
+			{
+				ix[i+1+j*4]=i;
+				iy[(i+1)*4+j]=i;
+			}
+		
+		for(i=0;i<nColocPatN;i++)
+			for(j=0;j<16;j++)
+			{
+				//indexx[j][i] = gx[i]+ix[j];
+				indexx[j+(i*16)] = gx[i]+ix[j];
+				//indexy[j][i] = gy[i]+iy[j];
+				indexy[j+(i*16)] = gy[i]+iy[j];
+			}
+		//Limit to boundaries grid
+		
+		O_trans = new double [1][1][1];
+		return O_trans;
+	}
+	
+	 double[][]  bspline_coefficients_2d(double[] u, double [] v)
+	{
+		double [][] Bu;
+		double [][] Bv;
+		double [][] W;
+		int i, N, k, m;
+		
+		Bu=bspline_coefficients_1d(u);
+		Bv=bspline_coefficients_1d(v);
+		 
+		N=u.length;
+		
+		W = new double [16][N];
+		for(i=0;i<N;i++)
+		{
+			for(k=0;k<4;k++)
+				for(m=0;m<4;m++)
+				{
+					W[m+(k*4)][i]=Bu[m][i]*Bv[k][i];
+				}
+			/*
+			//probably smart cycle would be better
+			W[0][i]=Bu[0][i]*Bv[0][i];
+			W[1][i]=Bu[1][i]*Bv[0][i];
+			W[2][i]=Bu[2][i]*Bv[0][i];
+			W[3][i]=Bu[3][i]*Bv[0][i];
+			
+			W[4][i]=Bu[0][i]*Bv[1][i];
+			W[5][i]=Bu[1][i]*Bv[1][i];
+			W[6][i]=Bu[2][i]*Bv[1][i];
+			W[7][i]=Bu[3][i]*Bv[1][i];
+			
+			W[8][i]=Bu[0][i]*Bv[2][i];
+			W[9][i]=Bu[1][i]*Bv[2][i];
+			W[10][i]=Bu[2][i]*Bv[2][i];
+			W[11][i]=Bu[3][i]*Bv[2][i];
+			
+			W[12][i]=Bu[0][i]*Bv[3][i];
+			W[13][i]=Bu[1][i]*Bv[3][i];
+			W[14][i]=Bu[2][i]*Bv[3][i];
+			W[15][i]=Bu[3][i]*Bv[3][i];
+			*/
+		}
+		return W;
+		
+	}
+	 double[][]  bspline_coefficients_1d(double [] u)
+	 {
+		 double [][] W;
+		 W = new double[4][u.length];		 
+		 
+		 for (int i=0;i<u.length;i++)
+		 {
+			W[0][i] = Math.pow(1-u[i],3)/6; 
+			W[1][i] = ( 3*Math.pow(u[i],3) - 6*u[i]*u[i]+ 4)/6;
+			W[2][i] = (-3*Math.pow(u[i],3) + 3*Math.pow(u[i],2) + 3*u[i] + 1)/6;
+			W[3][i] = Math.pow(u[i],3)/6;
+		 }
+		 
+		 return W;
+	 }
 	
 	//TODO add subpixel precision
 	/** Function calculates shift in X and Y between images using
@@ -180,20 +396,20 @@ public class ColorCorrection implements PlugIn{
 		int i,j;
 		float dRefRe,dRefIm, dWarpRe, dWarpIm;
 
-		int imheight, imwidth;
+		//int imheight, imwidth;
 		int imheightFFT, imwidthFFT;
 	    FHT fht1,fht2;
 	    
-		imheight=ip1.getHeight();
-		imwidth =ip1.getWidth();
+		//imheight=ip1.getHeight();
+		//imwidth =ip1.getWidth();
 		
 	    fht1 = new FHT(pad(ip1));
 	    fht2 = new FHT(pad(ip2));
-	    fht1.originalHeight=imheight;
-	    fht1.originalWidth=imwidth;
+	    //fht1.originalHeight=imheight;
+	    //fht1.originalWidth=imwidth;
 	    
-	    fht2.originalHeight=imheight;
-	    fht2.originalWidth=imwidth;
+	    //fht2.originalHeight=imheight;
+	    //fht2.originalWidth=imwidth;
 	    
 	    fht1.transform();
 	    fht2.transform();
@@ -305,13 +521,13 @@ public class ColorCorrection implements PlugIn{
 	int CCfindParticles()
 	{
 		ArrayList<double[]> colocTable = new ArrayList<double[]>();
-		double [] xyfound = new double [4];
+		double [] xyfound;
 		double dMinDist, dDist;
 		int ind_warped;
 		int i,j;
 		int nRef, nWarp;
-		nRef = xref.length;
-		nWarp = xwarp.length;
+		nRef = xyref[0].length;
+		nWarp = xywarp[0].length;
 		//looking for colocalization
 		for (i=0;i<nRef;i++)
 		{
@@ -329,8 +545,8 @@ public class ColorCorrection implements PlugIn{
 							//on the same frame
 							if((int)fref[i]== (int)fwarp[j])
 							{
-								dDist = Math.sqrt(Math.pow(xref[i]-xwarp[j], 2)+Math.pow(yref[i]-ywarp[j], 2));
-								if (dDist>dCCDist)
+								dDist = Math.sqrt(Math.pow(xyref[0][i]-xywarp[0][j], 2)+Math.pow(xyref[1][i]-xywarp[1][j], 2));
+								if (dDist<dCCDist)
 								{
 									if(dDist<dMinDist)
 									{
@@ -349,15 +565,27 @@ public class ColorCorrection implements PlugIn{
 
 					//mark particle as used
 					fwarp[ind_warped]=5;
-					xyfound[0]=xref[i];
-					xyfound[1]=yref[i];
-					xyfound[2]=xwarp[ind_warped];
-					xyfound[3]=ywarp[ind_warped];
+					xyfound = new double [4];
+					xyfound[0]=xyref[0][i];
+					xyfound[1]=xyref[1][i];
+					xyfound[2]=xywarp[0][ind_warped];
+					xyfound[3]=xywarp[1][ind_warped];
 					colocTable.add(xyfound);
 				}
 			}
 		}
-		return colocTable.size();
+		nColocPatN = colocTable.size();
+		xymov = new double[2][nColocPatN];
+		xystat = new double[2][nColocPatN];
+		//let's add found point to new array
+		for(i=0;i<nColocPatN;i++)
+		{
+			xystat[0][i] = colocTable.get(i)[0];
+			xystat[1][i] = colocTable.get(i)[1];
+			 xymov[0][i] = colocTable.get(i)[2];
+			 xymov[1][i] = colocTable.get(i)[3];
+		}
+		return nColocPatN;
 	}
 
 	/** 

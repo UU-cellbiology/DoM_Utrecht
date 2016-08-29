@@ -10,12 +10,12 @@ public class Z_Calculation implements PlugIn
 	double zfitRangeMin,zfitRangeMax;
 	double [] fitCoefZ,fitCoefX,fitCoefY;
 	
-	double []  sdx, sdy, z, x,y, xpx, ypx;
+	double []  sdx, sdy, z, x,y, xpx, ypx, sdx_err, sdy_err, z_err;
 	@Override
 	public void run(String arg) 
 	{
 		int i, nParticles;
-		double dVal;
+		double dDiff, dVal, dVal1, dVal2, dVal3, dVal_Err;
 		// TODO Auto-generated method stub
 		//check that the table is present
 		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
@@ -51,13 +51,17 @@ public class Z_Calculation implements PlugIn
 		
 		sdx = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X);
 		sdy = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y);
+		sdx_err = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X_err);
+		sdy_err = sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y_err);
 		IJ.showStatus("Calculating Z coordinate...");
 		nParticles=sdx.length;
 		z = new double [nParticles];
+		z_err = new double [nParticles];
 		for(i=0;i<nParticles;i++)
 		{
-			dVal = sdx[i]-sdy[i];
-			dVal = fitCoefZ[0] + fitCoefZ[1]*dVal +fitCoefZ[2]*dVal*dVal+fitCoefZ[3]*dVal*dVal*dVal;
+			dDiff = sdx[i]-sdy[i];
+			//dVal=dDiff;
+			dVal = fitCoefZ[0] + fitCoefZ[1]*dDiff +fitCoefZ[2]*dDiff*dDiff+fitCoefZ[3]*dDiff*dDiff*dDiff;
 			
 			if(dVal<zfitRangeMin)
 			{
@@ -68,6 +72,11 @@ public class Z_Calculation implements PlugIn
 				dVal=zfitRangeMax;
 			}
 			z[i]=dVal;
+			//error of difference
+			dVal_Err = Math.sqrt(sdx_err[i]*sdx_err[i]+sdy_err[i]*sdy_err[i]);
+			//summary error according to error propagation: first variance
+			dVal_Err = Math.pow(fitCoefZ[1]*dVal_Err,2) + Math.pow(fitCoefZ[2]*2*dVal_Err/dDiff,2) + Math.pow(fitCoefZ[3]*3*dVal_Err/(dDiff*dDiff),2);
+			z_err[i]=Math.sqrt(dVal_Err);
 			IJ.showProgress(i+1, nParticles);
 		}
 		//account for XY wobbling
@@ -104,6 +113,7 @@ public class Z_Calculation implements PlugIn
 		for(i=0;i<nParticles;i++)
 		{
 			sml.ptable.setValue(DOMConstants.Col_Znm, i, z[i]);
+			sml.ptable.setValue(DOMConstants.Col_loc_errZ, i, z_err[i]);
 			IJ.showProgress(i+1, nParticles);
 		}
 		if(Prefs.get("SiMoLOc.ZC_XYWobbling", false))

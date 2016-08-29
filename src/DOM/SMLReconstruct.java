@@ -39,8 +39,12 @@ public class SMLReconstruct {
 	double [] y;
 	/** z coordinates of particles in nm*/
 	double [] z;
+	/** x localization error (nm) */
 	double [] loc_errx;
+	/** y localization error (nm) */
 	double [] loc_erry;
+	/** z localization error (nm) */
+	double [] loc_errz;
 	/** frame numbers of particle*/
 	double [] f;
 	/** false positive mark */
@@ -125,13 +129,9 @@ public class SMLReconstruct {
 			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_FrameN, true);		
 			bFrameSorted = true;
 			IJ.showStatus("Sorting table by frame number (averaging preparation)...done");
-			//sml_.showTable();
+			
 		}
-		/*if(settings.b3D)
-		{
-			Sort_Results.sorting_external_silent(sml_, DOMConstants.Col_Znm, true);
-			sml_.showTable();
-		}*/
+		
 		
 		// load data
 		sml_.ptable_lock.lock();
@@ -158,6 +158,7 @@ public class SMLReconstruct {
 		//localization precision
 		loc_errx = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errX);
 		loc_erry = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errY);
+		loc_errz = sml_.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errZ);
 		
 		sml_.ptable_lock.unlock();
 		
@@ -259,9 +260,9 @@ public class SMLReconstruct {
 	*/
 	void draw_zstack(int fstart, int fstop, double zstep)
 	{	
-		double old_i, new_i, dErrx, dErry, xpeak, ypeak, loc_errxmag, loc_errymag;
-		int xmag, ymag, xsq, ysq;
-		int i,j;
+		double old_i, new_i, dErrx, dErry, dErrz, xpeak, ypeak, zpeak, loc_errxmag, loc_errymag,loc_errzmag;
+		int xmag, ymag, zmag, xsq, ysq, zsq;
+		int i,j,k;
 		
 		double dCutoff = 1000.0; //default cut-off is 1000 nm
 		double dNorm;
@@ -272,6 +273,7 @@ public class SMLReconstruct {
 		int sliceNumber;	//slice number of particle
 		
 		double zmin, zmax;
+		double zMagnification =1/zstep;
 		
 			
 	
@@ -287,7 +289,7 @@ public class SMLReconstruct {
 		
 		FloatProcessor[] ipf = new FloatProcessor[nSlices];
 		
-		for(int k = 0; k<nSlices; k++)
+		for(k = 0; k<nSlices; k++)
 		{
 			ipf[k] = new FloatProcessor(new_width, new_height);
 		}
@@ -306,13 +308,14 @@ public class SMLReconstruct {
 				IJ.showProgress(n, nParticlesCount);
 				xmag=(int) Math.round(x[n]*settings.dMagnification);
 				ymag=(int) Math.round(y[n]*settings.dMagnification);
+				zmag=(int) Math.round(z[n]*zMagnification);
 				
 				//calculate sliceNumber for this particle
-				sliceNumber = (int) Math.floor((z[n]-zmin)/zstep);
+				//sliceNumber = (int) Math.floor((z[n]-zmin)/zstep);
 				
 				/*DEBUGGING*/
-				if(sliceNumber>=nSlices)
-					sliceNumber = nSlices-1;
+				//if(sliceNumber>=nSlices)
+				//	sliceNumber = nSlices-1;
 				/*DEBUGGING*/
 				
 				if(loc_errx[n]<dCutoff && loc_erry[n]<dCutoff)
@@ -324,34 +327,44 @@ public class SMLReconstruct {
 					}
 					xsq = (int) Math.ceil(3*loc_errx[n]*settings.dMagnification);
 					ysq = (int) Math.ceil(3*loc_erry[n]*settings.dMagnification);
+					zsq = (int) Math.ceil(3*loc_errz[n]*zMagnification);
 					xpeak=x[n]*settings.dMagnification;
 					ypeak=y[n]*settings.dMagnification;
+					zpeak= z[n]*zMagnification;
 					loc_errxmag=loc_errx[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
 					loc_errymag=loc_erry[n]*settings.dMagnification*1.41421356; //last number is just sqrt(2)
+					loc_errzmag=loc_errz[n]*zMagnification*1.41421356; //last number is just sqrt(2)
 			
 					dErrx = ErrorFunction.erf2((xmag-xsq-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+xmag+xsq-xpeak)/loc_errxmag);
 					dErry = ErrorFunction.erf2((ymag-ysq-ypeak)/loc_errymag) - ErrorFunction.erf2((1+ymag+ysq-ypeak)/loc_errymag);
-					dNorm = 1/(dErrx*dErry);
+					dErrz = ErrorFunction.erf2((zmag-zsq-zpeak)/loc_errzmag) - ErrorFunction.erf2((1+zmag+zsq-zpeak)/loc_errzmag);
+					dNorm = 1/(dErrx*dErry*dErrz);
 			
 					for(i=xmag-xsq;i<xmag+xsq+1;i++)
 						for(j=ymag-ysq;j<ymag+ysq+1;j++)
-						{
-							if((i<new_width) && (j<new_height)&&(i>0)&&(j>0))
-							{
-								old_i=ipf[sliceNumber].getf(i, j);
-		
-								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
-								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
-								new_i = old_i + dNorm*dErrx*dErry;
-								ipf[sliceNumber].setf(i, j, (float)new_i);
+							for(k=zmag-zsq;k<zmag+zsq+1;k++)
+							{							
+								if((i<new_width) && (j<new_height)&&(i>0)&&(j>0))
+								{
+									sliceNumber = (int)Math.round(k-(zmin/zstep));
+									if(sliceNumber>=0 && sliceNumber<nSlices)
+									{
+										old_i=ipf[sliceNumber].getf(i, j);
+				
+										dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
+										dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);	
+										dErrz = ErrorFunction.erf2((k-zpeak)/loc_errzmag) - ErrorFunction.erf2((1+k-zpeak)/loc_errzmag);
+										new_i = old_i + dNorm*dErrx*dErry*dErrz;
+										ipf[sliceNumber].setf(i, j, (float)new_i);
+									}
+								}
 							}
-						}
 				}		
 			}
 		}
 		zstack = new ImageStack(new_width, new_height);
 		
-		for(int k=0; k<nSlices; k++)
+		for(k=0; k<nSlices; k++)
 		{
 			//zstack.addSlice(null, ipf[k].convertToShort(true));
 			zstack.addSlice(null, ipf[k]);
