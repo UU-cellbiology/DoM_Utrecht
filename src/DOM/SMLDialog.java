@@ -145,10 +145,10 @@ public class SMLDialog {
 	/** SNR threshold for particles used for color calibration
 	 * */
 	double dCCSNR;
-	/**
-	 *  Show distortion map
-	 */
+	/**  Show distortion map */
 	boolean bCCShowMap;
+	/**  Show points used for calibration */
+	boolean bCCShowPoints;
 	
 	
 		
@@ -408,6 +408,7 @@ public class SMLDialog {
 		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
 		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 7),0,3," original pixels");
 		ccDial.addNumericField("SNR threshold filter:",Prefs.get("SiMoLoc.dCCSNR", 10),1,4," ");
+		ccDial.addCheckbox("Show points used for calibration:", Prefs.get("SiMoLoc.bCCShowPoints", true));
 		ccDial.addCheckbox("Show final distortion map:", Prefs.get("SiMoLoc.bCCShowMap", true));
 		
 		ccDial.showDialog();
@@ -418,6 +419,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.dCCDist", dCCDist);
 		dCCSNR =  ccDial.getNextNumber();
 		Prefs.set("SiMoLoc.dCCSNR", dCCSNR);
+		bCCShowPoints = ccDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bCCShowMap", bCCShowPoints);
 		bCCShowMap = ccDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bCCShowMap", bCCShowMap);
 		return true;

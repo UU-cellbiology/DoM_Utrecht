@@ -3,16 +3,20 @@ package DOM;
 import java.awt.Color;
 import java.util.ArrayList;
 
+import ij.CompositeImage;
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Undo;
 import ij.gui.Arrow;
+import ij.gui.Line;
 import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Overlay;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
+import ij.plugin.CompositeConverter;
 import ij.plugin.PlugIn;
+import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
 import ij.process.ColorProcessor;
 import ij.process.FHT;
@@ -175,6 +179,7 @@ public class ColorCorrection implements PlugIn{
 		IJ.log("Aligning maximum projection pictures...");
 		
 		AdjustDimensions();
+		
 		dXYShift = calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
 				
 		IJ.showProgress(1.0);
@@ -189,13 +194,15 @@ public class ColorCorrection implements PlugIn{
 			
 			xywarp[0][i]+=dXYShift[0];
 			xywarp[1][i]+=dXYShift[1];
-			//xymov[0][i]+=dXYShift[0];
-			//xymov[1][i]+=dXYShift[1];
-			
+
 		}	
 		
 		//find images of particles in both channels
-		CCfindParticles();
+		if(CCfindParticles()<3)
+		{
+			IJ.error("Less than 3 particles are found in both channels. Try to increase distance or lower SNR threshold.");
+		    return;
+		}
 		
 		//mark them on images (what if not possible?!)
 		
@@ -206,11 +213,16 @@ public class ColorCorrection implements PlugIn{
 		O_trans = calculateBsplineTransform(5.0);
 		IJ.log("..done.");
 		
+		if(dlg.bCCShowPoints)
+		{
+			ShowRefPoints();
+		}
 		if(dlg.bCCShowMap)
 		{
 			GenerateMap();
 		}
 		
+		return;
 	}
 	
 	/** function calculating b-spline transform
@@ -436,26 +448,21 @@ public class ColorCorrection implements PlugIn{
 			O_newB_linear[ind[iter] + 4*O_newB_szx -1]= Pnew[4][iter];					
 		}		
 		int lsizeX,lsizeY;
-  	 // dimX=(int) ((dMwidth+(Spacing[0]*3))/Spacing[0])+1;
-	   //   dimY=(int) ((dMheight+(Spacing[1]*3))/Spacing[1])+1;
+
 
 		lsizeX=(int) ((dMwidth+(Spacing[0]*3))/Spacing[0])+1;
 		lsizeY=(int) ((dMheight+(Spacing[1]*3))/Spacing[1])+1;
 		O_new = new double[2][lsizeX][lsizeY];
 		 // Set the final refined matrix
-//		for(i=0;i<O_newB_szx;i++)
-	//		for(j=0;j<O_newB_szy;j++)
-				for(i=0;i<lsizeX;i++)
-					for(j=0;j<lsizeY;j++)
 
+		for(i=0;i<lsizeX;i++)
+			for(j=0;j<lsizeY;j++)
 				for(h=0;h<2;h++)
-					O_new[h][i][j] = O_newB_linear[i + j*O_newB_szx +h*O_newB_szx*O_newB_szy];
-					//O_newB[h][i][j] = O_newB_linear[i + j*O_newB_szx +h*O_newB_szx*O_newB_szy];
-				
-		//some extra verification test
+					O_new[h][i][j] = O_newB_linear[i + j*O_newB_szx +h*O_newB_szx*O_newB_szy];				
 		
 		return O_new;
 	}
+	
 	/**
 	 * Splitting knots of b-spline
 	 * */
@@ -1288,5 +1295,50 @@ public class ColorCorrection implements PlugIn{
 		map = new ImagePlus("Distortion map (minus rigid translation)", imDirection);
 		map.setOverlay(Directions);
 		map.show();
+    }
+    /** Shows composite image of two channels with overlayed
+     * detected spots
+     * */    
+    void ShowRefPoints()
+    {
+    	ImagePlus [] images = new ImagePlus[2];    	
+    	ImagePlus imFin;
+    	Overlay imOV = new Overlay();
+    	PointRoi imPointsMov;
+    	PointRoi imPointsReg;
+    	int i;
+    	
+    	images[1]=imp_refMax;
+    	images[0]=imp_warpMax;
+    	imFin = RGBStackMerge.mergeChannels(images, false);
+    	imFin.setTitle("Reference channel(2) is green(o), warped channel(1) is red(+)");
+    	
+    	imPointsMov = new PointRoi(xymov[0][0]-dXYShift[0],xymov[1][0]-dXYShift[1]);
+    	imPointsMov.setPointType(1);
+    	//imPointsMov.setStrokeColor(Color.gr);
+    	for(i=1;i<nColocPatN;i++)
+    	{
+    		imPointsMov.addPoint(xymov[0][i]-dXYShift[0], xymov[1][i]-dXYShift[1]);
+    	}
+    	imOV.add(imPointsMov);
+    	
+    	imPointsReg = new PointRoi(xystat[0][0],xystat[1][0]);
+    	imPointsReg.setPointType(3);
+    	//imPointsReg.setStrokeColor(Color.green);
+    	for(i=1;i<nColocPatN;i++)
+    	{
+    		imPointsReg.addPoint(xystat[0][i], xystat[1][i]);
+    	}
+    	imOV.add(imPointsReg);
+    	for(i=0;i<nColocPatN;i++)
+    	{
+    		imOV.add(new Line(xystat[0][i], xystat[1][i],xymov[0][i]-dXYShift[0], xymov[1][i]-dXYShift[1]));
+    		
+    	}
+    	
+    	
+    	imFin.setOverlay(imOV);
+    	imFin.show();
+    	
     }
 }
