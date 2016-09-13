@@ -145,6 +145,10 @@ public class SMLDialog {
 	/** SNR threshold for particles used for color calibration
 	 * */
 	double dCCSNR;
+	/**
+	 *  Show distortion map
+	 */
+	boolean bCCShowMap;
 	
 	
 		
@@ -403,7 +407,8 @@ public class SMLDialog {
 	{
 		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
 		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 7),0,3," original pixels");
-		ccDial.addNumericField("SNR threshold:",Prefs.get("SiMoLoc.dCCSNR", 3),1,4," ");
+		ccDial.addNumericField("SNR threshold filter:",Prefs.get("SiMoLoc.dCCSNR", 10),1,4," ");
+		ccDial.addCheckbox("Show final distortion map:", Prefs.get("SiMoLoc.bCCShowMap", true));
 		
 		ccDial.showDialog();
 		if (ccDial.wasCanceled())
@@ -413,7 +418,9 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.dCCDist", dCCDist);
 		dCCSNR =  ccDial.getNextNumber();
 		Prefs.set("SiMoLoc.dCCSNR", dCCSNR);
-		   return true;
+		bCCShowMap = ccDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bCCShowMap", bCCShowMap);
+		return true;
 	
 	}
 	/** Dialog showing parameters for drift correction
@@ -574,45 +581,6 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bShowParticlesLink", bShowParticlesLink);
 		return true;		
 	}
-	
-	/*
-	String [] getLUTsNames()
-	{
-		ArrayList<String> lutArray= new ArrayList<String>();
-		String [] luts, lutsdef;
-		int i;
-		
-		//Menus.getCommands();
-		lutsdef=IJ.getLuts();
-		String path = IJ.getDirectory("luts");
-		if (path==null) 
-			return lutsdef;
-		File f = new File(path);
-		String[] list = null;
-		if (f.exists() && f.isDirectory())
-			list = f.list();
-		if (list==null) 
-			return lutsdef;
-		if (IJ.isLinux()) StringSorter.sort(list);
-		for (i=0; i<list.length; i++) 
-		{
- 			String name = list[i];
- 			if (name.endsWith(".lut")) {
- 				name = name.substring(0,name.length()-4);
- 				if (name.contains("_") && !name.contains(" "))
- 					name = name.replace("_", " ");
- 				lutArray.add(name);
-			}
-		}
-		luts = new String[lutArray.size()+lutsdef.length];
-		for (i=0;i<lutsdef.length;i++)
-			luts[i]=lutsdef[i];
-		for (i=0;i<lutArray.size();i++)
-		{
-			luts[i+lutsdef.length]=lutArray.get(i);
-		}
-		return luts;
-	}
-	*/
+
 
 }

@@ -54,6 +54,11 @@ public class SMLReconstruct {
 	double [] approxx;
 	/** linearly interpolated drift x coordinates for each frame */
 	double [] approxy;
+	
+	/** max Z value*/
+	double zmax;
+	/** min Z value*/
+	double zmin;
 
 	double max=0;
 	double min=9999999;
@@ -156,6 +161,10 @@ public class SMLReconstruct {
 		{
 			if (f[n]>nframes) nframes=(int) f[n];
 			
+		}
+		if(dlg_.b3D)
+		{
+			getZmaxmin();
 		}
 	
 	}
@@ -260,13 +269,13 @@ public class SMLReconstruct {
 		int nSlices;		//total number of slices
 		int sliceNumber;	//slice number of particle
 		
-		double zmin, zmax;
+		//double zmin, zmax;
 		double zMagnification =1/zstep;
 		
 			
 	
-		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
-		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		//zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		//zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
 	
 		
 		nSlices = (int) Math.ceil((zmax-zmin)/zstep);
@@ -384,7 +393,9 @@ public class SMLReconstruct {
 		
 		double dCutoff = 1000.0; //default cut-off is 1000 nm
 		double dNorm;		
-		double zmin, zmax;
+		//double zmin, zmax;
+		//zmin=zmin;
+		//zmax=zmax;
 		double zhue;
 
 		int zOldInd;
@@ -394,8 +405,8 @@ public class SMLReconstruct {
 	
 		zLUT=getHSBLutTable();
 	
-		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
-		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		//zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		//zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
 		
 		ColorProcessor imcol = new ColorProcessor(new_width, new_height);
 		FloatProcessor[] ipf = new FloatProcessor[2];
@@ -409,7 +420,7 @@ public class SMLReconstruct {
 			dCutoff = settings.dcutoff;
 		
 
-		IJ.showStatus("Reconstructing Z-stack...");
+		IJ.showStatus("Reconstructing colorcoded Z projection...");
 		
 		for (int n=0;n<nParticlesCount;n++)
 		{
@@ -1563,6 +1574,21 @@ public class SMLReconstruct {
 		}	
 		IJ.log("Coordinates translated " + Double.toString(settings.dTranslationX) +" nm in X and "+ Double.toString(settings.dTranslationY) +" in Y");
 
+	}
+	/**function calculating zmin and zmax
+	 * */
+	void getZmaxmin()
+	{
+		zmax=(-1)*Double.MAX_VALUE;
+		zmin=Double.MAX_VALUE;
+		for (int i=0;i<z.length;i++)
+		{
+			if(z[i]>zmax)
+				zmax=z[i];
+			if(z[i]<zmin)
+				zmin=z[i];
+			
+		}
 	}
 
 }
