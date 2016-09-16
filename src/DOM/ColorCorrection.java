@@ -1612,22 +1612,23 @@ public class ColorCorrection implements PlugIn
 		    return;
 		}
 		//ipfinal = interpolate_bicubic();
-		ipfinal = interpolate_nearest();
+		ipfinal = interpolate_image();
 		
 		new ImagePlus("transformed",ipfinal).show();
 		
     }
     
     /**
-     * nearest-neighbor image interpolation 
+     * bicubic image interpolation 
      * */
-    ImageProcessor interpolate_nearest()
+    ImageProcessor interpolate_image()
     {
     	int trImHeight,trImWidth;
     	double [][] xyOrig;
     	double [][] xyTrans;
     	double [][] xyBas;
     	int i,j,k;
+    	double newx,newy;
     	double dVal;
     	//int i_new,j_new;
     	
@@ -1644,8 +1645,8 @@ public class ColorCorrection implements PlugIn
 		for (i=0;i<trImWidth;i++)
 			for (j=0;j<trImHeight;j++)
 			{
-				xyOrig[0][i+j*trImWidth] = i+dXYShift[0]+0.5;
-				xyOrig[1][i+j*trImWidth] = j+dXYShift[1]+0.5;
+				xyOrig[0][i+j*trImWidth] = i-dXYShift[0];
+				xyOrig[1][i+j*trImWidth] = j-dXYShift[1];
 
 			}
 		
@@ -1667,133 +1668,22 @@ public class ColorCorrection implements PlugIn
 					xyBas[k][i+j*trImWidth]=dVal;
 				}
 		ip2 = new FloatProcessor(trImWidth,trImHeight);
-
+		ip.setInterpolationMethod(ImageProcessor.BICUBIC);
 		for (i=0;i<trImWidth;i++)
 			for (j=0;j<trImHeight;j++)
 			{
-				dVal = ip.getf((int)xyBas[0][i+j*trImWidth],(int)xyBas[1][i+j*trImWidth]);
+				//newx=xyTrans[0][i+j*trImWidth];
+				//newy=xyTrans[1][i+j*trImWidth];
+				newx=2*xyOrig[0][i+j*trImWidth]-xyTrans[0][i+j*trImWidth];
+				newy=2*xyOrig[1][i+j*trImWidth]-xyTrans[1][i+j*trImWidth];
+				
+				/*if(newx<0)
+					newx=0;*/
+				dVal = ip.getInterpolatedPixel(newx, newy);
+				//dVal = ip.getf((int)xyBas[0][i+j*trImWidth],(int)xyBas[1][i+j*trImWidth]);
 				ip2.setf(i,j,(float)dVal);
 			}
 		return ip2;
     }
     
-    /**
-     * Bicubic image interpolation 
-     * */
-    ImageProcessor interpolate_bicubic()
-    {
-    	int trImHeight,trImWidth;
-    	double [][] xyOrig;
-    	double [][] xyTrans;
-    	double [][] xyBas;
-    	double [][] txy;
-    	double [][][] vec_txy;
-    	double [][][] vec_qxy;
-    	int [][][] nxy;
-    	double [][] dI;
-    	double dVal;
-    	int i,j,k,ind,p,nVal;
-    	ImageProcessor ip,ip2;
-    	
-    	// Make all x,y indices
-		trImWidth = imp.getWidth();
-		trImHeight = imp.getHeight();
-		ip = imp.getProcessor();
-		ip = ip.convertToFloat();
-		
-		xyOrig=new double[2][trImWidth*trImWidth]; 
-		for (i=0;i<trImWidth;i++)
-			for (j=0;j<trImHeight;j++)
-			{
-				xyOrig[0][i+j*trImWidth] = i+dXYShift[0];
-				xyOrig[1][i+j*trImWidth] = j+dXYShift[1];
-			}
-		
-		// Calulate the transformation of all image coordinates by the b-sline grid
-		xyTrans = bspline_transform_slow_2d(O_trans, Spacing, xyOrig);
-		
-		
-		/*for (i=0;i<trImWidth;i++)
-			for (j=0;j<trImHeight;j++)
-			{
-				xyTrans[0][i+j*trImWidth]-=xyOrig[0][i+j*trImWidth];
-				xyTrans[1][i+j*trImWidth]-=xyOrig[1][i+j*trImWidth];
-			}
-		*/
-		xyBas=new double[2][trImWidth*trImWidth]; 
-		txy=new double[2][trImWidth*trImWidth];
-		for (k=0;k<2;k++)
-			for (i=0;i<trImWidth;i++)
-				for (j=0;j<trImHeight;j++)
-				{
-					xyBas[k][i+j*trImWidth]=Math.floor(xyTrans[k][i+j*trImWidth]);
-					txy[k][i+j*trImWidth] = xyTrans[k][i+j*trImWidth]-xyBas[k][i+j*trImWidth];
-					//txy[k][i+j*trImWidth] = xyBas[k][i+j*trImWidth]-xyTrans[k][i+j*trImWidth];
-				}
-		
-		// Determine the t vectors
-		// and 1D neighbor coordinates
-		vec_txy = new double [4][2][trImWidth*trImWidth];
-		nxy =  new int [4][2][trImWidth*trImWidth];
-		for (k=0;k<2;k++)
-			for (i=0;i<trImWidth;i++)
-				for (j=0;j<trImHeight;j++)
-					for (p=0;p<4;p++)
-					{
-						ind = i+j*trImWidth;
-						vec_txy[p][k][ind] = 0.5*Math.pow(txy[k][ind],p);
-						
-						//1D neighbor coordinates
-						nVal = (int)(xyBas[k][i+j*trImWidth]-p-1);
-						if(nVal<0)
-							nVal=0;
-						if(k==0 && nVal>=trImWidth)
-							nVal=trImWidth-1;
-						if(k==1 && nVal>=trImHeight)
-							nVal=trImHeight-1;
-						nxy[p][k][ind] = nVal;
-					}
-		
-		 // t vector multiplied with 4x4 bicubic kernel gives the to q vectors
-		vec_qxy = new double [4][2][trImWidth*trImWidth];		
-		for (k=0;k<2;k++)
-			for (i=0;i<trImWidth;i++)
-				for (j=0;j<trImHeight;j++)
-				{
-					ind = i+j*trImWidth;
-					vec_qxy[0][k][ind] = (-1.0)*vec_txy[1][k][ind] + 2.0*vec_txy[2][k][ind] - 1.0*vec_txy[3][k][ind]; 
-					vec_qxy[1][k][ind] =  (2.0)*vec_txy[0][k][ind] - 5.0*vec_txy[2][k][ind] + 3.0*vec_txy[3][k][ind];
-					vec_qxy[2][k][ind] =  (1.0)*vec_txy[1][k][ind] + 4.0*vec_txy[2][k][ind] - 3.0*vec_txy[3][k][ind];
-					vec_qxy[3][k][ind] = (-1.0)*vec_txy[2][k][ind] + 1.0*vec_txy[3][k][ind];
-				}
-		dI = new double [4*4][trImWidth*trImWidth];	
-		
-		
-		for (i=0;i<trImWidth;i++)
-			for (j=0;j<trImHeight;j++)
-				for (k=0;k<4;k++)
-					for (p=0;p<4;p++)
-					{
-						ind = i+j*trImWidth;
-						dI[k+p*4][ind] = ip.getf(nxy[k][0][ind],nxy[p][1][ind]);
-					}		
-		ip2 = new FloatProcessor(trImWidth,trImHeight);
-		double [] dxI;
-		for (i=0;i<trImWidth;i++)
-			for (j=0;j<trImHeight;j++)
-			{
-				ind = i+j*trImWidth;
-				dxI = new double [4];
-				for (p=0;p<4;p++)				
-					for (k=0;k<4;k++)
-					{
-						dxI[p] += vec_qxy[k][0][ind]*dI[k+4*p][ind];//+vec_qxy[1][0][ind]*dI[1+4*0][ind]+vec_qxy[2][0][ind]*dI[2+4*0][ind];
-					}
-				dVal = 0;
-				for (p=0;p<4;p++)
-					dVal += vec_qxy[p][1][ind]*dxI[p];
-				ip2.setf(i,j,(float)dVal);
-			}	
-		return ip2;
-    }
 }
