@@ -1,12 +1,17 @@
 package DOM;
 
-import java.awt.Color;
-import java.util.ArrayList;
 
-import ij.CompositeImage;
+import java.awt.Color;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
+import ij.Prefs;
 import ij.Undo;
 import ij.gui.Arrow;
 import ij.gui.Line;
@@ -14,7 +19,7 @@ import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Overlay;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
-import ij.plugin.CompositeConverter;
+
 import ij.plugin.PlugIn;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
@@ -26,7 +31,8 @@ import ij.process.ImageStatistics;
 import ij.process.StackProcessor;
 
 
-public class ColorCorrection implements PlugIn{
+public class ColorCorrection implements PlugIn
+{
 	
 	ImagePlus imp;
 	ImagePlus imp_refMax;
@@ -50,7 +56,7 @@ public class ColorCorrection implements PlugIn{
 	/** Shift between channels in pixels */
 	double [] dXYShift;
 	/** dimension of the B-spline grid*/
-	int dimX,dimY;
+	int dimX, dimY;
 	/** B-Spline grid coefficients */
 	double [][][] O_trans;
 	/** list of colocalized particles coordinates together */
@@ -67,15 +73,52 @@ public class ColorCorrection implements PlugIn{
 	double dPxtoNm;
 	
 	int [] Spacing;
+	/** Main fitting dialog */
+	final NonBlockingGenericDialog nbStore = new NonBlockingGenericDialog("Save/Store color calibration");  
 	
-	//final NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Fit Z-calibration"); 
+	/** date when calibration was created*/	
+	String reportDate;
+	
+	
 	@Override
-	public void run(String arg) {
+	public void run(String arg) 
+	{
 	
 		int i;
 		
 		IJ.register(ColorCorrection.class);
-	
+		
+		
+		//output calibration to IJ.Log
+		if(arg.equals("show"))
+		{
+			ColocCal_showCalibration();
+			return;
+		}
+		
+		//correct Results table
+		if(arg.equals("table"))
+		{
+			if(ColocCal_getCalibration())
+			{
+				sml = new SMLAnalysis();
+				ColocCal_transformTable();
+			}
+			return;
+		}
+		
+		//correct Results table
+		if(arg.equals("image"))
+		{
+			if(ColocCal_getCalibration())
+			{
+				sml = new SMLAnalysis();
+				ColocCal_transformImage();
+			}
+			return;
+		}
+
+		
 		//show parameters dialog
 		if(!dlg.dglColorCalibration())
 			return;
@@ -186,7 +229,7 @@ public class ColorCorrection implements PlugIn{
 		
 		IJ.log("X shift: "+Double.toString(dXYShift[0])+ " px");
 		IJ.log("Y shift: "+Double.toString(dXYShift[1]) + " px");
-		IJ.log("Finding corresponding images of particles in both channels...");
+		IJ.log("Step 3: Finding corresponding images of particles in both channels...");
 		
 		//update warped particles coordinates
 		for(i=0;i<fwarp.length;i++)
@@ -203,13 +246,13 @@ public class ColorCorrection implements PlugIn{
 			IJ.error("Less than 3 particles are found in both channels. Try to increase distance or lower SNR threshold.");
 		    return;
 		}
-		
-		//mark them on images (what if not possible?!)
-		
+				
+				
 		IJ.log("In total "+Integer.toString(nColocPatN)+" particles found.");
+		IJ.log("Density: " + Double.toString(nColocPatN*1000000/(dMheight*dMwidth*dPxtoNm*dPxtoNm))+" particles/um2");
 		
 		
-		IJ.log("Calculating B-spline transform...");
+		IJ.log("Step 4: Calculating B-spline transform...");
 		O_trans = calculateBsplineTransform(5.0);
 		IJ.log("..done.");
 		
@@ -221,6 +264,32 @@ public class ColorCorrection implements PlugIn{
 		{
 			GenerateMap();
 		}
+		DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+		// Get the date today using Calendar object.
+		Date today = Calendar.getInstance().getTime();        
+		// Using DateFormat format method we can create a string 
+		// representation of a date with the defined format.
+		reportDate = df.format(today);
+		
+		String [] ccSaveOptions = new String [] {"Store and save calibration","Only save calibration","Only store calibration"};
+		nbStore.addChoice("I'd like to:", ccSaveOptions, "Store and save calibration");
+		nbStore.showDialog();
+		if(nbStore.wasOKed())
+		{
+			int nChoice = nbStore.getNextChoiceIndex(); 
+			if(nChoice==0 || nChoice==2)
+			{
+				ColocCal_storeCalibration();
+			};
+			if(nChoice==0 || nChoice==1)
+			{
+				//ColocCal_saveCalibration();
+			};
+						
+			
+		}
+		//nbStore.setOKLabel("Store calibration");
+		//Button b = new Button("Store and save calibration");
 		
 		return;
 	}
@@ -667,13 +736,11 @@ public class ColorCorrection implements PlugIn{
 				ix[i+1+j*4]=i;
 				iy[(i+1)*4+j]=i;
 			}
-		//int [][] indexx = new int [nColocPatN][16];
+
 		for(i=0;i<nColocPatN;i++)
 			for(j=0;j<16;j++)
 			{
-				//indexx[i][j] = gx[i]+ix[j];
 				indexx[j+(i*16)] = gx[i]+ix[j];
-				//indexy[j][i] = gy[i]+iy[j];
 				indexy[j+(i*16)] = gy[i]+iy[j];
 			}
 		//Limit to boundaries grid
@@ -1340,5 +1407,393 @@ public class ColorCorrection implements PlugIn{
     	imFin.setOverlay(imOV);
     	imFin.show();
     	
+    }
+    /** functions stores current color calibration to prefs */
+    void ColocCal_storeCalibration()
+    {   
+    	int i,j,h;
+    	String sFieldName;
+    	
+    	Prefs.set("SiMoLOc.CC_dPxtoNm",dPxtoNm);
+		Prefs.set("SiMoLOc.CC_calDate",reportDate);		
+		Prefs.set("SiMoLOc.CC_dMheight",dMheight);
+		Prefs.set("SiMoLOc.CC_dMwidth",dMwidth);
+		Prefs.set("SiMoLOc.CC_Spacing0",Spacing[0]);
+		Prefs.set("SiMoLOc.CC_Spacing1",Spacing[1]);
+		Prefs.set("SiMoLOc.CC_dimX",dimX);
+		Prefs.set("SiMoLOc.CC_dimY",dimY);
+		Prefs.set("SiMoLOc.CC_dXYShift0",dXYShift[0]);
+		Prefs.set("SiMoLOc.CC_dXYShift1",dXYShift[1]);
+		
+		for(i=0;i<dimX;i++)
+			for(j=0;j<dimY;j++)
+				for(h=0;h<2;h++)
+				{
+					sFieldName = "SiMoLOc.O_trans_" + Integer.toString(h)+"_"+ Integer.toString(i)+"_"+ Integer.toString(j);
+					Prefs.set(sFieldName,O_trans[h][i][j]);
+				}
+		
+		IJ.log("Calibration grid "+Integer.toString(dimX)+"x"+Integer.toString(dimY)+"x2 stored.");
+		IJ.log("Calibration date: "+ reportDate);
+    }
+    
+    /** functions loads current color calibration from prefs to the object */
+    boolean ColocCal_getCalibration()
+    {   
+    	int i,j,h;
+    	String sFieldName;
+    	
+    	
+    	//read stored values of calibration
+		
+    	dPxtoNm=Prefs.get("SiMoLOc.CC_dPxtoNm", Double.NaN);
+    	
+		if(Double.isNaN(dPxtoNm))
+		{
+			IJ.error("There is no valid chromatic calibration present, please make one!");
+			return false;
+		}
+		
+		reportDate = Prefs.get("SiMoLOc.CC_calDate","");
+    	dMheight = Prefs.get("SiMoLOc.CC_dMheight",0);
+    	dMwidth = Prefs.get("SiMoLOc.CC_dMwidth",0);
+    	Spacing = new int[2];
+		Spacing[0] = (int) Prefs.get("SiMoLOc.CC_Spacing0",0);
+		Spacing[1] = (int) Prefs.get("SiMoLOc.CC_Spacing1",0);
+		dimX = (int) Prefs.get("SiMoLOc.CC_dimX",0);
+		dimY = (int) Prefs.get("SiMoLOc.CC_dimY",0);
+		dXYShift = new double [2];
+		dXYShift[0] = Prefs.get("SiMoLOc.CC_dXYShift0",0);
+		dXYShift[1] = Prefs.get("SiMoLOc.CC_dXYShift1",0);
+		O_trans = new double[2][dimX][dimY];
+		for(i=0;i<dimX;i++)
+			for(j=0;j<dimY;j++)
+				for(h=0;h<2;h++)
+				{
+					sFieldName = "SiMoLOc.O_trans_" + Integer.toString(h)+"_"+ Integer.toString(i)+"_"+ Integer.toString(j);
+					O_trans[h][i][j] = Prefs.get(sFieldName,0);
+				}
+		
+		return true;
+    }
+    
+    /** functions loads current color calibration from prefs to the object */
+    void ColocCal_showCalibration()
+    {   
+    	int i,j,h;
+    	String sFieldName;
+    	String sVals;
+    	
+    	
+    	//read stored values of calibration
+		
+    	dPxtoNm=Prefs.get("SiMoLOc.CC_dPxtoNm", Double.NaN);
+    	
+		if(Double.isNaN(dPxtoNm))
+		{
+			IJ.error("There is no valid chromatic calibration present, please make one!");
+			return;
+		}
+		IJ.log("Pixel size: "+Double.toString(dPxtoNm)+" nm");
+		reportDate = Prefs.get("SiMoLOc.CC_calDate","");
+		IJ.log("Calibration date: "+ reportDate);
+    	dMheight = Prefs.get("SiMoLOc.CC_dMheight",0);    	
+    	dMwidth = Prefs.get("SiMoLOc.CC_dMwidth",0);
+    	IJ.log("Image size: "+Integer.toString((int)dMwidth)+"x"+Integer.toString((int)dMheight)+" px");
+    	Spacing = new int[2];
+		Spacing[0] = (int) Prefs.get("SiMoLOc.CC_Spacing0",0);
+		Spacing[1] = (int) Prefs.get("SiMoLOc.CC_Spacing1",0);
+		IJ.log("Spacing: "+Integer.toString(Spacing[0])+"x"+Integer.toString(Spacing[1]));
+		dimX = (int) Prefs.get("SiMoLOc.CC_dimX",0);
+		dimY = (int) Prefs.get("SiMoLOc.CC_dimY",0);
+		dXYShift = new double [2];
+		dXYShift[0] = Prefs.get("SiMoLOc.CC_dXYShift0",0);
+		dXYShift[1] = Prefs.get("SiMoLOc.CC_dXYShift1",0);	
+		
+		IJ.log("Shift in X: "+Integer.toString((int)dXYShift[0])+" px and Y:"+Integer.toString((int)dXYShift[1])+" px");
+		IJ.log("Calibration grid size: "+Integer.toString(dimX)+"x"+Integer.toString(dimY)+"x2");
+		O_trans = new double[2][dimX][dimY];
+		for(h=0;h<2;h++)
+		{
+			IJ.log("Layer " + Integer.toString(h));
+			
+			for(j=0;j<dimY;j++)
+			{
+				sVals = "";
+				for(i=0;i<dimX;i++)
+
+				{
+					sFieldName = "SiMoLOc.O_trans_" + Integer.toString(h)+"_"+ Integer.toString(i)+"_"+ Integer.toString(j);
+					O_trans[h][i][j] = Prefs.get(sFieldName,0);
+					sVals = sVals +Double.toString(O_trans[h][i][j])+" "; 
+				}
+				IJ.log(sVals);
+			}
+		}		
+		return;
+    }
+    /** 
+     * function applying b-spline grid transform to the table data
+     * */
+    void ColocCal_transformTable()
+    {
+    	double  dPxtoNmTable;
+    	int i, nPatN;
+    	
+    	if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
+		{
+			IJ.error("Not able to detect a valid 'Particles Table' for reconstruction, please load one.");
+			return;
+		}
+    	IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Applying chromatic correction to the table...");
+		IJ.log("Calibration date: "+ reportDate);
+		IJ.log("Shift in X: "+Integer.toString((int)dXYShift[0])+" px and Y:"+Integer.toString((int)dXYShift[1])+" px");
+		IJ.log("Calibration grid size: "+Integer.toString(dimX)+"x"+Integer.toString(dimY)+"x2");
+		
+		dPxtoNmTable =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		if(Math.abs(dPxtoNmTable-dPxtoNm)>0.01)
+		{
+			IJ.error("Pixel size of calibration " +Double.toString(dPxtoNm)+" nm is not equal to Results table pixel of "+Double.toString(dPxtoNmTable)+" nm");
+			return;
+		}
+		//ok, seems pixel size is ok,
+		//let's load results
+		fref = sml.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+		nPatN=fref.length;
+		xyref = new double [2][nPatN];
+		xyref[0] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
+		xyref[1] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+		
+		//apply shift
+    	for(i=0;i<nPatN;i++)
+    	{
+    		xyref[0][i] +=dXYShift[0];
+    		xyref[1][i] +=dXYShift[1];
+    	}
+    	
+    	//apply b-spline transform
+    	 xyref = bspline_transform_slow_2d(O_trans, Spacing, xyref);
+    	
+    	IJ.showStatus("Updating table with corrected X and Y values...");
+ 		//update table
+ 		sml.ptable_lock.lock();
+ 		for(i=0;i<nPatN;i++)
+ 		{
+			sml.ptable.setValue(DOMConstants.Col_Xnm, i, xyref[0][i]*dPxtoNmTable);
+			sml.ptable.setValue(DOMConstants.Col_Ynm, i, xyref[1][i]*dPxtoNmTable);
+			sml.ptable.setValue(DOMConstants.Col_X, i, xyref[0][i]);
+			sml.ptable.setValue(DOMConstants.Col_Y, i, xyref[0][i]);
+ 		}
+ 		sml.ptable_lock.unlock();
+		//sml_.ptable.updateResults();
+		sml.showTable();
+		IJ.showStatus("Updating table with corrected X and Y values...done");
+    }
+    /** 
+     * function applying b-spline grid transform to the image/stack data
+     * */
+    void ColocCal_transformImage()
+    {
+    	
+    	//int i_new, j_new;
+    	ImageProcessor ip,ipfinal;
+    	//let's get the image
+		imp = IJ.getImage();
+		
+		if (imp==null)
+		{
+		    IJ.noImage();
+		    return;
+		}
+		else if (imp.getType() != ImagePlus.GRAY8 && imp.getType() != ImagePlus.GRAY16 ) 
+		{
+		    IJ.error("8 or 16 bit greyscale image required");
+		    return;
+		}
+		//ipfinal = interpolate_bicubic();
+		ipfinal = interpolate_nearest();
+		
+		new ImagePlus("transformed",ipfinal).show();
+		
+    }
+    
+    /**
+     * nearest-neighbor image interpolation 
+     * */
+    ImageProcessor interpolate_nearest()
+    {
+    	int trImHeight,trImWidth;
+    	double [][] xyOrig;
+    	double [][] xyTrans;
+    	double [][] xyBas;
+    	int i,j,k;
+    	double dVal;
+    	//int i_new,j_new;
+    	
+    	ImageProcessor ip,ip2;//, ipmoved;
+    	
+    	
+    	// Make all x,y indices
+		trImWidth = imp.getWidth();
+		trImHeight = imp.getHeight();
+		ip = imp.getProcessor();
+		ip = ip.convertToFloat();
+		
+		xyOrig=new double[2][trImWidth*trImWidth]; 
+		for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+			{
+				xyOrig[0][i+j*trImWidth] = i+dXYShift[0]+0.5;
+				xyOrig[1][i+j*trImWidth] = j+dXYShift[1]+0.5;
+
+			}
+		
+		// Calculate the transformation of all image coordinates by the b-spline grid
+		xyTrans = bspline_transform_slow_2d(O_trans, Spacing, xyOrig);
+		xyBas=new double[2][trImWidth*trImWidth]; 
+		
+		for (k=0;k<2;k++)
+			for (i=0;i<trImWidth;i++)
+				for (j=0;j<trImHeight;j++)
+				{
+					dVal =Math.floor(xyTrans[k][i+j*trImWidth]);
+					if(dVal<0)
+						dVal=0;
+					if(k==0 && dVal>=trImWidth)
+						dVal=trImWidth-1;
+					if(k==1 && dVal>=trImHeight)
+						dVal=trImHeight-1;
+					xyBas[k][i+j*trImWidth]=dVal;
+				}
+		ip2 = new FloatProcessor(trImWidth,trImHeight);
+
+		for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+			{
+				dVal = ip.getf((int)xyBas[0][i+j*trImWidth],(int)xyBas[1][i+j*trImWidth]);
+				ip2.setf(i,j,(float)dVal);
+			}
+		return ip2;
+    }
+    
+    /**
+     * Bicubic image interpolation 
+     * */
+    ImageProcessor interpolate_bicubic()
+    {
+    	int trImHeight,trImWidth;
+    	double [][] xyOrig;
+    	double [][] xyTrans;
+    	double [][] xyBas;
+    	double [][] txy;
+    	double [][][] vec_txy;
+    	double [][][] vec_qxy;
+    	int [][][] nxy;
+    	double [][] dI;
+    	double dVal;
+    	int i,j,k,ind,p,nVal;
+    	ImageProcessor ip,ip2;
+    	
+    	// Make all x,y indices
+		trImWidth = imp.getWidth();
+		trImHeight = imp.getHeight();
+		ip = imp.getProcessor();
+		ip = ip.convertToFloat();
+		
+		xyOrig=new double[2][trImWidth*trImWidth]; 
+		for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+			{
+				xyOrig[0][i+j*trImWidth] = i+dXYShift[0];
+				xyOrig[1][i+j*trImWidth] = j+dXYShift[1];
+			}
+		
+		// Calulate the transformation of all image coordinates by the b-sline grid
+		xyTrans = bspline_transform_slow_2d(O_trans, Spacing, xyOrig);
+		
+		
+		/*for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+			{
+				xyTrans[0][i+j*trImWidth]-=xyOrig[0][i+j*trImWidth];
+				xyTrans[1][i+j*trImWidth]-=xyOrig[1][i+j*trImWidth];
+			}
+		*/
+		xyBas=new double[2][trImWidth*trImWidth]; 
+		txy=new double[2][trImWidth*trImWidth];
+		for (k=0;k<2;k++)
+			for (i=0;i<trImWidth;i++)
+				for (j=0;j<trImHeight;j++)
+				{
+					xyBas[k][i+j*trImWidth]=Math.floor(xyTrans[k][i+j*trImWidth]);
+					txy[k][i+j*trImWidth] = xyTrans[k][i+j*trImWidth]-xyBas[k][i+j*trImWidth];
+					//txy[k][i+j*trImWidth] = xyBas[k][i+j*trImWidth]-xyTrans[k][i+j*trImWidth];
+				}
+		
+		// Determine the t vectors
+		// and 1D neighbor coordinates
+		vec_txy = new double [4][2][trImWidth*trImWidth];
+		nxy =  new int [4][2][trImWidth*trImWidth];
+		for (k=0;k<2;k++)
+			for (i=0;i<trImWidth;i++)
+				for (j=0;j<trImHeight;j++)
+					for (p=0;p<4;p++)
+					{
+						ind = i+j*trImWidth;
+						vec_txy[p][k][ind] = 0.5*Math.pow(txy[k][ind],p);
+						
+						//1D neighbor coordinates
+						nVal = (int)(xyBas[k][i+j*trImWidth]-p-1);
+						if(nVal<0)
+							nVal=0;
+						if(k==0 && nVal>=trImWidth)
+							nVal=trImWidth-1;
+						if(k==1 && nVal>=trImHeight)
+							nVal=trImHeight-1;
+						nxy[p][k][ind] = nVal;
+					}
+		
+		 // t vector multiplied with 4x4 bicubic kernel gives the to q vectors
+		vec_qxy = new double [4][2][trImWidth*trImWidth];		
+		for (k=0;k<2;k++)
+			for (i=0;i<trImWidth;i++)
+				for (j=0;j<trImHeight;j++)
+				{
+					ind = i+j*trImWidth;
+					vec_qxy[0][k][ind] = (-1.0)*vec_txy[1][k][ind] + 2.0*vec_txy[2][k][ind] - 1.0*vec_txy[3][k][ind]; 
+					vec_qxy[1][k][ind] =  (2.0)*vec_txy[0][k][ind] - 5.0*vec_txy[2][k][ind] + 3.0*vec_txy[3][k][ind];
+					vec_qxy[2][k][ind] =  (1.0)*vec_txy[1][k][ind] + 4.0*vec_txy[2][k][ind] - 3.0*vec_txy[3][k][ind];
+					vec_qxy[3][k][ind] = (-1.0)*vec_txy[2][k][ind] + 1.0*vec_txy[3][k][ind];
+				}
+		dI = new double [4*4][trImWidth*trImWidth];	
+		
+		
+		for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+				for (k=0;k<4;k++)
+					for (p=0;p<4;p++)
+					{
+						ind = i+j*trImWidth;
+						dI[k+p*4][ind] = ip.getf(nxy[k][0][ind],nxy[p][1][ind]);
+					}		
+		ip2 = new FloatProcessor(trImWidth,trImHeight);
+		double [] dxI;
+		for (i=0;i<trImWidth;i++)
+			for (j=0;j<trImHeight;j++)
+			{
+				ind = i+j*trImWidth;
+				dxI = new double [4];
+				for (p=0;p<4;p++)				
+					for (k=0;k<4;k++)
+					{
+						dxI[p] += vec_qxy[k][0][ind]*dI[k+4*p][ind];//+vec_qxy[1][0][ind]*dI[1+4*0][ind]+vec_qxy[2][0][ind]*dI[2+4*0][ind];
+					}
+				dVal = 0;
+				for (p=0;p<4;p++)
+					dVal += vec_qxy[p][1][ind]*dxI[p];
+				ip2.setf(i,j,(float)dVal);
+			}	
+		return ip2;
     }
 }

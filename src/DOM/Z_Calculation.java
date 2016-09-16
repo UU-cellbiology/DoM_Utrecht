@@ -30,7 +30,7 @@ public class Z_Calculation implements PlugIn
 		//read stored values of calibration
 		
 		fitCoefZ[0]=Prefs.get("SiMoLOc.ZC_polCoef0", Double.NaN);
-		if(fitCoefZ[0]==Double.NaN)
+		if(Double.isNaN(fitCoefZ[0]))
 		{
 			IJ.error("There is no valid Z-calibration present, please make one!");
 			return;

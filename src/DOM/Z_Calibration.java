@@ -708,7 +708,7 @@ public class Z_Calibration implements PlugIn{
         fitCoefZ = new double[4];
         fitRange = new int[2];
 		fitCoefZ[0]=Prefs.get("SiMoLOc.ZC_polCoef0", Double.NaN);
-		if(fitCoefZ[0]==Double.NaN)
+		if(Double.isNaN(fitCoefZ[0]))
 		{
 			IJ.error("There is no valid Z-calibration stored, please make one!");
 			return;
@@ -855,7 +855,7 @@ public class Z_Calibration implements PlugIn{
         fitCoefZ = new double[4];
         fitRange = new int[2];
 		fitCoefZ[0]=Prefs.get("SiMoLOc.ZC_polCoef0", Double.NaN);
-		if(fitCoefZ[0]==Double.NaN)
+		if(Double.isNaN(fitCoefZ[0]))
 		{
 			IJ.error("There is no valid Z-calibration stored, please make one!");
 			return;
