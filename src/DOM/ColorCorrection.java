@@ -2,6 +2,10 @@ package DOM;
 
 
 import java.awt.Color;
+import java.awt.Rectangle;
+import java.io.FileNotFoundException;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -19,7 +23,7 @@ import ij.gui.NonBlockingGenericDialog;
 import ij.gui.Overlay;
 import ij.gui.PointRoi;
 import ij.gui.Roi;
-
+import ij.io.SaveDialog;
 import ij.plugin.PlugIn;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
@@ -38,12 +42,12 @@ public class ColorCorrection implements PlugIn
 	ImagePlus imp_refMax;
 	ImagePlus imp_warpMax;
 	
-	ImagePlus mark_ref_imp;
-	ImagePlus mark_warp_imp;
+	//ImagePlus mark_ref_imp;
+	//ImagePlus mark_warp_imp;
 
 	
 	ImageStack is_temp;
-	Roi refROI, warpedROI;
+
 	SMLAnalysis sml;
 	SMLDialog dlg = new SMLDialog();
 	
@@ -86,6 +90,12 @@ public class ColorCorrection implements PlugIn
 	
 		int i;
 		
+		Roi refROI, warpedROI;
+		boolean bRefRoi = false;
+		boolean bWarpRoi = false;
+		Rectangle nRect;
+		
+		
 		IJ.register(ColorCorrection.class);
 		
 		
@@ -117,7 +127,24 @@ public class ColorCorrection implements PlugIn
 			}
 			return;
 		}
+		
+		//save calibration
+		if(arg.equals("save"))
+		{
+			if(ColocCal_getCalibration())
+			{
+				ColocCal_Save();
+			}
+			return;
+			
+		}
+		//save calibration
+		if(arg.equals("load"))
+		{
 
+			ColocCal_Load();
+			return;
+		}
 		
 		//show parameters dialog
 		if(!dlg.dglColorCalibration())
@@ -151,9 +178,10 @@ public class ColorCorrection implements PlugIn
 		}
 			
 		refROI=imp.getRoi();
-		mark_ref_imp = imp;
+		
 		if(!(refROI==null))
 		{
+			bRefRoi = true;
 			imp=imp.duplicate();
 		}
 		
@@ -173,6 +201,17 @@ public class ColorCorrection implements PlugIn
 		xyref = new double [2][fref.length];
 		xyref[0] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
 		xyref[1] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+		
+		if(bRefRoi)
+		{
+			//if ROI is selected, let's move point of origin of coordinates
+			nRect = refROI.getBounds();
+			for(i=0;i<xyref[0].length;i++)
+			{
+				xyref[0][i]-=nRect.getX();
+				xyref[1][i]-=nRect.getY();
+			}
+		}
 
 		dPxtoNm =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
 		
@@ -200,9 +239,9 @@ public class ColorCorrection implements PlugIn
 		IJ.run("Detect Molecules");
 		
 		warpedROI=imp.getRoi();
-		mark_warp_imp = imp;
 		if(!(warpedROI==null))
 		{
+			bWarpRoi = true;
 			imp=imp.duplicate();
 		}
 		zProj = new ZProjector(imp);
@@ -218,6 +257,17 @@ public class ColorCorrection implements PlugIn
 		xywarp[0] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_X);
 		xywarp[1] = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
 		
+		
+		if(bWarpRoi)
+		{
+			//if ROI is selected, let's move point of origin of coordinates
+			nRect = warpedROI.getBounds();
+			for(i=0;i<xyref[0].length;i++)
+			{
+				xywarp[0][i]-=nRect.getX();
+				xywarp[1][i]-=nRect.getY();
+			}
+		}
 		
 		IJ.log("Aligning maximum projection pictures...");
 		
@@ -283,7 +333,7 @@ public class ColorCorrection implements PlugIn
 			};
 			if(nChoice==0 || nChoice==1)
 			{
-				//ColocCal_saveCalibration();
+				ColocCal_Save();
 			};
 						
 			
@@ -645,7 +695,6 @@ public class ColorCorrection implements PlugIn
 		for(i=0;i<nPoints;i++)
 			for(j=0;j<16;j++)
 			{
-				//TODO PLUS ONE IN ORIGINAL CODE  in both directions hmmmm ??? verify
 				Cx[i][j] = O_trans[0][ix[j+(i*16)]][iy[j+(i*16)]]*CheckBound[j+(i*16)]; 
 				Cy[i][j] = O_trans[1][ix[j+(i*16)]][iy[j+(i*16)]]*CheckBound[j+(i*16)]; 
 			}
@@ -1219,8 +1268,7 @@ public class ColorCorrection implements PlugIn
     /**
      * function adjusting canvas size of two images to biggest dimension (separately in x and y)
      * 
-     * */
-    
+     * */  
     void AdjustDimensions()
     {
 		
@@ -1289,7 +1337,7 @@ public class ColorCorrection implements PlugIn
     }    
     
     /** 
-     * Function generates distortion map after displacement
+     * Function generates distortion map image (after translation correction)
      * 
      * */
     void GenerateMap()
@@ -1477,7 +1525,7 @@ public class ColorCorrection implements PlugIn
 		return true;
     }
     
-    /** functions loads current color calibration from prefs to the object */
+    /** functions prints current color calibration from prefs to the IJ log window*/
     void ColocCal_showCalibration()
     {   
     	int i,j,h;
@@ -1597,7 +1645,8 @@ public class ColorCorrection implements PlugIn
     {
     	
     	//int i_new, j_new;
-    	ImageProcessor ip,ipfinal;
+    	//ImageProcessor ipfinal;
+    
     	//let's get the image
 		imp = IJ.getImage();
 		
@@ -1606,41 +1655,72 @@ public class ColorCorrection implements PlugIn
 		    IJ.noImage();
 		    return;
 		}
-		else if (imp.getType() != ImagePlus.GRAY8 && imp.getType() != ImagePlus.GRAY16 ) 
+		else if (imp.getType() != ImagePlus.GRAY8 && imp.getType() != ImagePlus.GRAY16 && imp.getType() != ImagePlus.GRAY32) 
 		{
-		    IJ.error("8 or 16 bit greyscale image required");
+		    IJ.error("8, 16 or 32 bit greyscale image required");
 		    return;
 		}
-		//ipfinal = interpolate_bicubic();
-		ipfinal = interpolate_image();
+		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+		IJ.log("Applying chromatic correction to image/stack...");
+		IJ.log("Calibration date: "+ reportDate);
+		IJ.log("Shift in X: "+Integer.toString((int)dXYShift[0])+" px and Y:"+Integer.toString((int)dXYShift[1])+" px");
+		IJ.log("Calibration grid size: "+Integer.toString(dimX)+"x"+Integer.toString(dimY)+"x2");
 		
-		new ImagePlus("transformed",ipfinal).show();
+		
+		interpolate_image();
+		
+		return;
+		//ipfinal = interpolate_bicubic();
+		/*
+		
+		for(nSlice=0;nSlice<nStackSize;nSlice++)
+		{
+			imp.setSliceWithoutUpdate(nSlice+1);
+			//ip = ;
+			ipfinal = interpolate_image(imp.getProcessor().duplicate());
+			if(imp.getType()==ImagePlus.GRAY8)
+				finStack.addSlice(ipfinal.convertToByte(false));
+			if(imp.getType()==ImagePlus.GRAY16)
+				finStack.addSlice(ipfinal.convertToShort(false));
+			else
+				finStack.addSlice(ipfinal);
+		}
+		new ImagePlus(imp.getTitle()+" (chromatic corrected)",finStack).show();
+		*/
 		
     }
     
     /**
      * bicubic image interpolation 
      * */
-    ImageProcessor interpolate_image()
+    void interpolate_image()
     {
     	int trImHeight,trImWidth;
     	double [][] xyOrig;
     	double [][] xyTrans;
-    	double [][] xyBas;
-    	int i,j,k;
+    	//double [][] xyBas;
+    	int i,j;//,k;
     	double newx,newy;
     	double dVal;
+    	int nSlice, nStackSize;
+    	ImageStack finStack;
+    	
     	//int i_new,j_new;
     	
-    	ImageProcessor ip,ip2;//, ipmoved;
+    	ImageProcessor ip2;
+    	FloatProcessor ipn;
     	
     	
     	// Make all x,y indices
 		trImWidth = imp.getWidth();
 		trImHeight = imp.getHeight();
-		ip = imp.getProcessor();
-		ip = ip.convertToFloat();
+		nStackSize = imp.getStackSize();
+		finStack = new ImageStack(trImWidth,trImHeight);
+	
 		
+		//ipn = (FloatProcessor) ip.convertToFloat();
+		
+		//account for translation		
 		xyOrig=new double[2][trImWidth*trImWidth]; 
 		for (i=0;i<trImWidth;i++)
 			for (j=0;j<trImHeight;j++)
@@ -1650,40 +1730,170 @@ public class ColorCorrection implements PlugIn
 
 			}
 		
+		IJ.showStatus("Calculating image transform...");
 		// Calculate the transformation of all image coordinates by the b-spline grid
 		xyTrans = bspline_transform_slow_2d(O_trans, Spacing, xyOrig);
-		xyBas=new double[2][trImWidth*trImWidth]; 
+
+		IJ.showStatus("Applying correction to images...");
+		for(nSlice=0;nSlice<nStackSize;nSlice++)
+		{
+				IJ.showProgress(nSlice, nStackSize);
+				imp.setSliceWithoutUpdate(nSlice+1);
+				ipn = imp.getProcessor().duplicate().convertToFloatProcessor();
 		
-		for (k=0;k<2;k++)
-			for (i=0;i<trImWidth;i++)
-				for (j=0;j<trImHeight;j++)
-				{
-					dVal =Math.floor(xyTrans[k][i+j*trImWidth]);
-					if(dVal<0)
-						dVal=0;
-					if(k==0 && dVal>=trImWidth)
-						dVal=trImWidth-1;
-					if(k==1 && dVal>=trImHeight)
-						dVal=trImHeight-1;
-					xyBas[k][i+j*trImWidth]=dVal;
-				}
-		ip2 = new FloatProcessor(trImWidth,trImHeight);
-		ip.setInterpolationMethod(ImageProcessor.BICUBIC);
-		for (i=0;i<trImWidth;i++)
-			for (j=0;j<trImHeight;j++)
-			{
-				//newx=xyTrans[0][i+j*trImWidth];
-				//newy=xyTrans[1][i+j*trImWidth];
-				newx=2*xyOrig[0][i+j*trImWidth]-xyTrans[0][i+j*trImWidth];
-				newy=2*xyOrig[1][i+j*trImWidth]-xyTrans[1][i+j*trImWidth];
+				ip2 = new FloatProcessor(trImWidth,trImHeight);
 				
-				/*if(newx<0)
-					newx=0;*/
-				dVal = ip.getInterpolatedPixel(newx, newy);
-				//dVal = ip.getf((int)xyBas[0][i+j*trImWidth],(int)xyBas[1][i+j*trImWidth]);
-				ip2.setf(i,j,(float)dVal);
-			}
-		return ip2;
+				//add bilinear? is it quicker?!!
+				ipn.setInterpolationMethod(ImageProcessor.BICUBIC);
+				for (i=0;i<trImWidth;i++)
+					for (j=0;j<trImHeight;j++)
+					{
+						//newx=xyTrans[0][i+j*trImWidth];
+						//newy=xyTrans[1][i+j*trImWidth];
+						newx=2*xyOrig[0][i+j*trImWidth]-xyTrans[0][i+j*trImWidth];
+						newy=2*xyOrig[1][i+j*trImWidth]-xyTrans[1][i+j*trImWidth];
+						
+						/*if(newx<0)
+							newx=0;*/
+						dVal = ipn.getInterpolatedPixel(newx, newy);
+						//dVal = ip.getf((int)xyBas[0][i+j*trImWidth],(int)xyBas[1][i+j*trImWidth]);
+						ip2.setf(i,j,(float)dVal);
+					}
+		
+				if(imp.getType()==ImagePlus.GRAY8)
+					finStack.addSlice(ip2.convertToByte(false));
+				if(imp.getType()==ImagePlus.GRAY16)
+					finStack.addSlice(ip2.convertToShort(false));
+				else
+					finStack.addSlice(ip2);
+		}
+		IJ.showProgress(1.0); // (nSlice, nStackSize);
+		IJ.showStatus("Applying correction to images...done.");
+		new ImagePlus(imp.getTitle()+" (chromatic corrected)",finStack).show();
+		return;
+				
+		
     }
-    
+    /**
+     * saves chromatic calibration to file
+     * */   
+    void ColocCal_Save()
+    {
+		SaveDialog sd = new SaveDialog("Save chromatic calibration", "chromatic_calibration", ".txt");
+        String path = sd.getDirectory();
+        int i,j,h;
+        String sVals;
+        if (path==null)
+        	return;
+        String filename = path+sd.getFileName();
+        PrintWriter writer;
+		try {
+			writer = new PrintWriter(filename, "UTF-8");
+			
+			writer.println("CCdate\t"+reportDate);
+			writer.println("CC_dPxtoNm\t"+Double.toString(dPxtoNm));
+			writer.println("CC_dMheight\t"+Double.toString(dMheight));
+			writer.println("CC_dMwidth\t"+Double.toString(dMwidth));
+			writer.println("CC_Spacing0\t"+Integer.toString(Spacing[0]));
+			writer.println("CC_Spacing1\t"+Integer.toString(Spacing[1]));
+			writer.println("CC_dimX\t"+Integer.toString(dimX));
+			writer.println("CC_dimY\t"+Integer.toString(dimY));
+			writer.println("CC_dXYShift0\t"+Double.toString(dXYShift[0]));
+			writer.println("CC_dXYShift1\t"+Double.toString(dXYShift[1]));
+			writer.println("Coeff map");
+			for(h=0;h<2;h++)
+			{
+
+				
+				for(j=0;j<dimY;j++)
+				{
+					sVals = "";
+					for(i=0;i<dimX;i++)
+					{
+						sVals = sVals +Double.toString(O_trans[h][i][j])+"\t"; 
+					}
+					writer.println(sVals);
+				}
+			}		
+			
+			
+			writer.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			IJ.log(e.getMessage());
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			//e.printStackTrace();
+			IJ.log(e.getMessage());
+		}
+		IJ.log("Chromatic calibration saved.");
+		return;
+    }
+    /**
+     * loads chromatic calibration from file
+     * */   
+    void ColocCal_Load()
+    {
+    	
+    	String sCalibration;
+		String [] sCalSplittedRows;
+		String [] sCalSplittedVals;
+		String delimsn = "[\n]+";
+		String delimst = "[\t]+";
+		int i,j,h;
+		String sFieldName;
+		
+		sCalibration = IJ.openAsString("");
+		if(sCalibration==null || sCalibration.equals(""))
+			return;
+		sCalSplittedRows = sCalibration.split(delimsn);
+		
+		sCalSplittedVals =sCalSplittedRows[0].split(delimst);
+		if(!(sCalSplittedVals[0].equals("CCdate")))
+		{
+			IJ.error("Not able to detect a valid chromatic calibration, try another file.");
+			return;
+		}
+		
+		Prefs.set("SiMoLOc.CC_calDat",sCalSplittedVals[1]);
+		sCalSplittedVals =sCalSplittedRows[1].split(delimst);
+		Prefs.set("SiMoLOc.CC_dPxtoNm",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[2].split(delimst);
+		Prefs.set("SiMoLOc.CC_dMheight",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[3].split(delimst);
+		Prefs.set("SiMoLOc.CC_dMwidth",Double.parseDouble(sCalSplittedVals[1]));
+		sCalSplittedVals =sCalSplittedRows[4].split(delimst);
+		Prefs.set("SiMoLOc.CC_Spacing0",Integer.parseInt(sCalSplittedVals[1]));	
+		sCalSplittedVals =sCalSplittedRows[5].split(delimst);
+		Prefs.set("SiMoLOc.CC_Spacing1",Integer.parseInt(sCalSplittedVals[1]));	
+		
+		sCalSplittedVals =sCalSplittedRows[6].split(delimst);
+		dimX = Integer.parseInt(sCalSplittedVals[1]);
+		Prefs.set("SiMoLOc.CC_dimX",dimX);	
+		sCalSplittedVals =sCalSplittedRows[7].split(delimst);
+		dimY = Integer.parseInt(sCalSplittedVals[1]);
+		Prefs.set("SiMoLOc.CC_dimY",dimY);			
+		
+		sCalSplittedVals =sCalSplittedRows[8].split(delimst);
+		Prefs.set("SiMoLOc.CC_dXYShift0",Double.parseDouble(sCalSplittedVals[1]));	
+		sCalSplittedVals =sCalSplittedRows[9].split(delimst);
+		Prefs.set("SiMoLOc.CC_dXYShift1",Double.parseDouble(sCalSplittedVals[1]));	
+		
+		for(h=0;h<2;h++)
+		{
+
+			for(j=0;j<dimY;j++)
+			{
+				sCalSplittedVals =sCalSplittedRows[(11+j)+h*dimY].split(delimst);
+				for(i=0;i<dimX;i++)
+				{	
+					sFieldName = "SiMoLOc.O_trans_" + Integer.toString(h)+"_"+ Integer.toString(i)+"_"+ Integer.toString(j);
+					Prefs.set(sFieldName,Double.parseDouble(sCalSplittedVals[i]));
+				}
+			}
+			
+		}
+		IJ.log("Chromatic calibration loaded.");
+		return;
+    }
 }

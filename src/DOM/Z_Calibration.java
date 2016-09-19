@@ -792,6 +792,9 @@ public class Z_Calibration implements PlugIn{
 		boolean bXYWobble;
 		sCalibration = IJ.openAsString("");
 		
+		if(sCalibration==null || sCalibration.equals(""))
+			return;
+		
 		sCalSplittedRows = sCalibration.split(delimsn);
 		
 		sCalSplittedVals =sCalSplittedRows[0].split(delimst);
