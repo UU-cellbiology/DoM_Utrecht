@@ -23,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Date;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Vector;
@@ -37,12 +38,16 @@ import ij.io.SaveDialog;
 //import ij.gui.Plot;
 import ij.measure.CurveFitter;
 import ij.plugin.PlugIn;
-import ij.plugin.frame.Fitter;
 
 public class Z_Calibration implements PlugIn{
 
 	SMLDialog dlg = new SMLDialog();
 	SMLAnalysis sml = new SMLAnalysis();
+
+	/** dynamic array containing all tracks **/
+	ArrayList<ArrayList<Double[]>> all_tracks = new ArrayList<ArrayList<Double[]>>();
+	
+	/** maximul length of track in frames **/
 	int  maxTracklength;
 	
 	double []  f, sdx, sdx_err, sdy,sdy_err, trackid, particleid, tl,  sortedTracklength, sdDif, rsquared,x,y;
@@ -58,6 +63,12 @@ public class Z_Calibration implements PlugIn{
 	int[] fitRange;
 	/** zero Z offset value */
 	double zOffset;
+	/** X offset value */
+	int zOffind;
+	/** X offset value */
+	//double xOffset;
+	/** Y offset value */
+	//double yOffset;
 	/** fit range of Z curve in indexes of longestTrack array*/
 	int [] indexFitRange;
 	/** Main fitting dialog */
@@ -76,8 +87,12 @@ public class Z_Calibration implements PlugIn{
 	
 	int nPolDegree=3;
 	
+	int nFrameMin, nFrameMax;
+	
 	/** whether fit was performed or not */
 	boolean bFitDone = false;
+	
+	double [][] dDiff;
 	
 	Plot PlotSDdiff;
 	Plot PlotSDxy;
@@ -155,7 +170,8 @@ public class Z_Calibration implements PlugIn{
 	
 	public void zCal_particleTableInteractive()
 	{
-		
+		int i,j;
+		ArrayList<Double []> inner;
 		
 		//check that the table is present
 		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
@@ -169,7 +185,7 @@ public class Z_Calibration implements PlugIn{
 		{
 			//IJ.error("Particle table is probably not linked.");
 			IJ.log("WARNING! Particles are not linked in the table, performing automatic linking.");
-			IJ.run("Link Particles to Tracks", "for=[All particles] max=4 measure=[Initial position] maximum=10");;
+			IJ.run("Link Particles to Tracks", "for=[All particles] max=4 measure=[Initial position] maximum=10");
 			sml = new SMLAnalysis();
 			//return;
 		}
@@ -187,41 +203,168 @@ public class Z_Calibration implements PlugIn{
 		
 		//load values
 		get_values_from_table();
+		
+		
+		
 		if(!calculateLongestTrack())
 			return;
+		
+		calculateAverageTracks();
+		
 		estimateZzeroPosition();
+		zCal_calcMeanSD();
 		indexFitRange = new int [2];
 
 
 		PlotSDdiff = new Plot("Difference in PSF width and height (unfitted)","Z position (nm)","width-height (nm)");
+		//PlotSDdiff.addPoints(dDiff[0], dDiff[1],dDiff[2], Plot.DOT);
+		
+		/*PlotSDdiff.addPoints(dDiff[0], dDiff[1], Plot.DOT);
+		PlotSDdiff.setColor(Color.gray);
+		double [] x,y,y2;
+		for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			x = new double [inner.size()];
+			y = new double [inner.size()];
+			for(j=0;j<inner.size();j++)
+			{
+				x[j]=(inner.get(j)[2]*dlg.zCalDistBetweenPlanes)-zOffset;
+				y[j]=inner.get(j)[8];
+			}
+			PlotSDdiff.addPoints(x, y, Plot.CIRCLE);
+		
+		}
+		PlotSDdiff.setColor(Color.black);
+		PlotSDdiff.addPoints(dDiff[0], dDiff[1],dDiff[2], Plot.CIRCLE);*/
 		PlotSDdiff.addPoints(longestTrack[5], sdDif, Plot.CIRCLE);
 		PlotSDdiff.setLegend("not fitted", Plot.AUTO_POSITION);
+		//PlotSDdiff.setLimitsToFit(true);
 		final ImagePlus impDiffSD = new ImagePlus();//plot.getImagePlus();
 		PlotSDdiff.setImagePlus(impDiffSD);
 		PlotSDdiff.draw();
 		
+		
 		PlotSDxy = new Plot("Width and height of PSF","Z position (nm)","size of PSF (nm)");
+		//PlotSDxy.addPoints(dDiff[0], dDiff[3],dDiff[4], Plot.DOT);
+		//PlotSDxy.addPoints(dDiff[0], dDiff[5],dDiff[6], Plot.DOT);
+		//PlotSDxy.addPoints(dDiff[0], dDiff[3], Plot.DOT);
+		//PlotSDxy.addPoints(dDiff[0], dDiff[5], Plot.DOT);
+
+		//PlotSDxy.setLimitsToFit(true);
+		//PlotSDxy.setLimitsToFit(false);
+		
+		
+		/*
+		for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			x = new double [inner.size()];
+			y = new double [inner.size()];
+			y2 = new double [inner.size()];
+			for(j=0;j<inner.size();j++)
+			{
+				x[j]=(inner.get(j)[2]*dlg.zCalDistBetweenPlanes)-zOffset;
+				y[j]=inner.get(j)[0];
+				y2[j]=inner.get(j)[1];
+				
+			}
+			PlotSDxy.setColor(Color.red);
+			PlotSDxy.addPoints(x, y, Plot.CIRCLE);
+			PlotSDxy.setColor(Color.blue);
+			PlotSDxy.addPoints(x, y2, Plot.CIRCLE);
+
+		}*/
 		//plot sdx
 		PlotSDxy.setColor(Color.red);
 		PlotSDxy.addPoints(longestTrack[2], longestTrack[0],longestTrack[3], Plot.CIRCLE);	
-		//plot sdy
+		//plot sdy		
 		PlotSDxy.setColor(Color.blue);
 		PlotSDxy.addPoints(longestTrack[2], longestTrack[1],longestTrack[4], Plot.CIRCLE);
 		PlotSDxy.setColor(Color.black);
+		//PlotSDxy.addPoints(dDiff[0], dDiff[3],dDiff[4], Plot.CIRCLE);
+		//PlotSDxy.addPoints(dDiff[0], dDiff[5],dDiff[6], Plot.CIRCLE);
 		PlotSDxy.setLegend("width	height", Plot.AUTO_POSITION);
+		//PlotSDxy.setLimitsToFit(true);
 		final ImagePlus impSDxy = new ImagePlus();//plot.getImagePlus();
 		PlotSDxy.setImagePlus(impSDxy);
 		PlotSDxy.draw();
 		
 		PlotX = new Plot("X wobbling","Z position (nm)","X shift (nm)");
+		
+		boolean bVal;
+		double xyOffset;
+		int nInd=0;
+		/*for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			bVal = false;
+			x = new double [inner.size()];
+			y = new double [inner.size()];
+			for(j=0;j<inner.size();j++)
+			{
+				x[j]=inner.get(j)[2]-zOffset;
+				if(x[j]<0.5*dlg.zCalDistBetweenPlanes)
+				{
+					nInd =j;
+					bVal=true;
+				}
+				y[j]=inner.get(j)[6];
+			}
+			if(bVal)
+			{
+				//finding x offset
+				xyOffset = y[nInd];
+				for(j=0;j<inner.size();j++)
+				{
+					y[j]-=xyOffset;
+				}				
+				
+				PlotX.addPoints(x, y, Plot.CIRCLE);
+			}
+
+		}
+		*/
 		PlotX.addPoints(longestTrack[5], longestTrack[6], Plot.CIRCLE);
 		PlotX.setLegend("not fitted", Plot.AUTO_POSITION);
+		//PlotX.setLimitsToFit(true);
 		final ImagePlus impX = new ImagePlus();
 		PlotX.setImagePlus(impX);
 		PlotX.draw();
 
 		PlotY = new Plot("Y wobbling","Z position (nm)","Y shift (nm)");
+		/*for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			bVal = false;
+			x = new double [inner.size()];
+			y = new double [inner.size()];
+			for(j=0;j<inner.size();j++)
+			{
+				x[j]=inner.get(j)[2]-zOffset;
+				if(x[j]<0.5*dlg.zCalDistBetweenPlanes)
+				{
+					nInd =j;
+					bVal=true;
+				}
+				y[j]=inner.get(j)[7];
+			}
+			if(bVal)
+			{
+				//finding x offset
+				xyOffset = y[nInd];
+				for(j=0;j<inner.size();j++)
+				{
+					y[j]-=xyOffset;
+				}				
+				
+				PlotY.addPoints(x, y, Plot.CIRCLE);
+			}
+		}
+		*/
 		PlotY.addPoints(longestTrack[5], longestTrack[7], Plot.CIRCLE);
+		
+		//PlotY.setLimitsToFit(true);
 		PlotY.setLegend("not fitted", Plot.AUTO_POSITION);
 		final ImagePlus impY = new ImagePlus();
 		PlotY.setImagePlus(impY);
@@ -550,11 +693,13 @@ public class Z_Calibration implements PlugIn{
 		return -1;
 	}
 	
+	/** function finds the longest track **/
 	
 	public boolean calculateLongestTrack()
 	{
 		
 		int i;
+		
 		//find longest track taking into account r2 threshold
 		int dLongestTrackID = (int)trackid[0];
 		maxTracklength = 0;
@@ -579,8 +724,8 @@ public class Z_Calibration implements PlugIn{
 				dCurrentTrack=trackid[i];
 			}
 		}
-		//case only one track is present
 		
+		//case only one track is present	
 		if(dCurrentTrack == trackid[0])
 			maxTracklength=dCurrentLength;
 		//check that track has enough point
@@ -602,7 +747,7 @@ public class Z_Calibration implements PlugIn{
 					{				
 						longestTrack[0][dCurrentLength]=sdx[i];
 						longestTrack[1][dCurrentLength]=sdy[i];
-						longestTrack[2][dCurrentLength]=f[i];
+						longestTrack[2][dCurrentLength]=(f[i]-nFrameMin)*dlg.zCalDistBetweenPlanes;
 						longestTrack[3][dCurrentLength]=sdx_err[i];
 						longestTrack[4][dCurrentLength]=sdy_err[i];
 						/// five is reserved for shifted z axis
@@ -613,12 +758,13 @@ public class Z_Calibration implements PlugIn{
 				}
 		}
 		//subtract first frame
+		/*
 		for(i=1;i<maxTracklength;i++)
 		{
 			longestTrack[2][i]=(longestTrack[2][i]-longestTrack[2][0])*dlg.zCalDistBetweenPlanes;
-		}
+		}*/
 		//first frame
-		longestTrack[2][0]=0;
+		//longestTrack[2][0]=0;
 		
 		//calculate difference between SDx and SDy
 		sdDif = new double[maxTracklength];
@@ -629,6 +775,172 @@ public class Z_Calibration implements PlugIn{
 			
 		}
 		return true;
+	}
+	/** function pulls together all tracks to all_tracks structure **/
+	public boolean calculateAverageTracks()
+	{
+		int i;		
+		//find min and max frame
+		nFrameMin = Integer.MAX_VALUE;
+		nFrameMax = Integer.MIN_VALUE;
+		for(i=0;i<f.length;i++)
+		{
+			if(f[i]<nFrameMin)
+				nFrameMin=(int)f[i];
+			if(f[i]>nFrameMax)
+				nFrameMax=(int)f[i];
+			
+			
+		}
+		//all tracks
+		
+		
+	    ArrayList<Double []> inner = new ArrayList<Double []>();
+	    
+	    double dCurrentTrack = trackid[0];
+	    Double [] dPoint;
+		
+		for(i=0;i<sdx.length;i++)
+		{
+			if((int)trackid[i]==(int)dCurrentTrack)
+			{
+				if(rsquared[i]>=dlg.zCalRsquareThreshold)
+					{
+						dPoint = new Double [9];
+						dPoint[0]=sdx[i];
+						dPoint[1]=sdy[i];
+						//dPoint[2]=(f[i]-nFrameMin)*dlg.zCalDistBetweenPlanes;
+						dPoint[2]=(f[i]-nFrameMin);
+						dPoint[3]=sdx_err[i];
+						dPoint[4]=sdy_err[i];
+						/// five is reserved for shifted z axis
+						dPoint[6]=x[i];
+						dPoint[7]=y[i];
+						dPoint[8]=sdx[i]-sdy[i];
+						//dCurrentLength++;
+						inner.add(dPoint);
+					}
+			}
+			else
+			//track is finished, add it
+			{
+				//arbitrary threshold to remove noise for now
+				if(inner.size()>(maxTracklength-3))
+					all_tracks.add(inner);
+				
+				inner = new ArrayList<Double []>();
+				/*if(dCurrentLength>maxTracklength)
+				{
+					maxTracklength=dCurrentLength;
+					dLongestTrackID=(int)dCurrentTrack;
+				}
+				dCurrentLength=1;*/
+				
+				dCurrentTrack=trackid[i];
+				dPoint = new Double [9];
+				dPoint[0]=sdx[i];
+				dPoint[1]=sdy[i];
+				//dPoint[2]=(f[i]-nFrameMin)*dlg.zCalDistBetweenPlanes;
+				dPoint[2]=(f[i]-nFrameMin);
+				dPoint[3]=sdx_err[i];
+				dPoint[4]=sdy_err[i];
+				/// five is reserved for shifted z axis
+				dPoint[6]=x[i];
+				dPoint[7]=y[i];
+				dPoint[8]=sdx[i]-sdy[i];
+					
+				//dCurrentLength++;
+				inner.add(dPoint);
+				
+			}
+		}
+		if(inner.size()>(maxTracklength-3))
+			all_tracks.add(inner);
+		
+		
+		return true;
+		
+	}
+	
+	/**function calculates average and SD values for SD,X,Y,etc**/
+	
+	public void zCal_calcMeanSD()
+	{
+		int i,j;
+		int nInd;
+		double [][] dZ = new double [7][nFrameMax-nFrameMin+1];
+		ArrayList<Double []> inner;
+		
+		double [] x;
+		double [] y;
+		//calculate all points that are present
+		for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			for(j=0;j<inner.size();j++)
+			{
+				nInd = inner.get(j)[2].intValue();
+				dZ[0][nInd]++;
+				dZ[1][nInd]+=inner.get(j)[8];//sdx-sdy
+				dZ[3][nInd]+=inner.get(j)[0];//sdx
+				dZ[5][nInd]+=inner.get(j)[1];//sdy
+				//x[j]=inner.get(j)[2];
+				///y[j]=inner.get(j)[8];
+			}					
+		}		
+		//calculate average
+		for(i=0;i<(nFrameMax-nFrameMin+1);i++)
+		{
+			if(dZ[0][i]>0)
+			{
+				dZ[1][i]=dZ[1][i]/dZ[0][i];
+				dZ[3][i]=dZ[3][i]/dZ[0][i];
+				dZ[5][i]=dZ[5][i]/dZ[0][i];
+			}
+		}
+		//calculate variance
+		for(i=0;i<all_tracks.size();i++)
+		{
+			inner = all_tracks.get(i);
+			for(j=0;j<inner.size();j++)
+			{
+				nInd = inner.get(j)[2].intValue();
+				dZ[2][nInd]+=Math.pow(inner.get(j)[8]-dZ[1][nInd],2);		
+				dZ[4][nInd]+=Math.pow(inner.get(j)[0]-dZ[3][nInd],2);
+				dZ[6][nInd]+=Math.pow(inner.get(j)[1]-dZ[5][nInd],2);
+			}
+		}
+		nInd= 0;
+		//calculate SD
+		for(i=0;i<(nFrameMax-nFrameMin+1);i++)
+		{
+			if(dZ[0][i]>0)
+			{
+				dZ[2][i]=Math.sqrt(dZ[2][i]/dZ[0][i]);
+				dZ[4][i]=Math.sqrt(dZ[4][i]/dZ[0][i]);
+				dZ[6][i]=Math.sqrt(dZ[6][i]/dZ[0][i]);
+				nInd++;
+			}
+		}		
+		dDiff = new double [7][nInd];
+		nInd=-1;
+		for(i=0;i<(nFrameMax-nFrameMin+1);i++)
+		{
+			if(dZ[0][i]>0)
+			{
+				nInd++;
+				dDiff[0][nInd] = i*dlg.zCalDistBetweenPlanes-zOffset;
+				dDiff[1][nInd] =  dZ[1][i];
+				dDiff[2][nInd] =  dZ[2][i];
+				dDiff[3][nInd] =  dZ[3][i];
+				dDiff[4][nInd] =  dZ[4][i];
+				dDiff[5][nInd] =  dZ[5][i];
+				dDiff[6][nInd] =  dZ[6][i];				
+			}
+		
+		}
+		
+		return;
 	}
 	
 	public void zCal_storeCalibration()
@@ -1014,8 +1326,10 @@ public class Z_Calibration implements PlugIn{
 		int nBeg = (int)Math.round(maxTracklength/3.0);
 		int nEnd = (int)Math.round(2.0*maxTracklength/3.0);
 		int i;
-		int zOffind;
-		double xOffset,yOffset;
+		//int zOffind;
+		double xOffset;
+		double yOffset;
+		
 		zOffset = 0;
 		zOffind=nBeg;
 		double dMin = Double.MAX_VALUE;

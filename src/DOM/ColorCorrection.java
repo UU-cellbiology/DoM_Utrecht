@@ -272,8 +272,9 @@ public class ColorCorrection implements PlugIn
 		IJ.log("Aligning maximum projection pictures...");
 		
 		AdjustDimensions();
-		
-		dXYShift = calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
+		ImCrossCorrelation imCrCorr = new ImCrossCorrelation();
+		//dXYShift = imCrCorr.calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
+		dXYShift = imCrCorr.calcShiftFFTCorrelationDouble(imp_refMax.getProcessor(),imp_warpMax.getProcessor(),1);
 				
 		IJ.showProgress(1.0);
 		
@@ -314,6 +315,11 @@ public class ColorCorrection implements PlugIn
 		{
 			GenerateMap();
 		}
+		if(dlg.bCCShowResults)
+		{
+			OutputResults();
+		}
+		
 		DateFormat df = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 		// Get the date today using Calendar object.
 		Date today = Calendar.getInstance().getTime();        
@@ -399,7 +405,7 @@ public class ColorCorrection implements PlugIn
 	     }
 	     dDistMean/=nColocPatN;
 	     //display new average
-	     IJ.log("Initial average distance: " + Double.toString(dDistMean*dPxtoNm) + " nm");
+	     IJ.log("Initial average distance (minus translation): " + Double.toString(dDistMean*dPxtoNm) + " nm");
 
 	     for(nIterCount = 0;nIterCount<(int)MaxRef;nIterCount++)
 	     {
@@ -945,136 +951,6 @@ public class ColorCorrection implements PlugIn
 		 return W;
 	 }
 	
-	//TODO add subpixel precision (?)
-	/** Function calculates shift in X and Y between images using
-	 * cross correlation calculated through FFT transform
-	 * */
-	public double [] calcShiftFFTCorrelation(ImageProcessor ip1, ImageProcessor ip2)
-	{
-		double [] xyshift = new double [2];
-		
-		
-		int i,j;
-		float dRefRe,dRefIm, dWarpRe, dWarpIm;
-
-		//int imheight, imwidth;
-		int imheightFFT, imwidthFFT;
-	    FHT fht1,fht2;
-	    
-		//imheight=ip1.getHeight();
-		//imwidth =ip1.getWidth();
-		
-	    fht1 = new FHT(pad(ip1));
-	    fht2 = new FHT(pad(ip2));
-	    //fht1.originalHeight=imheight;
-	    //fht1.originalWidth=imwidth;
-	    
-	    //fht2.originalHeight=imheight;
-	    //fht2.originalWidth=imwidth;
-	    
-	    fht1.transform();
-	    fht2.transform();
-	    ImageStack ct1 = fht1.getComplexTransform();
-	    ImageStack ct2 = fht2.getComplexTransform();
-	    ImageStack istemp;
-		
-	    FloatProcessor [] is_refFFT = new FloatProcessor[2];
-		FloatProcessor [] is_warpFFT = new FloatProcessor[2];
-		FloatProcessor [] is_FFTMult = new FloatProcessor[2];
-		imheightFFT=ct1.getHeight();
-		imwidthFFT =ct1.getWidth();
-		for(i=0;i<2;i++)
-		{
-			is_refFFT[i]=(FloatProcessor) ct1.getProcessor(i+1);
-		}
-		for(i=0;i<2;i++)
-		{
-			is_warpFFT[i]=(FloatProcessor) ct2.getProcessor(i+1);
-			is_FFTMult[i] = new FloatProcessor(imwidthFFT,imheightFFT);
-		}
-			
-		//calculate convolution between two FFT
-		for(i=0;i<imwidthFFT;i++)
-			for(j=0;j<imheightFFT;j++)
-			{
-				dRefRe=is_refFFT[0].getf(i,j);
-				dRefIm=is_refFFT[1].getf(i,j);
-				
-				dWarpRe=is_warpFFT[0].getf(i,j);
-				//conjugate
-				dWarpIm=(float) ((-1.0)*is_warpFFT[1].getf(i,j));
-		
-				
-				is_FFTMult[0].setf(i,j,dRefRe*dWarpRe-dWarpIm*dRefIm);
-				is_FFTMult[1].setf(i,j,dRefRe*dWarpIm+dWarpRe*dRefIm);
-				
-				
-			}
-
-		istemp = new ImageStack(imwidthFFT, imheightFFT);
-		
-
-
-		istemp.addSlice("Real", is_FFTMult[0]);
-		istemp.addSlice("Imaginary", is_FFTMult[1]);
-		
-		
-		//ct1 = doComplexInverseTransform(istemp,imwidth, imheight);
-		ct1 = doComplexInverseTransform(istemp,0, 0);
-		
-		//ImagePlus imp1 = new ImagePlus("Complex of 1", ct1);
-		//imp1.show();
-		 
-	    
-		for(i=0;i<2;i++)
-		{
-			is_FFTMult[i]=(FloatProcessor) ct1.getProcessor(i+1);
-		}
-		
-		int niMax=0,njMax=0;
-		double nAbsMax=(-1.0)*Double.MAX_VALUE;
-		double dVal;
-		for(i=0;i<imwidthFFT;i++)
-			for(j=0;j<imheightFFT;j++)
-			{
-				dVal=Math.sqrt(is_FFTMult[0].getf(i,j)*is_FFTMult[0].getf(i,j)+is_FFTMult[1].getf(i,j)*is_FFTMult[1].getf(i,j));
-				
-				if(dVal>0)
-				{
-					dVal++;
-				}
-				if(dVal>nAbsMax)
-				{
-					nAbsMax=dVal;
-					niMax=i;
-					njMax=j;
-				}
-			}
-		
-		if((niMax+1)>Math.floor(0.5*imwidthFFT))
-		{
-			niMax = niMax - imwidthFFT;
-		}
-		/*else
-		{
-			niMax = niMax;
-		}*/
-		if((njMax+1)>Math.floor(0.5*imheightFFT))
-		{
-			njMax = njMax - imheightFFT;
-		}
-		/*
-		else
-		{
-			njMax = njMax;
-		}*/
-		
-		xyshift[0]=(double)niMax;
-		xyshift[1]=(double)njMax;
-	    return xyshift;
-		
-	}
-	
 	
 	/** function locating particles images in both channels
 	 *  returns number of colocalized particles  
@@ -1149,122 +1025,6 @@ public class ColorCorrection implements PlugIn
 		}
 		return nColocPatN;
 	}
-
-	/** 
-	 * some parts from ij.plugin.FFT code
-	 *  
-	 * */
-    ImageProcessor pad(ImageProcessor ip) 
-    {
-        int originalWidth = ip.getWidth();
-        int originalHeight = ip.getHeight();
-        int maxN = Math.max(originalWidth, originalHeight);
-        int i = 2;
-        while(i<maxN) i *= 2;
-        if (i==maxN && originalWidth==originalHeight) 
-        {
-        
-            return ip;
-        }
-        maxN = i;
-   
-        ImageStatistics stats = ImageStatistics.getStatistics(ip, ImageStatistics.MEAN, null);
-        ImageProcessor ip2 = ip.createProcessor(maxN, maxN);
-        ip2.setValue(stats.mean);
-        ip2.fill();
-        ip2.insert(ip, 0, 0);
-  
-        Undo.reset();
-        //new ImagePlus("padded", ip2.duplicate()).show();
-        return ip2;
-    }
-	/**	Swap quadrants 1 and 3 and 2 and 4 of the specified ImageProcessor 
-	so the power spectrum origin is at the center of the image.
-	<pre>
-	    2 1
-	    3 4
-	</pre>
-*/
-    void swapQuadrants(ImageStack stack) {
-        FHT fht = new FHT(new FloatProcessor(1, 1));
-        for (int i=1; i<=stack.getSize(); i++)
-            fht.swapQuadrants(stack.getProcessor(i));
-    }
-    
-    /** Complex to Complex Inverse Fourier Transform
-    *   @author Joachim Wesner
-    */
-    void c2c2DFFT(float[] rein, float[] imin, int maxN, float[] reout, float[] imout) 
-    {
-            FHT fht = new FHT(new FloatProcessor(maxN,maxN));
-            float[] fhtpixels = (float[])fht.getPixels();
-            // Real part of inverse transform
-            for (int iy = 0; iy < maxN; iy++)
-                  cplxFHT(iy, maxN, rein, imin, false, fhtpixels);
-            fht.inverseTransform();
-            // Save intermediate result, so we can do a "in-place" transform
-            float[] hlp = new float[maxN*maxN];
-            System.arraycopy(fhtpixels, 0, hlp, 0, maxN*maxN);
-            // Imaginary part of inverse transform
-            for (int iy = 0; iy < maxN; iy++)
-                  cplxFHT(iy, maxN, rein, imin, true, fhtpixels);
-            fht.inverseTransform();
-            System.arraycopy(hlp, 0, reout, 0, maxN*maxN);
-            System.arraycopy(fhtpixels, 0, imout, 0, maxN*maxN);
-      }
-    
-    /** Build FHT input for equivalent inverse FFT
-    *   @author Joachim Wesner
-    */
-    void cplxFHT(int row, int maxN, float[] re, float[] im, boolean reim, float[] fht) 
-    {
-            int base = row*maxN;
-            int offs = ((maxN-row)%maxN) * maxN;
-            if (!reim) {
-                  for (int c=0; c<maxN; c++) {
-                        int l =  offs + (maxN-c)%maxN;
-                        fht[base+c] = ((re[base+c]+re[l]) - (im[base+c]-im[l]))*0.5f;
-                  }
-            } else {
-                  for (int c=0; c<maxN; c++) {
-                        int l = offs + (maxN-c)%maxN;
-                        fht[base+c] = ((im[base+c]+im[l]) + (re[base+c]-re[l]))*0.5f;
-                  }
-            }
-      }
-    
-    ImageStack doComplexInverseTransform(ImageStack stack, int width, int height ) 
-    {
-   
-        int maxN = stack.getWidth();
-        swapQuadrants(stack);
-        float[] rein = (float[])stack.getPixels(1);
-        float[] imin = (float[])stack.getPixels(2);
-        float[] reout= new float[maxN*maxN];
-        float[] imout = new float[maxN*maxN];
-        c2c2DFFT(rein, imin, maxN, reout, imout);
-        ImageStack stack2 = new ImageStack(maxN, maxN);
-        swapQuadrants(stack);
-        stack2.addSlice("Real", reout);
-        stack2.addSlice("Imaginary", imout);
-        stack2 = unpad(stack2,width,height);
-        /*String name = WindowManager.getUniqueName(imp.getTitle().substring(10));
-        ImagePlus imp2 = new ImagePlus(name, stack2);
-        imp2.getProcessor().resetMinAndMax();
-        imp2.show();*/
-        return stack2;
-    }
-    
-    ImageStack unpad(ImageStack stack, int width, int height) 
-    {
-      
- 
-        if (width==0 || height==0 || (width==stack.getWidth()&&height==stack.getHeight()))
-            return stack;
-        StackProcessor sp = new StackProcessor(stack, null);
-        ImageStack stack2 = sp.crop(0, 0, width, height);
-        return stack2;
-    }
     /**
      * function adjusting canvas size of two images to biggest dimension (separately in x and y)
      * 
@@ -1631,7 +1391,7 @@ public class ColorCorrection implements PlugIn
 			sml.ptable.setValue(DOMConstants.Col_Xnm, i, xyref[0][i]*dPxtoNmTable);
 			sml.ptable.setValue(DOMConstants.Col_Ynm, i, xyref[1][i]*dPxtoNmTable);
 			sml.ptable.setValue(DOMConstants.Col_X, i, xyref[0][i]);
-			sml.ptable.setValue(DOMConstants.Col_Y, i, xyref[0][i]);
+			sml.ptable.setValue(DOMConstants.Col_Y, i, xyref[1][i]);
  		}
  		sml.ptable_lock.unlock();
 		//sml_.ptable.updateResults();
@@ -1895,5 +1655,40 @@ public class ColorCorrection implements PlugIn
 		}
 		IJ.log("Chromatic calibration loaded.");
 		return;
+    }
+    /** Function outputs coordinates of reference
+     * and warped channels to Results table*/
+    void OutputResults()
+    {
+    	double dl;
+    	sml.ptable.reset(); // erase particle table
+    	
+    	//transform coordinates
+    	xywarp = bspline_transform_slow_2d(O_trans, Spacing, xymov);
+    	
+    	
+    	sml.ptable_lock.lock();
+ 		for(int i=0;i<nColocPatN;i++)
+ 		{
+ 			sml.ptable.incrementCounter();
+ 			sml.ptable.addValue("X_(nm)_reference", (xystat[0][i])*dPxtoNm);
+ 			sml.ptable.addValue("Y_(nm)_reference", (xystat[1][i])*dPxtoNm);
+ 			sml.ptable.addValue("X_(nm)_warped_before", (xymov[0][i]-dXYShift[0])*dPxtoNm);
+ 			sml.ptable.addValue("Y_(nm)_warped_before", (xymov[1][i]-dXYShift[1])*dPxtoNm);
+ 			sml.ptable.addValue("X_(nm)_warped_translation", (xymov[0][i])*dPxtoNm);
+ 			sml.ptable.addValue("Y_(nm)_warped_translation", (xymov[1][i])*dPxtoNm);
+ 			sml.ptable.addValue("X_(nm)_warped_final", (xywarp[0][i])*dPxtoNm);
+ 			sml.ptable.addValue("Y_(nm)_warped_final", (xywarp[1][i])*dPxtoNm);
+ 			dl = Math.sqrt(Math.pow(xystat[0][i]-xymov[0][i]+dXYShift[0], 2)+Math.pow(xystat[1][i]-xymov[1][i]+dXYShift[1], 2))*dPxtoNm;
+ 			sml.ptable.addValue("dl(ref_-_before)", dl);
+ 			dl = Math.sqrt(Math.pow(xystat[0][i]-xymov[0][i], 2)+Math.pow(xystat[1][i]-xymov[1][i], 2))*dPxtoNm;
+ 			sml.ptable.addValue("dl(ref_-_translation)", dl);
+ 			dl = Math.sqrt(Math.pow(xystat[0][i]-xywarp[0][i], 2)+Math.pow(xystat[1][i]-xywarp[1][i], 2))*dPxtoNm;
+ 			sml.ptable.addValue("dl(ref_-_final)", dl);
+
+ 		}
+ 		sml.ptable_lock.unlock();
+ 		sml.showTable();
+    	
     }
 }

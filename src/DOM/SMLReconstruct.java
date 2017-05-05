@@ -674,12 +674,12 @@ public class SMLReconstruct {
 		else
 			nIntervalsCount = (int) Math.floor(((double)nframes)/((double)nIntervalFrames));
 
-		//sanity check
-		if(settings.nDriftMaxDistnm<settings.nDriftScale)
-		{
-			IJ.error("Maximum drift displacement is smaller than pixel size, aborting!");
-			return;
-		}			
+		//sanity check		
+		//if(settings.nDriftMaxDistnm<settings.nDriftScale)
+		//{
+			//IJ.error("Maximum drift displacement is smaller than pixel size, aborting!");
+			//return;
+		//}			
 		
 		if(nIntervalsCount <= 1)
 		{
@@ -687,7 +687,7 @@ public class SMLReconstruct {
 			return;
 		}
 	
-		//the rest of the table is truncated for now (Baaaad!)			
+		
 		driftx = new double [nIntervalsCount];
 		drifty = new double [nIntervalsCount];
 		driftxfull =  new double [nframes];
@@ -711,10 +711,12 @@ public class SMLReconstruct {
 		IJ.log("Intermediate reconstructions time: " + String.format("%.2f",((double)Math.abs(reconstructionTime))*0.000000001) + " s");
 		//show them, if asked
 		if(settings.bShowIntermediate)
-			new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", driftstack).show();
+			new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" px size="+String.format("%d",((int)settings.nDriftScale))+" nm)", driftstack).show();
+			//new ImagePlus("Intermediate reconstructions (Drift frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", driftstack).show();
 		
 		
 		IJ.showStatus("Applying Drift correction (calculating cross-correlation)...");
+		/*
 		for (i=1; i<nIntervalsCount; i++)
 		{
 			IJ.showProgress(i-1, nIntervalsCount);			
@@ -728,17 +730,31 @@ public class SMLReconstruct {
 
 		if(settings.bShowCrossCorrelation)
 			new ImagePlus("Cross Correlation (Drift frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", crosscorrstack).show();
+		*/
 		
 		driftx[0]=0;
 		drifty[0]=0;
-		
+		ImCrossCorrelation imCrCorr = new ImCrossCorrelation();
+		double [] xymaxd;
 		//define pixel with highest cross correlation value on correlation map
 		for (i=1; i<nIntervalsCount; i++)
 		{
-			xymax = getmaxpositions(crosscorrstack.getProcessor(i));
-			driftx[i] = driftx[i-1]+((xymax[0]-settings.nDriftPixels)*settings.nDriftScale);
-			drifty[i] = drifty[i-1]+((xymax[1]-settings.nDriftPixels)*settings.nDriftScale);
+			
+			//xymaxd=imCrCorr.calcShiftFFTCorrelation(driftstack.getProcessor(i),driftstack.getProcessor(i+1));
+			xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1);
+			driftx[i] = driftx[i-1]+(xymaxd[0]*settings.nDriftScale);
+			drifty[i] = drifty[i-1]+(xymaxd[1]*settings.nDriftScale);
+			//xymax = getmaxpositions(crosscorrstack.getProcessor(i));
+			//driftx[i] = driftx[i-1]+((xymax[0]-settings.nDriftPixels)*settings.nDriftScale);
+			//drifty[i] = drifty[i-1]+((xymax[1]-settings.nDriftPixels)*settings.nDriftScale);
+			IJ.showProgress(i-1, nIntervalsCount);			
 		}
+		IJ.showProgress(nIntervalsCount, nIntervalsCount);
+		fullTime = System.nanoTime() - startTime;
+		IJ.log("Cross correlation calculation time: " + String.format("%.2f", ((double)Math.abs(fullTime-reconstructionTime))*0.000000001)+ " s");
+		IJ.log("Total time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
+
+		
 		//applysimplecorrection();
 		
 		//linear interpolation of drift
@@ -794,7 +810,8 @@ public class SMLReconstruct {
 		{
 			sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(driftxfull[i])+"\t"+Double.toString(driftyfull[i])+"\n";						
 		}
-		Frame frame = WindowManager.getFrame("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)");
+		//Frame frame = WindowManager.getFrame("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)");
+		Frame frame = WindowManager.getFrame("Drift Correction (frames bin="+settings.nDriftFrames);
 		if (frame!=null && (frame instanceof TextWindow) )
 		{
 			DriftTable = (TextWindow)frame;
@@ -845,8 +862,8 @@ public class SMLReconstruct {
 			
 		
 	}
-	/** function uses linear approximation on 
-	 * discrete set of drift correction values
+	/** function uses linear approximation for interpolation of intermediate values 
+	 * for discrete set of drift correction values (corresponding to bins of frames)
 	 * */
 	void applylinearapproximationcorrection()
 	{
@@ -976,7 +993,7 @@ public class SMLReconstruct {
 		
 	}
 	
-	/** Function calculates cross-correlation between two images */	
+	/* Function calculates cross-correlation between two images //OBSOLETE	
 	ShortProcessor crosscorrelation (ImageProcessor ip1, ImageProcessor ip2)
 	{
 		int nMaxPix = settings.nDriftPixels;
@@ -1025,7 +1042,8 @@ public class SMLReconstruct {
 		returnIP = (ShortProcessor) resultIP.convertToShort(true);
 		returnIP.smooth();
 		return returnIP;		
-	}
+	}*/
+	
 	/** *
 	 * builds cumulative distribution histogram 
 	 * of z coordinate with 256 bins 
@@ -1034,12 +1052,12 @@ public class SMLReconstruct {
 	{
 		double [] cumHist = new double[256];
 		int [] cumHistFinal = new int[256];
-		double zmin, zmax;
+		//double zmin, zmax;
 		double ztemp;
 		int i;	
 	
-		zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
-		zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
+		//zmin=Prefs.get("SiMoLOc.ZC_fitRangeMin", 0);
+		//zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
 		
 		if(settings.bDynamicZscale)
 		{

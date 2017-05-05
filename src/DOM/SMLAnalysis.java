@@ -101,6 +101,7 @@ public class SMLAnalysis {
 			dubyte.erode();
 			//new ImagePlus("erosion", dubyte.duplicate()).show();
 		}
+		//new ImagePlus("threshold", dubyte.duplicate()).show();
 		//dupip.invert();
 		
 		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);

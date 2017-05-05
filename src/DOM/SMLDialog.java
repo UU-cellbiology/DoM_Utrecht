@@ -149,7 +149,8 @@ public class SMLDialog {
 	boolean bCCShowMap;
 	/**  Show points used for calibration */
 	boolean bCCShowPoints;
-	
+	/**  Put coordinates of points used for calibration to table */
+	boolean bCCShowResults;
 	
 		
 	//particle linking parameters
@@ -207,11 +208,11 @@ public class SMLDialog {
 				"Detect molecules (no fitting)","Detect molecules and fit", "Fit detected molecules"};
 		GenericDialog fpDial = new GenericDialog("Find Particles");
 		fpDial.addChoice("Task:", DetectionType, Prefs.get("SiMoLoc.DetectionType", "Detect molecules and fit"));
-		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 2), 2,4," pixels");
+		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 1.7), 2,4," pixels");
 		//fpDial.addNumericField("Gaussial kernel size, \nodd number from 7(fast) till 13 (slow)  ", Prefs.get("SiMoLoc.nKernelSize", 7), 0);		
 		fpDial.addNumericField("Pixel size", Prefs.get("SiMoLoc.dPixelSize", 66), 2, 4, "nm");
-		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 50), 0);
-		fpDial.addNumericField("Fitting iterations number", Prefs.get("SiMoLoc.nIterations", 30), 0);
+		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 500), 0);
+		fpDial.addNumericField("Fitting iterations number", Prefs.get("SiMoLoc.nIterations", 3), 0);
 		fpDial.addCheckbox("Mark detected particles in overlay?", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
 		
@@ -408,8 +409,9 @@ public class SMLDialog {
 		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
 		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 7),0,3," original pixels");
 		ccDial.addNumericField("SNR threshold filter:",Prefs.get("SiMoLoc.dCCSNR", 10),1,4," ");
-		ccDial.addCheckbox("Show points used for calibration:", Prefs.get("SiMoLoc.bCCShowPoints", true));
-		ccDial.addCheckbox("Show final distortion map:", Prefs.get("SiMoLoc.bCCShowMap", true));
+		ccDial.addCheckbox("Show points used for calibration", Prefs.get("SiMoLoc.bCCShowPoints", true));
+		ccDial.addCheckbox("Show final distortion map", Prefs.get("SiMoLoc.bCCShowMap", true));
+		ccDial.addCheckbox("Provide reference points coordinates in Results", Prefs.get("SiMoLoc.bCCShowResults", true));
 		
 		ccDial.showDialog();
 		if (ccDial.wasCanceled())
@@ -423,6 +425,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bCCShowMap", bCCShowPoints);
 		bCCShowMap = ccDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bCCShowMap", bCCShowMap);
+		bCCShowResults = ccDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bCCShowMap", bCCShowResults);
 		return true;
 	
 	}
@@ -438,12 +442,12 @@ public class SMLDialog {
 		dgDriftCorrection.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
 		dgDriftCorrection.addNumericField("Pixel size for intermediate reconstruction: ", Prefs.get("SiMoLoc.nDriftScale", 10), 2,6,"nm");
 		dgDriftCorrection.addNumericField("Window size:", Prefs.get("SiMoLoc.drift_frames", 1000), 0,6," frames");
-		dgDriftCorrection.addNumericField("Maximum shift between windows:", Prefs.get("SiMoLoc.drift_nm", 50), 0, 3, " nm" );
+		//dgDriftCorrection.addNumericField("Maximum shift between windows:", Prefs.get("SiMoLoc.drift_nm", 50), 0, 3, " nm" );
 		dgDriftCorrection.addCheckbox("Apply correction to Results Table", Prefs.get("SiMoLoc.drift_apply", true));
 		dgDriftCorrection.addCheckbox("Show corrected image (using settings from Reconstruct)", Prefs.get("SiMoLoc.drift_reconstruct", true));
 		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~");
 		dgDriftCorrection.addCheckbox("Show intermediate reconstructions", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
-		dgDriftCorrection.addCheckbox("Show cross-correlation maps", Prefs.get("SiMoLoc.drift_cross_correlation", false));
+		//dgDriftCorrection.addCheckbox("Show cross-correlation maps", Prefs.get("SiMoLoc.drift_cross_correlation", false));
 		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~~~");
 		//Get and show values from "Reconstruct window"
 		String sRenderParameters="Rendering parameters (from Reconstruct menu)\n";
@@ -517,9 +521,10 @@ public class SMLDialog {
 		
 		nDriftFrames = (int) dgDriftCorrection.getNextNumber();
 		Prefs.set("SiMoLoc.drift_frames", nDriftFrames);
-		nDriftMaxDistnm = dgDriftCorrection.getNextNumber();
-		nDriftPixels = (int) Math.ceil(nDriftMaxDistnm /nDriftScale);
-		Prefs.set("SiMoLoc.drift_nm", nDriftMaxDistnm);
+		
+		//nDriftMaxDistnm = dgDriftCorrection.getNextNumber();
+		//nDriftPixels = (int) Math.ceil(nDriftMaxDistnm /nDriftScale);
+		//Prefs.set("SiMoLoc.drift_nm", nDriftMaxDistnm);
 
 
 		bDriftUpdateTable = dgDriftCorrection.getNextBoolean();
@@ -527,10 +532,12 @@ public class SMLDialog {
 		bDriftMakeReconstruction = dgDriftCorrection.getNextBoolean();
 		Prefs.set("SiMoLoc.drift_reconstruct", bDriftMakeReconstruction);
 		
+		
 		bShowIntermediate = dgDriftCorrection.getNextBoolean();
 		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
-		bShowCrossCorrelation = dgDriftCorrection.getNextBoolean();
-		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
+		bShowCrossCorrelation = false;
+		//bShowCrossCorrelation = dgDriftCorrection.getNextBoolean();
+		//Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
         
 		// width and height of image
 		nRecWidth = xmax + xlocavg_*3.0;
@@ -560,8 +567,8 @@ public class SMLDialog {
 		String [] LinkFPOptions = new String [] {
 				"Only true positives", "All particles"};
 		
-		dgLink.addChoice("For linking use:", LinkFPOptions, Prefs.get("SiMoLoc.Link_FP", "Only true positives"));
-		dgLink.addNumericField("Max distance to search over one frame:", Prefs.get("SiMoLoc.LinkDist", 1), 2,4," original pixels");
+		dgLink.addChoice("For linking use:", LinkFPOptions, Prefs.get("SiMoLoc.Link_FP", "All particles"));
+		dgLink.addNumericField("Max distance to search over one frame:", Prefs.get("SiMoLoc.LinkDist", 5), 2,4," original pixels");
 		dgLink.addChoice("Measure distance from:", Link_Dist, Prefs.get("SiMoLoc.LinkTrace", "Initial position"));
 		dgLink.addNumericField("Maximum linking gap in frames:", Prefs.get("SiMoLoc.LinkFrames", 0), 0);
 		dgLink.addCheckbox("Display tracks in overlay?", Prefs.get("SiMoLoc.bShowTracks", true));
