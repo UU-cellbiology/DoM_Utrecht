@@ -407,7 +407,7 @@ public class SMLDialog {
 	public boolean dglColorCalibration() 
 	{
 		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
-		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 7),0,3," original pixels");
+		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 10),0,3," original pixels");
 		ccDial.addNumericField("SNR threshold filter:",Prefs.get("SiMoLoc.dCCSNR", 10),1,4," ");
 		ccDial.addCheckbox("Show points used for calibration", Prefs.get("SiMoLoc.bCCShowPoints", true));
 		ccDial.addCheckbox("Show final distortion map", Prefs.get("SiMoLoc.bCCShowMap", true));

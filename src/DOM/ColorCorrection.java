@@ -152,9 +152,9 @@ public class ColorCorrection implements PlugIn
 		dCCSNR= dlg.dCCSNR;
 		dCCDist = dlg.dCCDist;
 		
-		NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Choose image and ROI of REFERENCE channel");
+		NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Choose image of REFERENCE channel");
 		
-		nb.addMessage("Choose calibration image and ROI region for REFERENCE channel");
+		nb.addMessage("Choose calibration image/stack (or ROI) for REFERENCE channel");
 		nb.showDialog();
 		if(!nb.wasOKed())
 			return;
@@ -216,8 +216,8 @@ public class ColorCorrection implements PlugIn
 		dPxtoNm =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
 		
 		
-		nb = new NonBlockingGenericDialog("Choose image and ROI of WARPED channel");
-		nb.addMessage("Choose calibration image and ROI region for WARPED channel");
+		nb = new NonBlockingGenericDialog("Choose image of WARPED channel");
+		nb.addMessage("Choose calibration image/stack (or ROI) for WARPED channel");
 		nb.showDialog();
 		if(!nb.wasOKed())
 			return;
