@@ -447,7 +447,7 @@ public class SMLDialog {
 		dgDriftCorrection.addCheckbox("Show corrected image (using settings from Reconstruct)", Prefs.get("SiMoLoc.drift_reconstruct", true));
 		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~");
 		dgDriftCorrection.addCheckbox("Show intermediate reconstructions", Prefs.get("SiMoLoc.drift_intermediate_reconstr", false));		
-		//dgDriftCorrection.addCheckbox("Show cross-correlation maps", Prefs.get("SiMoLoc.drift_cross_correlation", false));
+		dgDriftCorrection.addCheckbox("Show cross-correlation maps", Prefs.get("SiMoLoc.drift_cross_correlation", false));
 		dgDriftCorrection.addMessage("~~~~~~~~~~~~~~~~~~~~~~~");
 		//Get and show values from "Reconstruct window"
 		String sRenderParameters="Rendering parameters (from Reconstruct menu)\n";
@@ -535,9 +535,9 @@ public class SMLDialog {
 		
 		bShowIntermediate = dgDriftCorrection.getNextBoolean();
 		Prefs.set("SiMoLoc.drift_intermediate_reconstr", bShowIntermediate);
-		bShowCrossCorrelation = false;
-		//bShowCrossCorrelation = dgDriftCorrection.getNextBoolean();
-		//Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
+		//bShowCrossCorrelation = false;
+		bShowCrossCorrelation = dgDriftCorrection.getNextBoolean();
+		Prefs.set("SiMoLoc.drift_cross_correlation", bShowCrossCorrelation);
         
 		// width and height of image
 		nRecWidth = xmax + xlocavg_*3.0;

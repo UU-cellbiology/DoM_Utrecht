@@ -644,7 +644,7 @@ public class SMLReconstruct {
 		int i;
 
 		int nIntervalFrames;
-		int [] xymax;
+		//int [] xymax;
 		String sDriftData ="";
 		TextWindow DriftTable; 
 		
@@ -666,7 +666,7 @@ public class SMLReconstruct {
 		drift_width  = (int) (settings.nRecWidth*dDriftMagn);
 		drift_height = (int) (settings.nRecHeight*dDriftMagn);
 		driftstack = new ImageStack(drift_width, drift_height);
-		crosscorrstack = new ImageStack(2*settings.nDriftPixels+1, 2*settings.nDriftPixels+1);
+		crosscorrstack = new ImageStack(drift_width, drift_height);
 		
 		//calculating number of time intervals
 		if(settings.bFramesInterval)
@@ -674,12 +674,6 @@ public class SMLReconstruct {
 		else
 			nIntervalsCount = (int) Math.floor(((double)nframes)/((double)nIntervalFrames));
 
-		//sanity check		
-		//if(settings.nDriftMaxDistnm<settings.nDriftScale)
-		//{
-			//IJ.error("Maximum drift displacement is smaller than pixel size, aborting!");
-			//return;
-		//}			
 		
 		if(nIntervalsCount <= 1)
 		{
@@ -740,13 +734,14 @@ public class SMLReconstruct {
 		for (i=1; i<nIntervalsCount; i++)
 		{
 			
-			//xymaxd=imCrCorr.calcShiftFFTCorrelation(driftstack.getProcessor(i),driftstack.getProcessor(i+1));
-			xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1);
+			if(settings.bShowCrossCorrelation)
+			{
+				crosscorrstack.addSlice(imCrCorr.calcFFTCorrelationImage(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1));
+			}
+			xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1);			
 			driftx[i] = driftx[i-1]+(xymaxd[0]*settings.nDriftScale);
 			drifty[i] = drifty[i-1]+(xymaxd[1]*settings.nDriftScale);
-			//xymax = getmaxpositions(crosscorrstack.getProcessor(i));
-			//driftx[i] = driftx[i-1]+((xymax[0]-settings.nDriftPixels)*settings.nDriftScale);
-			//drifty[i] = drifty[i-1]+((xymax[1]-settings.nDriftPixels)*settings.nDriftScale);
+	
 			IJ.showProgress(i-1, nIntervalsCount);			
 		}
 		IJ.showProgress(nIntervalsCount, nIntervalsCount);
@@ -754,6 +749,9 @@ public class SMLReconstruct {
 		IJ.log("Cross correlation calculation time: " + String.format("%.2f", ((double)Math.abs(fullTime-reconstructionTime))*0.000000001)+ " s");
 		IJ.log("Total time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
 
+		
+		if(settings.bShowCrossCorrelation)
+			new ImagePlus("Cross Correlation (Drift frames="+settings.nDriftFrames+" px size="+String.format("%d",((int)settings.nDriftScale))+" nm)", crosscorrstack).show();
 		
 		//applysimplecorrection();
 		
@@ -811,7 +809,7 @@ public class SMLReconstruct {
 			sDriftData = sDriftData + Integer.toString(i+1)+"\t"+Double.toString(driftxfull[i])+"\t"+Double.toString(driftyfull[i])+"\n";						
 		}
 		//Frame frame = WindowManager.getFrame("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)");
-		Frame frame = WindowManager.getFrame("Drift Correction (frames bin="+settings.nDriftFrames);
+		Frame frame = WindowManager.getFrame("Drift Correction (frames bin="+settings.nDriftFrames +" px size="+String.format("%d",((int)settings.nDriftScale))+" nm)");
 		if (frame!=null && (frame instanceof TextWindow) )
 		{
 			DriftTable = (TextWindow)frame;
@@ -820,7 +818,8 @@ public class SMLReconstruct {
 			DriftTable.getTextPanel().updateDisplay();			
 		}
 			else
-				DriftTable = new TextWindow("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", "Frame_Number\tX_drift_(nm)\tY_drift_(nm)", sDriftData, 450, 300);			
+				DriftTable = new TextWindow("Drift Correction (frames="+settings.nDriftFrames+" px size="+String.format("%d",((int)settings.nDriftScale))+" nm)", "Frame_Number\tX_drift_(nm)\tY_drift_(nm)", sDriftData, 450, 300);
+				//DriftTable = new TextWindow("Drift Correction (frames="+settings.nDriftFrames+" max shift="+String.format("%d",((int)settings.nDriftMaxDistnm))+" nm)", "Frame_Number\tX_drift_(nm)\tY_drift_(nm)", sDriftData, 450, 300);			
 		
 		return;
 		
