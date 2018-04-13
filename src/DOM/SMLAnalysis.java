@@ -39,7 +39,7 @@ public class SMLAnalysis {
 	SMLAnalysis()
 	{
 		ptable = ResultsTable.getResultsTable();
-		ptable.setPrecision(5);
+		ptable.setPrecision(2);
 		
 	}
 	
@@ -101,7 +101,7 @@ public class SMLAnalysis {
 			dubyte.erode();
 			//new ImagePlus("erosion", dubyte.duplicate()).show();
 		}
-		//new ImagePlus("threshold", dubyte.duplicate()).show();
+		//new ImagePlus("threshold_eroded", dubyte.duplicate()).show();
 		//dupip.invert();
 		
 		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
@@ -455,10 +455,10 @@ public class SMLAnalysis {
 					for(j =(int) (yCentroid-ySD); j<=(int)(yCentroid+ySD); j++)
 						dNoiseSD += Math.pow(dNoiseAvrg -ipRaw.getPixel(i,j),2);
 					dNoiseSD = Math.sqrt(dNoiseSD/(4*xSD+4*ySD+8));
-					if (nFalsePositive==1)						
+					if (nFalsePositive==0)						
 						dSNR =  fitted_parameters[1]/dNoiseSD;
 					else
-						dSNR =  (dIMax - dIMin)/dNoiseSD;
+						dSNR =  (dIMax - dNoiseAvrg)/dNoiseSD;
 				}
 				//}
 				if(fitted_parameters[2]>0 && fitted_parameters[2]<width && fitted_parameters[3]>0 && fitted_parameters[3]<height && fitted_parameters[1]>0)

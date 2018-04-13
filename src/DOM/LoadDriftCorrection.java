@@ -20,7 +20,10 @@ public class LoadDriftCorrection implements PlugIn
 		String [] sCorrSplittedRows;
 		String [] sCorrSplittedVals;
 		String delimsn = "[\n]+";
+		
 		String delimst = "[\t]+";
+		String delimstab = "[\t]+";
+		String delimscomma = ",";
 		int nTotalFramesTable;
 		double [] xdrift;
 		double [] ydrift;
@@ -38,6 +41,10 @@ public class LoadDriftCorrection implements PlugIn
 		}
 		sCorrection = IJ.openAsString("");
 		sCorrSplittedRows = sCorrection.split(delimsn);
+		if(sCorrSplittedRows[0].contains(","))
+			{delimst=delimscomma;}
+		else
+			{delimst=delimstab;}
 		
 		sCorrSplittedVals =sCorrSplittedRows[0].split(delimst);
 

@@ -64,9 +64,9 @@ public class Export_MTrackJ implements PlugIn {
 		}
 		
 		//sorting tracks to be sure in the Results table organization
-		Sort_Results.sorting_external_silent(sml, 19, true);
-		Sort_Results.sorting_external_silent(sml, 18, true);
 		
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_ParticleID, true);
+		Sort_Results.sorting_external_silent(sml, DOMConstants.Col_TrackID, true);
 		//reading Results table to linker object 
 		smlLink = new SMLLinker(sml);
 		

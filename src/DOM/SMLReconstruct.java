@@ -734,13 +734,30 @@ public class SMLReconstruct {
 		for (i=1; i<nIntervalsCount; i++)
 		{
 			
-			if(settings.bShowCrossCorrelation)
+			//first batch and all others
+			if(settings.nDriftMethod==0)
 			{
-				crosscorrstack.addSlice(imCrCorr.calcFFTCorrelationImage(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1));
+				if(settings.bShowCrossCorrelation)
+				{
+					crosscorrstack.addSlice(imCrCorr.calcFFTCorrelationImage(driftstack.getProcessor(1),driftstack.getProcessor(i+1),1));
+				}
+				xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(1),driftstack.getProcessor(i+1),1);			
+				driftx[i] = xymaxd[0]*settings.nDriftScale;
+				drifty[i] = xymaxd[1]*settings.nDriftScale;
+
 			}
-			xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1);			
-			driftx[i] = driftx[i-1]+(xymaxd[0]*settings.nDriftScale);
-			drifty[i] = drifty[i-1]+(xymaxd[1]*settings.nDriftScale);
+			
+			//consecutive batches
+			if(settings.nDriftMethod==1)
+			{
+				if(settings.bShowCrossCorrelation)
+				{
+					crosscorrstack.addSlice(imCrCorr.calcFFTCorrelationImage(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1));
+				}
+				xymaxd=imCrCorr.calcShiftFFTCorrelationDouble(driftstack.getProcessor(i),driftstack.getProcessor(i+1),1);			
+				driftx[i] = driftx[i-1]+(xymaxd[0]*settings.nDriftScale);
+				drifty[i] = drifty[i-1]+(xymaxd[1]*settings.nDriftScale);
+			}
 	
 			IJ.showProgress(i-1, nIntervalsCount);			
 		}
@@ -1386,6 +1403,7 @@ public class SMLReconstruct {
 				z[nCount]   = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Znm];
 				loc_errx[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errX];
 				loc_erry[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errY];
+				loc_errz[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_loc_errZ];
 				res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp]+=1.2; //restore averaged value
 				fp[nCount]  = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_Fp];
 				f[nCount] = res_table_unique[nFrameCount][nCurrentParticle][DOMConstants.Col_FrameN];
@@ -1467,7 +1485,7 @@ public class SMLReconstruct {
 			dAverW[DOMConstants.Col_Y] += item[DOMConstants.Col_Y]*dWeight;
 			dAverW[DOMConstants.Col_Ynm] += item[DOMConstants.Col_Ynm]*dWeight;			
 			dAverW[DOMConstants.Col_loc_errY] += dWeight;
-			
+						
 			dWeight = Math.pow(item[DOMConstants.Col_Amp_error], -2);
 			dAverW[DOMConstants.Col_AmplFit] += item[DOMConstants.Col_AmplFit]*dWeight;
 			dAverW[DOMConstants.Col_Amp_error] += dWeight;
@@ -1484,16 +1502,16 @@ public class SMLReconstruct {
 			dAverW[DOMConstants.Col_SD_Y] += item[DOMConstants.Col_SD_Y]*dWeight;
 			dAverW[DOMConstants.Col_SD_Y_err] += dWeight;
 			
-			//TODO recalculate Z as weighted when Z error would be present
-			/*if(Math.abs(item[DOMConstants.Col_Znm])>0)
+			//recalculate Z as weighted when Z error is present
+			if(Math.abs(item[DOMConstants.Col_Znm])>0)
 			{
 				dWeight = Math.pow(item[DOMConstants.Col_loc_errZ], -2);
 				dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm]*dWeight;
 				dAverW[DOMConstants.Col_loc_errZ] += dWeight;
 			}
-			*/
+			
 			//simple average part
-			dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm];
+			//dAverW[DOMConstants.Col_Znm] += item[DOMConstants.Col_Znm];
 			
 			dAverW[DOMConstants.Col_IntegrInt] += item[DOMConstants.Col_IntegrInt];
 			dAverW[DOMConstants.Col_SNR] += item[DOMConstants.Col_SNR];
@@ -1526,15 +1544,15 @@ public class SMLReconstruct {
 		dAverW[DOMConstants.Col_SD_Y]/=dAverW[DOMConstants.Col_SD_Y_err];		
 		dAverW[DOMConstants.Col_SD_Y_err] = 1/Math.sqrt(dAverW[DOMConstants.Col_SD_Y_err]);
 		
-		//TODO recalculate Z as weighted when Z error would be present
-		/*if(Math.abs(dAverW[DOMConstants.Col_Znm])>0)
+		// recalculate Z as weighted when Z error is present
+		if(Math.abs(dAverW[DOMConstants.Col_Znm])>0)
 		{
 			dAverW[DOMConstants.Col_Znm]/=dAverW[DOMConstants.Col_loc_errZ];		
 			dAverW[DOMConstants.Col_loc_errZ] = 1/Math.sqrt(dAverW[DOMConstants.Col_loc_errZ]);			
-		}*/
+		}
 
 		//just simple average for these values
-		dAverW[DOMConstants.Col_Znm] /= (double)nCount;
+		//dAverW[DOMConstants.Col_Znm] /= (double)nCount;
 		dAverW[DOMConstants.Col_IntegrInt] /= (double)nCount;
 		dAverW[DOMConstants.Col_SNR] /= (double)nCount;
 		dAverW[DOMConstants.Col_chi] /= (double)nCount;

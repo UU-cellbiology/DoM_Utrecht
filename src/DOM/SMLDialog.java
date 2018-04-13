@@ -1,16 +1,11 @@
 package DOM;
 
 
-import java.awt.MenuItem;
-import java.io.File;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
 
 import ij.IJ;
-import ij.Menus;
 import ij.Prefs;
 import ij.gui.GenericDialog;
-import ij.util.StringSorter;
 import ij.util.Tools;
 
 public class SMLDialog {
@@ -58,9 +53,7 @@ public class SMLDialog {
 	/** width of original image for reconstruction in nm */
 	double nRecWidth;
 	/** height of original image for reconstruction in nm */
-	double nRecHeight;          
-	/** parameter of intensity reconstruction */
-	//int nIntIndex;           
+	double nRecHeight;                   
 	/** parameter of intensity reconstruction */
 	int nSDIndex;            
 	/** value of SD in case of fixed value */
@@ -99,6 +92,11 @@ public class SMLDialog {
 	boolean bDrift=false;
 	/** number of frames for averaging per one time interval during drift correction */
 	int nDriftFrames; 
+	/** CC method to account for drift:
+	 * 0 = Direct CC first batch and all others;
+	 * 1 = Direct CC consecutive batches 
+	 * 2 = Redundant CC -> to be implemented **/
+	int nDriftMethod;
 	/** Maximal shift in pixels per one time period defined by previous parameter for drift correction */
 	int nDriftPixels;
 	/** Maximal shift in nm per one time period defined by previous parameter for drift correction */
@@ -436,12 +434,16 @@ public class SMLDialog {
 	 */
 	public boolean DriftCorrection(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, double xmax, double ymax) 		
 	{
-		
+		String [] DriftMethodOpt = new String [] {
+				"Direct CC first batch and all others","Direct CC consecutive batches"};
 		
 		GenericDialog dgDriftCorrection = new GenericDialog("Calculate drift correction (correlation based)");
 		dgDriftCorrection.addMessage("Average localization precision in X: " + new DecimalFormat("#.##").format(xlocavg_) + " nm, in Y: " +  new DecimalFormat("#.##").format(ylocavg_) +" nm.");
 		dgDriftCorrection.addNumericField("Pixel size for intermediate reconstruction: ", Prefs.get("SiMoLoc.nDriftScale", 10), 2,6,"nm");
-		dgDriftCorrection.addNumericField("Window size:", Prefs.get("SiMoLoc.drift_frames", 1000), 0,6," frames");
+		dgDriftCorrection.addNumericField("Batch size:", Prefs.get("SiMoLoc.drift_frames", 1000), 0,6," frames");
+		
+		dgDriftCorrection.addChoice("Method:", DriftMethodOpt, Prefs.get("SiMoLoc.drift_method", "Direct CC first batch and all others"));
+		
 		//dgDriftCorrection.addNumericField("Maximum shift between windows:", Prefs.get("SiMoLoc.drift_nm", 50), 0, 3, " nm" );
 		dgDriftCorrection.addCheckbox("Apply correction to Results Table", Prefs.get("SiMoLoc.drift_apply", true));
 		dgDriftCorrection.addCheckbox("Show corrected image (using settings from Reconstruct)", Prefs.get("SiMoLoc.drift_reconstruct", true));
@@ -521,6 +523,9 @@ public class SMLDialog {
 		
 		nDriftFrames = (int) dgDriftCorrection.getNextNumber();
 		Prefs.set("SiMoLoc.drift_frames", nDriftFrames);
+		
+		nDriftMethod = dgDriftCorrection.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.drift_method", DriftMethodOpt[nDriftMethod]);
 		
 		//nDriftMaxDistnm = dgDriftCorrection.getNextNumber();
 		//nDriftPixels = (int) Math.ceil(nDriftMaxDistnm /nDriftScale);

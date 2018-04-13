@@ -534,7 +534,7 @@ public class Detect_Molecules implements PlugIn {
 				IJ.log("Fitting time: " + String.format("%.2f", ((double)Math.abs(fullTime-detectionTime))*0.000000001)+ " s");
 				IJ.log("Total time: " + String.format("%.2f",((double)Math.abs(fullTime))*0.000000001) + " s");
 			}
-
+			IJ.log("Total number of localizations: "+String.format("%d", sml.ptable.getCounter()));
 		}
 
 	}

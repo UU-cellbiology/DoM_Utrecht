@@ -44,16 +44,17 @@ public class DriftCorrection implements PlugIn{
 		sz = xloc.length; 
 		xlocavg=0; ylocavg = 0;
 		dPatCount=0;
+		double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
 		for (i=0; i<sz; i++)
 		{
-			if(falsepos[i]<0.2)
+			if(xloc[i]*pxsize<1 && yloc[i]*pxsize<1)
 			{
 				xlocavg+=xloc[i];
 				ylocavg+=yloc[i];
 				dPatCount++;
 			}
 		}
-		//pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		
 		xlocavg = xlocavg/dPatCount;
 		ylocavg = ylocavg/dPatCount;
 		
@@ -70,8 +71,8 @@ public class DriftCorrection implements PlugIn{
 		ymax = 0;
 		for (i=0; i<sz; i++)
 		{
-			//use only true positives to estimate image borders
-			if(falsepos[i]<0.2)
+			//check if localization precision is less than 1 pixels
+			if(xloc[i]*pxsize<1 && yloc[i]*pxsize<1)
 			{
 				if(xnm[i]>xmax)
 					xmax=xnm[i];
@@ -89,9 +90,14 @@ public class DriftCorrection implements PlugIn{
 		smlViewer = new SMLReconstruct(imagename, sml, dlg);
 		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");		
 		IJ.log("Calculating drift correction ");
-		IJ.log("Window size: "+ String.format("%d",dlg.nDriftFrames)+" frames");
+		IJ.log("Batch size: "+ String.format("%d",dlg.nDriftFrames)+" frames");
 		IJ.log("Pixel size of intermediate reconstructions: "+ String.format("%.2f",dlg.nDriftScale)+ " nm");
-		IJ.log("Maximum shift between windows: "+ String.format("%.2f",dlg.nDriftMaxDistnm)+ " nm");
+		if(dlg.nDriftMethod==0)
+			IJ.log("Drift correction method: Direct CC first batch and all others");
+		if(dlg.nDriftMethod==1)
+			IJ.log("Drift correction method: Direct CC consecutive batches");
+		
+		//IJ.log("Maximum shift between windows: "+ String.format("%.2f",dlg.nDriftMaxDistnm)+ " nm");
 		if(dlg.bDriftUpdateTable)
 			IJ.log("Results Table update: On");
 		else

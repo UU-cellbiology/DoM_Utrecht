@@ -77,6 +77,11 @@ public class Z_Calculation implements PlugIn
 			//summary error according to error propagation: first variance
 			dVal_Err = Math.pow(fitCoefZ[1]*dVal_Err,2) + Math.pow(fitCoefZ[2]*2*dVal_Err/dDiff,2) + Math.pow(fitCoefZ[3]*3*dVal_Err/(dDiff*dDiff),2);
 			z_err[i]=Math.sqrt(dVal_Err);
+			if(z_err[i]==0)
+			{
+				z_err[i]++;
+				z_err[i]--;
+			}				
 			IJ.showProgress(i+1, nParticles);
 		}
 		//account for XY wobbling

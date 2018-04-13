@@ -52,18 +52,23 @@ public class Reconstruct_Image implements PlugIn{
 		xloc = sml.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errX);
 		yloc = sml.ptable.getColumnAsDoubles(DOMConstants.Col_loc_errY);		
 		sz = xloc.length; 
+		
 		xlocavg=0; ylocavg = 0;
 		dPatCount=0;
+		double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
+		
 		for (i=0; i<sz; i++)
 		{
-			if(falsepos[i]<0.2)
+			//check if localization precision is less than 1 pixels
+			//old: if(falsepos[i]<0.2)
+			if(xloc[i]*pxsize<1 && yloc[i]*pxsize<1)
 			{
 				xlocavg+=xloc[i];
 				ylocavg+=yloc[i];
 				dPatCount++;
 			}
 		}
-		double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
+		
 		xlocavg = xlocavg/dPatCount;
 		ylocavg = ylocavg/dPatCount;
 		
@@ -80,8 +85,9 @@ public class Reconstruct_Image implements PlugIn{
 		ymax = 0;
 		for (i=0; i<sz; i++)
 		{
-			//use only true positives to estimate image borders
-			if(falsepos[i]<0.2)
+
+			//check if localization precision is less than 1 pixels
+			if(xloc[i]*pxsize<1 && yloc[i]*pxsize<1)
 			{
 				if(xnm[i]>xmax)
 					xmax=xnm[i];

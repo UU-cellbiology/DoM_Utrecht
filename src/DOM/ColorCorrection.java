@@ -245,6 +245,7 @@ public class ColorCorrection implements PlugIn
 			imp=imp.duplicate();
 		}
 		zProj = new ZProjector(imp);
+		zProj.setMethod(ZProjector.MAX_METHOD);
 		zProj.doProjection();
 		imp_warpMax = zProj.getProjection();
 		
