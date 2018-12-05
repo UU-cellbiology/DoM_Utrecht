@@ -82,15 +82,22 @@ public class Detect_Molecules implements PlugIn {
 		
 		//creating new overlay
 		SpotsPositions = new Overlay();
+		/** calculate memory size required for one thread in bytes */
+		long nOneFrameSize=imp.getWidth()*imp.getHeight()*imp.getBitDepth()/8; //original image
+		nOneFrameSize+=imp.getWidth()*imp.getHeight()*32/8; //convoluted version
+		nOneFrameSize+=imp.getWidth()*imp.getHeight(); //thresholded version
 		
-		if (!dlg.findParticles()) return;
+		
+		
+		if (!dlg.findParticles(nOneFrameSize)) return;
 		
 		//generating gaussian mexican-hat convolution kernel with size of PSF
 		sml.initConvKernel(dlg);
 		//putting limiting criteria on spot size
 		//dlg.nAreaCut = dlg.nKernelSize + 1;
-		dlg.nAreaCut = (int) (dlg.dPSFsigma * dlg.dPSFsigma);
-		
+		//dlg.nAreaCut = (int) (dlg.dPSFsigma * dlg.dPSFsigma);
+		dlg.nAreaCut = (int)Math.ceil(2.0*dlg.dPSFsigma * dlg.dPSFsigma);
+		dlg.nAreaMax = (int) (12.0*dlg.dPSFsigma * dlg.dPSFsigma);
 		nStackSize = imp.getStackSize();
 
 		

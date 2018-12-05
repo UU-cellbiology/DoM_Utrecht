@@ -16,7 +16,6 @@ import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
 import ij.Prefs;
-import ij.Undo;
 import ij.gui.Arrow;
 import ij.gui.Line;
 import ij.gui.NonBlockingGenericDialog;
@@ -28,11 +27,9 @@ import ij.plugin.PlugIn;
 import ij.plugin.RGBStackMerge;
 import ij.plugin.ZProjector;
 import ij.process.ColorProcessor;
-import ij.process.FHT;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
-import ij.process.StackProcessor;
 
 
 public class ColorCorrection implements PlugIn

@@ -3,6 +3,7 @@ package DOM;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.text.DecimalFormat;
 
 import ij.IJ;
 import ij.io.SaveDialog;
@@ -18,6 +19,7 @@ public class Export_FD implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
+		DecimalFormat df2 = new DecimalFormat ("#.##");
 		IJ.register(Export_FD.class);
 		//check that the table is present
 		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))
@@ -70,10 +72,10 @@ public class Export_FD implements PlugIn
 				//writing values
 				for (i=0;i<nPatNumber;i++)
 		       	{
-					//frame, x, y, z, uncertainty xy, uncertainty z 
-					//sFileWrite=String.format("%d\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\n",(int)frame[i],x_[i],y_[i], z_[i],xerr[i],zerr[i]);
+					
 					//ignore uncertainty for now
-					sFileWrite=String.format("%d\t%.2f\t%.2f\t%.2f\t0.0\t0.0\n",(int)frame[i],x_[i],y_[i], z_[i]);
+					sFileWrite=Integer.toString((int)frame[i])+"\t"+df2.format(x_[i])+"\t"+df2.format(y_[i])+"\t"+df2.format(z_[i])+"\n";
+					//sFileWrite=String.format("%d\t%.2f\t%.2f\t%.2f\t0.0\t0.0\n",(int)frame[i],x_[i],y_[i], z_[i]);
 	
 					writer.write(sFileWrite);
 					IJ.showProgress(i, nPatNumber);

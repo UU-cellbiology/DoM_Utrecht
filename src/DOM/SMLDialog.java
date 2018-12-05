@@ -28,8 +28,10 @@ public class SMLDialog {
 	double dPixelSize;
 	/** number of threads for detection/fitting */
 	int nThreads; 
-	/** threshold of particle's area */
+	/** minimum threshold of particle's area */
 	int nAreaCut; 
+	/** maximum threshold of particle's area */
+	int nAreaMax;
 	/** whether or not add overlay of detected particles */
 	boolean bShowParticles;
 	/** whether or not to ignore false positives */
@@ -197,10 +199,14 @@ public class SMLDialog {
 		}
 		
 	/** Dialog showing options for particle search algorithm
-	 * 		
+	 * 		As an input it takes size of memory in bytes 
+	 * 		required for one thread of analysis function (SMLAnalysis)
 	 * @return
 	 */
-	public boolean findParticles() {
+	public boolean findParticles(long nOneFrameSize) {
+		
+		long nMaxThreadsN=(long)(IJ.maxMemory()-IJ.currentMemory()); //available memory
+		nMaxThreadsN= (long)(0.9*nMaxThreadsN/nOneFrameSize); //leave 5% for the safety
 		
 		String [] DetectionType = new String [] {
 				"Detect molecules (no fitting)","Detect molecules and fit", "Fit detected molecules"};
@@ -208,8 +214,8 @@ public class SMLDialog {
 		fpDial.addChoice("Task:", DetectionType, Prefs.get("SiMoLoc.DetectionType", "Detect molecules and fit"));
 		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 1.7), 2,4," pixels");
 		//fpDial.addNumericField("Gaussial kernel size, \nodd number from 7(fast) till 13 (slow)  ", Prefs.get("SiMoLoc.nKernelSize", 7), 0);		
-		fpDial.addNumericField("Pixel size", Prefs.get("SiMoLoc.dPixelSize", 66), 2, 4, "nm");
-		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 500), 0);
+		fpDial.addNumericField("Pixel size", Prefs.get("SiMoLoc.dPixelSize", 66), 2, 4, "nm");		
+		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 500), 0,6," max="+Long.toString(nMaxThreadsN));
 		fpDial.addNumericField("Fitting iterations number", Prefs.get("SiMoLoc.nIterations", 3), 0);
 		fpDial.addCheckbox("Mark detected particles in overlay?", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));

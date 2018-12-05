@@ -8,7 +8,6 @@ import java.text.DecimalFormat;
 /** Export to ThunderSTORM format 
  * **/
 import ij.IJ;
-import ij.ImagePlus;
 import ij.Prefs;
 import ij.gui.GenericDialog;
 import ij.io.SaveDialog;
@@ -35,6 +34,7 @@ public class Export_TS implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
+		DecimalFormat df2 = new DecimalFormat ("#.##");
 
 		/** whether z values are calculated **/
 		boolean zValsPresent=false;
@@ -130,14 +130,14 @@ public class Export_TS implements PlugIn
         {
         	//already background subtracted
         	intInt[i]=intInt[i]*dTSExportADU/dEMGainValue;
-        	//correct fot the offset
+        	//correct for the offset
         	bg[i]=(bg[i]-dTSExportBase)*dTSExportADU/dEMGainValue;
         	//estimate background noise from SNR
         	if(snr[i]>0.0)
         		bkgstd[i] = (amp[i]/snr[i])*dTSExportADU/dEMGainValue;
         	else
         		bkgstd[i]=0;
-        	//recalculating uncertainity (as SD sum of both values) to one value and store it at xerr
+        	//recalculating uncertainty (as SD sum of both values) to one value and store it at xerr
         	xerr[i]= Math.sqrt(xerr[i]*xerr[i]+yerr[i]*yerr[i]);
         }
         if(!zValsPresent)
@@ -160,20 +160,25 @@ public class Export_TS implements PlugIn
 			for (i=0;i<nPatNumber;i++)
 	       	{
 				//id, frame, x, y
-				sFileWrite=String.format("%d,%d,%.1f,%.1f,",i+1,(int)frame[i],x_[i],y_[i]);
+				//sFileWrite=String.format("%d,%d,%.1f,%.1f,",i+1,(int)frame[i],x_[i],y_[i]);
+				sFileWrite=Integer.toString(i+1)+","+ Integer.toString((int)frame[i])+ ","+df2.format(x_[i])+","+df2.format(y_[i])+",";
 				// z and sigmas
 				if(zValsPresent)
 				{
-					sFileWrite=sFileWrite+String.format("%.1f,%.1f,%.1f,",z_[i],sdx_[i],sdy_[i]);
+					//sFileWrite=sFileWrite+String.format("%.1f,%.1f,%.1f,",z_[i],sdx_[i],sdy_[i]);
+					sFileWrite=sFileWrite+df2.format(z_[i])+","+df2.format(sdx_[i])+","+df2.format(sdy_[i])+",";
 				}
 				else
 				{
-					sFileWrite=sFileWrite+String.format("%.1f,",averSD[i]);											
+					//sFileWrite=sFileWrite+String.format("%.1f,",averSD[i]);											
+					sFileWrite=sFileWrite+df2.format(averSD[i])+",";
 				}
-				//intensity, offset, bkgstd, chi2, xy uncertainity
-				sFileWrite=sFileWrite+String.format("%.1f,%.1f,%.1f,%.1f,%.1f",intInt[i],bg[i],bkgstd[i],chi[i],xerr[i]);
+				//intensity, offset, bkgstd, chi2, xy uncertainty
+				//sFileWrite=sFileWrite+String.format("%.1f,%.1f,%.1f,%.1f,%.1f",intInt[i],bg[i],bkgstd[i],chi[i],xerr[i]);
+				sFileWrite=sFileWrite+df2.format(intInt[i])+","+df2.format(bg[i])+","+df2.format(bkgstd[i])+","+df2.format(chi[i])+","+df2.format(xerr[i]);
 				if(zValsPresent)
-					sFileWrite=sFileWrite+String.format(",%.1f",zerr[i]);
+					sFileWrite=sFileWrite+","+df2.format(zerr[i]);
+					//sFileWrite=sFileWrite+String.format(",%.1f",zerr[i]);
 				sFileWrite=sFileWrite+"\n";
 				writer.write(sFileWrite);
 				IJ.showProgress(i, nPatNumber);

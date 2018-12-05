@@ -1009,56 +1009,6 @@ public class SMLReconstruct {
 		
 	}
 	
-	/* Function calculates cross-correlation between two images //OBSOLETE	
-	ShortProcessor crosscorrelation (ImageProcessor ip1, ImageProcessor ip2)
-	{
-		int nMaxPix = settings.nDriftPixels;
-		int i, j, m, n;
-		int tot;
-		double dCC,dCC1,dCC2;
-		double val1,val2;
-		
-		
-		FloatProcessor resultIP;
-		ShortProcessor returnIP;
-		ImageProcessor extendedip1;
-		
-		
-		tot = 2*nMaxPix+1;
-		extendedip1 = new FloatProcessor(drift_width+tot-1, drift_height+tot-1);
-
-		for (i=0;i<drift_width;i++)
-			for (j=0;j<drift_height;j++)
-				extendedip1.setf(i+nMaxPix, j+nMaxPix, ip1.get(i,j));
-
-		resultIP = new FloatProcessor(tot, tot);
-		
-		
-		for (i=0;i<tot;i++)
-			for (j=0;j<tot;j++)
-			{
-				dCC=0;
-				dCC1=0;
-				dCC2=0;
-				for(m=0; m<drift_width; m++)
-					for(n=0; n<drift_height; n++)
-					{
-						val1=extendedip1.get(m+i,n+j);
-						val2=ip2.get(m, n);
-						dCC+=val1*val2;
-						dCC1+=val1;
-						dCC2+=val2;
-					}
-				if(dCC1!=0.0 && dCC2!=0.0)
-					resultIP.setf(i,j,(float)(dCC/(dCC1*dCC2)));
-				else
-					resultIP.setf(i,j,0);
-			}
-		
-		returnIP = (ShortProcessor) resultIP.convertToShort(true);
-		returnIP.smooth();
-		return returnIP;		
-	}*/
 	
 	/** *
 	 * builds cumulative distribution histogram 

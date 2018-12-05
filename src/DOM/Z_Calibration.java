@@ -9,6 +9,8 @@ import java.awt.AWTEvent;
 import java.awt.Button;
 import java.awt.Choice;
 import java.awt.Color;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
 import java.awt.GridLayout;
 import java.awt.Panel;
 import java.awt.TextField;
@@ -75,6 +77,8 @@ public class Z_Calibration implements PlugIn{
 	final NonBlockingGenericDialog nb = new NonBlockingGenericDialog("Fit Z-calibration");  
 	/** fitting button */
 	Button b;
+	/** scale plot's sizes **/
+	double dPlotScale=0.5;
 	
 	/** original range min */
 	int nRefMinZ;
@@ -213,6 +217,13 @@ public class Z_Calibration implements PlugIn{
 		
 		estimateZzeroPosition();
 		zCal_calcMeanSD();
+		
+		GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+		int screenwidth = gd.getDisplayMode().getWidth();
+		int screenheight = gd.getDisplayMode().getHeight();
+		final int plotWidth =screenwidth/5;
+		final int plotHeight=screenheight/5;
+		
 		indexFitRange = new int [2];
 
 
@@ -239,8 +250,9 @@ public class Z_Calibration implements PlugIn{
 		PlotSDdiff.addPoints(dDiff[0], dDiff[1],dDiff[2], Plot.CIRCLE);*/
 		PlotSDdiff.addPoints(longestTrack[5], sdDif, Plot.CIRCLE);
 		PlotSDdiff.setLegend("not fitted", Plot.AUTO_POSITION);
-		//PlotSDdiff.setLimitsToFit(true);
+		PlotSDdiff.setFrameSize(plotWidth , plotHeight); 
 		final ImagePlus impDiffSD = new ImagePlus();//plot.getImagePlus();
+		
 		PlotSDdiff.setImagePlus(impDiffSD);
 		PlotSDdiff.draw();
 		
@@ -284,8 +296,9 @@ public class Z_Calibration implements PlugIn{
 		PlotSDxy.setColor(Color.black);
 		//PlotSDxy.addPoints(dDiff[0], dDiff[3],dDiff[4], Plot.CIRCLE);
 		//PlotSDxy.addPoints(dDiff[0], dDiff[5],dDiff[6], Plot.CIRCLE);
+		PlotSDxy.setFrameSize(plotWidth, plotHeight);
 		PlotSDxy.setLegend("width	height", Plot.AUTO_POSITION);
-		//PlotSDxy.setLimitsToFit(true);
+		 
 		final ImagePlus impSDxy = new ImagePlus();//plot.getImagePlus();
 		PlotSDxy.setImagePlus(impSDxy);
 		PlotSDxy.draw();
@@ -326,6 +339,7 @@ public class Z_Calibration implements PlugIn{
 		}
 		*/
 		PlotX.addPoints(longestTrack[5], longestTrack[6], Plot.CIRCLE);
+		PlotX.setFrameSize(plotWidth, plotHeight);
 		PlotX.setLegend("not fitted", Plot.AUTO_POSITION);
 		//PlotX.setLimitsToFit(true);
 		final ImagePlus impX = new ImagePlus();
@@ -364,7 +378,7 @@ public class Z_Calibration implements PlugIn{
 		*/
 		PlotY.addPoints(longestTrack[5], longestTrack[7], Plot.CIRCLE);
 		
-		//PlotY.setLimitsToFit(true);
+		PlotY.setFrameSize(plotWidth, plotHeight);
 		PlotY.setLegend("not fitted", Plot.AUTO_POSITION);
 		final ImagePlus impY = new ImagePlus();
 		PlotY.setImagePlus(impY);
@@ -483,6 +497,7 @@ public class Z_Calibration implements PlugIn{
 				PlotSDdiff.setColor(Color.black);
 				PlotSDdiff.setLegend("data	fit ("+sFitResultsSplit[8]+")", Plot.AUTO_POSITION);
 				PlotSDdiff.setLimitsToFit(true);
+				PlotSDdiff.setFrameSize(plotWidth, plotHeight);
 				PlotSDdiff.setImagePlus(impDiffSD);
 				PlotSDdiff.draw();
 				icDiff = new ImageCanvas(impDiffSD);
@@ -518,6 +533,7 @@ public class Z_Calibration implements PlugIn{
 					PlotX.setColor(Color.blue);
 					PlotX.addPoints(dRangeZ, fittedX, Plot.LINE);
 					PlotX.setColor(Color.black);
+					PlotX.setFrameSize(plotWidth, plotHeight);
 					PlotX.setLegend("data	X fit ("+sFitResultsSplit[8]+")", Plot.AUTO_POSITION);
 					PlotX.setLimitsToFit(true);
 					PlotX.setImagePlus(impX);
@@ -540,6 +556,7 @@ public class Z_Calibration implements PlugIn{
 					PlotY.setColor(Color.blue);
 					PlotY.addPoints(dRangeZ, fittedY, Plot.LINE);
 					PlotY.setColor(Color.black);
+					PlotY.setFrameSize(plotWidth, plotHeight);
 					PlotY.setLegend("data	Y fit ("+sFitResultsSplit[8]+")", Plot.AUTO_POSITION);
 					PlotY.setLimitsToFit(true);
 					PlotY.setImagePlus(impY);

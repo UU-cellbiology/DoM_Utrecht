@@ -2,7 +2,12 @@ package DOM;
 
 
 import java.awt.Color;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Stack;
+
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -16,10 +21,24 @@ import ij.process.ByteProcessor;
 import ij.process.FloatProcessor;
 import ij.process.ImageProcessor;
 import ij.process.ImageStatistics;
-import ij.process.TypeConverter;
 import jaolho.data.lma.LMA;
 
+/** Comparator for sorting of pixels of thresholded mask
+ * by intensity order 
+ * **/
+class ArrayComparator implements Comparator<int []> {
+   
+    public int compare(int [] o1, int [] o2) {
 
+    	if(o1[2]==o2[2])
+        	return 0;
+        if(o1[2]>o2[2])
+        	return -1;
+        else
+        	return 1;               
+        
+    }
+}
 public class SMLAnalysis {
 	
 	ImageStatistics imgstat;
@@ -33,9 +52,12 @@ public class SMLAnalysis {
 	ResultsTable ptable;// = ResultsTable.getResultsTable();
 	
 	java.util.concurrent.locks.Lock ptable_lock = new java.util.concurrent.locks.ReentrantLock();
+
+    final static int[] DIR_X_OFFSET = new int[] {  0,  1,  1,  1,  0, -1, -1, -1 };
+    final static int[] DIR_Y_OFFSET = new int[] { -1, -1,  0,  1,  1,  1,  0, -1 };
 	
-	
-	//default constructor 
+	/** default class constructor 
+	 * initializes Results Table **/
 	SMLAnalysis()
 	{
 		ptable = ResultsTable.getResultsTable();
@@ -45,16 +67,24 @@ public class SMLAnalysis {
 	
 	
 	
-	// Particle finding routine based on spots enhancement with
-	// 2D PSF Gaussian approximated convolution/backgrounds subtraction, thresholding
-	// and particle filtering
+	/** Particle finding routine based on spots enhancement with
+	 * 2D PSF Gaussian approximated convolution/backgrounds subtraction, thresholding
+	 *  and particle filtering 
+	 * **/
 	void detectParticles(ImageProcessor ip, SMLDialog fdg, int nFrame, Overlay SpotsPositions_,Roi RoiActive_)
 	{
-		int nThreshold;
-		FloatProcessor dupip = null ; //duplicate of image
-		ImageProcessor dushort; //duplicate of image
-		ByteProcessor dubyte = null; //tresholded image
-		TypeConverter tc; 
+		float [] nThreshold;
+
+		/** float duplicate of image **/
+		FloatProcessor dupip = null ; 
+
+		/** tresholded image **/
+		ByteProcessor dubyte = null; 
+		/** watershed image of maxima **/
+		//ByteProcessor dubyteWS = null; 
+		//MaximumFinder maxF = new MaximumFinder();
+	
+		//TypeConverter tc; 
 		
 		dupip = (FloatProcessor) ip.duplicate().convertToFloat();
 				
@@ -69,8 +99,8 @@ public class SMLAnalysis {
 		SMLconvolveFloat(dupip, fConKernel, fdg.nKernelSize, fdg.nKernelSize);
 		
 		//new ImagePlus("convoluted", dupip.duplicate()).show();
-		tc = new TypeConverter(dupip, true);
-		dushort =  tc.convertToShort();
+		//tc = new TypeConverter(dupip, true);
+		//dushort =  tc.convertToShort();
 		//new ImagePlus("convoluted", dushort.duplicate()).show();
 		  
 		
@@ -82,50 +112,65 @@ public class SMLAnalysis {
 		//nThreshold = (int)(imgstat.mean + 3.0*imgstat.stdDev);
 
 		//new smart thresholding
-		nThreshold = getThreshold(dushort);
+		nThreshold = getThreshold(dupip);
 		
-		dushort.threshold(nThreshold);
+		//dushort.threshold(nThreshold);
 		//convert to byte
-		dubyte  = (ByteProcessor) dushort.convertToByte(false);
+		//dubyte  = (ByteProcessor) dushort.convertToByte(false);
+		dubyte  =thresholdFloat(dupip,(float)(nThreshold[0]+3.0*nThreshold[1]));
+		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], nThreshold[0], MaximumFinder.SEGMENTED, true, false);
+		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], ImageProcessor.NO_THRESHOLD, MaximumFinder.SEGMENTED, false, false);
+		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], MaximumFinder.SEGMENTED, false);
+		
+		//new ImagePlus("convoluted", dupip.duplicate()).show();
+		
+		//new ImagePlus("watershed", dubyteWS.duplicate()).show();
 		//new ImagePlus("threshold", dubyte.duplicate()).show();
 		
+		//dubyte.copyBits(dubyteWS, 0, 0, Blitter.AND);
+		//dubyteWS=quickAND(dubyte,dubyteWS);
+		//new ImagePlus("ANDresult", dubyte.duplicate()).show();
 		//morphological operations on thresholded image	
-		//dubyte.dilate(2, 0);
-		//dubyte.erode(2, 0);
+	
+		
 		
 		//cleaning up image a bit
-		if(fdg.nKernelSize>3)
+		if(fdg.nKernelSize>5)
 		{
 			dubyte.dilate();		
 			//new ImagePlus("dilated", dubyte.duplicate()).show();
 			dubyte.erode();
 			//new ImagePlus("erosion", dubyte.duplicate()).show();
-		}
+		}		
+			
 		//new ImagePlus("threshold_eroded", dubyte.duplicate()).show();
+
 		//dupip.invert();
 		
-		labelParticles(dubyte, ip, nFrame, fdg.dPixelSize, fdg.nAreaCut, fdg.dPSFsigma, SpotsPositions_, fdg.bShowParticles, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
+		labelParticles(dubyte, ip, nFrame, fdg, SpotsPositions_, RoiActive_);//, fdg.bIgnoreFP);//, fdg.dSymmetry/100);
 		
 
 	}
 	
-	//function that finds centroids x,y and area
-	//of spots after thresholding
-	//based on connected components	labeling Java code
-	//implemented by Mariusz Jankowski & Jens-Peer Kuska
-	//and in March 2012 available by link
-    //http://www.izbi.uni-leipzig.de/izbi/publikationen/publi_2004/IMS2004_JankowskiKuska.pdf
-	
-	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, double dPixelSize_, int nAreaCut, double dPSFsigma_, Overlay SpotsPositions__, boolean bShow, Roi RoiAct)
+	/** function that finds centroids x,y and area
+	 * of spots after thresholding
+	 * based on connected components labeling Java code
+	 * implemented by Mariusz Jankowski & Jens-Peer Kuska
+	 * and in March 2012 available by link
+	 * http://www.izbi.uni-leipzig.de/izbi/publikationen/publi_2004/IMS2004_JankowskiKuska.pdf
+	**/
+	void labelParticles(ImageProcessor ipBinary, ImageProcessor ipRaw,  int nFrame, SMLDialog dlg, Overlay SpotsPositions__, Roi RoiAct)
 	{
 		int width = ipBinary.getWidth();
 		int height = ipBinary.getHeight();
 
 		int dBorder; // radius in pixels around center point to fit Gaussian
  				
+		//double dPSFsigma_=dlg.dPSFsigma;
 		int nArea;
 
-		int i,j;
+		int i,j,k,m;
+		int vNeighbor;
 
 		double dVal, dInt;
 		double dIMax, dIMin;
@@ -133,16 +178,24 @@ public class SMLAnalysis {
 		double xCentroid, yCentroid;
 		boolean bBorder;
 		boolean bInRoi;
+		boolean bIsLocMax;
 
 		int lab = 1;
 		int [] pos ;		
-		
+		/** stack for segmenting
+		 * thresholded spots by flood fill algorithm **/
 		Stack<int[]> sstack = new Stack<int[]>( );
-		int [][] label = new int[width][height] ;
+		/** Extra storage of thresholded mask region
+		 * in case it is bigger than typical spot size.
+		 * Used to find local maxima within large spots
+		 * **/
+		ArrayList<int[]> stackPost = new ArrayList<int[]>( );
+		
+		int [][] label = new int[width][height] ;		
 		
 		OvalRoi spotROI;
 
-		dBorder= (int)(dPSFsigma_*DOMConstants.FITRADIUS);
+		dBorder= (int)(dlg.dPSFsigma*DOMConstants.FITRADIUS);
 				
 		
 		for (int r = 1; r < width-1; r++)
@@ -155,6 +208,8 @@ public class SMLAnalysis {
 				/* push the position in the stack and assign label */
 				sstack.push(new int [] {r, c}) ;
 				label[r][c] = lab ;
+				stackPost.clear();
+				stackPost.add(new int [] {r, c, ipRaw.getPixel(r,c)}) ;
 				nArea = 0;
 				dIMax = -1000;
 				xCentroid = 0; yCentroid = 0;
@@ -183,45 +238,55 @@ public class SMLAnalysis {
 					
 					if (ipBinary.getPixel(i-1,j-1) > 0 && label[i-1][j-1] == 0) {
 						sstack.push( new int[] {i-1,j-1} );
+						stackPost.add( new int[] {i-1,j-1,ipRaw.getPixel(i-1,j-1)} );						
 						label[i-1][j-1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i-1,j) > 0 && label[i-1][j] == 0) {
 						sstack.push( new int[] {i-1,j} );
+						stackPost.add( new int[] {i-1,j,ipRaw.getPixel(i-1,j)} );
 						label[i-1][j] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i-1,j+1) > 0 && label[i-1][j+1] == 0) {
 						sstack.push( new int[] {i-1,j+1} );
+						stackPost.add( new int[] {i-1,j+1,ipRaw.getPixel(i-1,j+1)} );
 						label[i-1][j+1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i,j-1) > 0 && label[i][j-1] == 0) {
 						sstack.push( new int[] {i,j-1} );
+						stackPost.add( new int[] {i,j-1,ipRaw.getPixel(i,j-1)} );
 						label[i][j-1] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i,j+1) > 0 && label[i][j+1] == 0) {
 						sstack.push( new int[] {i,j+1} );
+						stackPost.add( new int[] {i,j+1,ipRaw.getPixel(i,j+1)} );
 						label[i][j+1] = lab ;
 					}
 					if (ipBinary.getPixel(i+1,j-1) > 0 && label[i+1][j-1] == 0) {
 						sstack.push( new int[] {i+1,j-1} );
+						stackPost.add( new int[] {i+1,j-1,ipRaw.getPixel(i+1,j-1)} );
 						label[i+1][j-1] = lab ;
 					}
 				
 					if (ipBinary.getPixel(i+1,j)>0 && label[i+1][j] == 0) {
 						sstack.push( new int[] {i+1,j} );
+						stackPost.add( new int[] {i+1,j,ipRaw.getPixel(i+1,j)} );
 						label[i+1][j] = lab ;
 					}
 					
 					if (ipBinary.getPixel(i+1,j+1) > 0 && label[i+1][j+1] == 0) {
 						sstack.push( new int[] {i+1,j+1} );
+						stackPost.add( new int[] {i+1,j+1,ipRaw.getPixel(i+1,j+1)} );
 						label[i+1][j+1] = lab ;
 					}
 					
 				} /* end while */
-				if(!bBorder && nArea > nAreaCut)
+				
+				// nice small thresholded area, everything is fine
+				if(!bBorder && nArea > dlg.nAreaCut && nArea < dlg.nAreaMax)
 				{					
 					xCentroid /= dInt;
 					yCentroid /= dInt;
@@ -256,9 +321,9 @@ public class SMLAnalysis {
 								ptable.addValue("MinInt",dIMin);
 										
 								ptable_lock.unlock();
-								if(bShow)
+								if(dlg.bShowParticles)
 								{
-									spotROI = new OvalRoi(0.5+xCentroid-2*dPSFsigma_,0.5+yCentroid-2*dPSFsigma_,4.0*dPSFsigma_,4.0*dPSFsigma_);
+									spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
 									spotROI.setStrokeColor(Color.yellow);	
 									spotROI.setPosition(nFrame+1);
 									SpotsPositions__.add(spotROI);										
@@ -268,6 +333,105 @@ public class SMLAnalysis {
 					}
 				
 				}
+				////probably many particles in the thresholded area	
+				//let's look for the local maxima and use them
+				if(nArea >= dlg.nAreaMax && !bBorder)
+				{
+					//sort array by intensity values
+					Collections.sort(stackPost, new ArrayComparator());
+					
+					while ( !stackPost.isEmpty()) 
+					{												
+						pos = (int[]) stackPost.get(0);
+						k = pos[0]; m = pos[1];
+						dVal = pos[2];
+						xCentroid = dVal*k;
+						yCentroid = dVal*m;
+						dInt = dVal;						
+						bIsLocMax=true;
+						
+						for (int d=0; d<8; d++) 
+						{   							
+							vNeighbor = ipRaw.getPixel(k+DIR_X_OFFSET[d], m+DIR_Y_OFFSET[d]);
+							if (vNeighbor <= dVal) 
+							{
+								xCentroid += vNeighbor*(k+DIR_X_OFFSET[d]);
+								yCentroid += vNeighbor*(m+DIR_Y_OFFSET[d]);
+								dInt+=vNeighbor;
+	                        }
+							else
+							{
+								bIsLocMax=false;
+								stackPost.remove(0);
+								break;
+							}
+						}
+						if(bIsLocMax)
+						{
+							xCentroid /= dInt;
+							yCentroid /= dInt;
+
+							if ( (xCentroid>dBorder) && (yCentroid>dBorder) && (xCentroid<(width-1-dBorder)) && (yCentroid<(height-1-dBorder)) )
+							{
+								bInRoi = true;
+								if(RoiAct!=null)
+								{
+									if(!RoiAct.contains((int)xCentroid, (int)yCentroid))
+										bInRoi=false;
+								}
+								if(bInRoi)
+								{
+									//find minimum value around peak position
+									dIMin = 1000000;
+									//nCount = 0;
+									for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
+										for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
+										{
+											dVal = ipRaw.getPixel(i,j);
+											if (dVal<dIMin)
+												dIMin = dVal;																	
+										}
+									
+									ptable_lock.lock();
+									ptable.incrementCounter();
+									ptable.addValue("Frame Number", nFrame+1);
+									ptable.addValue("X_centroid_(px)",xCentroid);	
+									ptable.addValue("Y_centroid_(px)",yCentroid);
+									ptable.addValue("MaxInt",dIMax);
+									ptable.addValue("MinInt",dIMin);
+											
+									ptable_lock.unlock();
+									if(dlg.bShowParticles)
+									{
+										spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
+										spotROI.setStrokeColor(Color.yellow);	
+										spotROI.setPosition(nFrame+1);
+										SpotsPositions__.add(spotROI);										
+									}
+								}
+							}
+							//remove max and its neighbors from the list
+							int nListLength = stackPost.size();
+							i=0;
+							while(nListLength>0 && i<nListLength)
+							{
+								pos =stackPost.get(i);
+								//if(nMaxPos[0]>=xCentroid-RoiRad && nMaxPos[0]<=xCentroid+RoiRad && nMaxPos[1]>=yCentroid-RoiRad && nMaxPos[1]<=yCentroid+RoiRad)
+								if(Math.abs(xCentroid-pos[0])<3.0*dlg.dPSFsigma && Math.abs(yCentroid-pos[1])<3.0*dlg.dPSFsigma)
+								{
+									stackPost.remove(i);
+									nListLength--;
+								}
+								else
+								{
+									i++;
+								}
+							}
+						}//end of if(bIsLocMax)
+						
+					}
+					
+				}
 				lab++ ;
 			} // end for cycle
 		
@@ -276,7 +440,14 @@ public class SMLAnalysis {
 		
 	}
 	
-	//function fitting particles in specific frame
+	/** function fitting particles in specific frame
+	 * 
+	 * @param ipRaw original image processor
+	 * @param fdg   dialog item containing all parameters
+	 * @param particles_ particles to fit table
+	 * @param nFrame  current frame
+	 * @param SpotsPositions__  Image Overlay to add particle ROIs
+	 */
 	void fitParticles(ImageProcessor ipRaw, SMLDialog fdg, double[][] particles_, int nFrame, Overlay SpotsPositions__)
 	{
 		int width = ipRaw.getWidth();
@@ -343,16 +514,10 @@ public class SMLAnalysis {
 					dIntDev+=Math.pow(ipRaw.getPixel(i,j)-dIntAverage,2);		
 				}			
 			
-			
-			
-			
-			
+		
 				//initial values of fitting parameters				
-				//dFitParams[0]= particles_[3][nParticlesCount]; //minimum, background level
-				//dFitParams[1]= particles_[2][nParticlesCount] - particles_[3][nParticlesCount]; // intensity amplitude, max-min
 				dFitParams[0]= dIMin; //minimum, background level
 				dFitParams[1]= dIMax - dIMin; // intensity amplitude, max-min
-
 				dFitParams[2]= particles_[0][nParticlesCount];//x center
 				dFitParams[3]= particles_[1][nParticlesCount];//y center
 				dFitParams[4]= fdg.dPSFsigma;
@@ -529,15 +694,19 @@ public class SMLAnalysis {
 		
 	}
 
-	// function calculating convolution kernel of 2D Gaussian shape
-	// with background subtraction for spots enhancement
+	/** function calculating convolution kernel of 2D Gaussian shape
+	 * with background subtraction for spots enhancement (kind of mexican hat) **/
 	void initConvKernel(SMLDialog fdg)
 	{
 		int i,j; //counters
-		int nBgPixCount; //number of kernel pixels for background subtraction 
-		float GaussSum; //sum of all integrated Gaussian function values inside 'spot circle'
-		float fSpot; // spot circle radius
-		float fSpotSqr; // spot circle radius squared
+		/** number of kernel pixels for background subtraction  **/
+		int nBgPixCount;
+		/** sum of all integrated Gaussian function values inside 'spot circle' **/
+		float GaussSum; 
+		/** spot circle radius **/
+		float fSpot; 
+		/**  spot circle radius squared **/
+		float fSpotSqr; 
 		
 		//intermediate values to speed up calculations
 		float fIntensity;
@@ -611,11 +780,16 @@ public class SMLAnalysis {
 		return;
 	}
 	
-	//returns value of mean intensity+3*SD based on 
-	//fitting of image histogram to gaussian function
-	int getThreshold(ImageProcessor thImage)
+	/** Returns value of mean intensity [0] and SD [1] based on 
+	 * fitting of image histogram to gaussian function.
+	 * Estimates optimal bin size of histogram.
+	 * @param thImage input imageprocessor
+	 * @return
+	 */
+	float []  getThreshold(ImageProcessor thImage)
 	{
 		ImageStatistics imgstat;
+		float [] results;
 		double  [][] dHistogram;
 		double  [] dHistCum;
 		double  [][] dNoiseFit;
@@ -630,11 +804,14 @@ public class SMLAnalysis {
 		double dSum=0.0;
 		double dSumFit=0.0;
 		LMA fitlma;
+		int nBinSizeEst = 256;
+		
+		nBinSizeEst =getBinOptimalNumber(thImage);
 		
 		
 		
 		//mean, sd, min, max
-		//imgstat = ImageStatistics.getStatistics(thImage, 38, null);
+		thImage.setHistogramSize(nBinSizeEst);
 		imgstat = ImageStatistics.getStatistics(thImage, Measurements.MEAN+Measurements.STD_DEV+Measurements.MIN_MAX, null);
 		dMean = imgstat.mean;
 		nPeakPos = 0;
@@ -745,17 +922,20 @@ public class SMLAnalysis {
 		for(i =0;i<3;i++)
 			dFitErrors[i] *= 100/fitlma.parameters[i]; 
 		
-		if (dFitErrors[1]> 20 || dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
+		//if (dFitErrors[1]> 20 || dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
+		if (dMean<imgstat.min || dMean> imgstat.max ||  dSD < imgstat.min || dSD> imgstat.max)
 			//fit somehow failed
-			return (int)(imgstat.mean + 3.0*imgstat.stdDev);
+		{	results = new float [] {(float) imgstat.mean,(float) imgstat.stdDev};}
 		else
-			return (int)(dMean + 3.0*dSD);
-		
+		{	results = new float [] {(float) dMean,(float) dSD};}
+
+		return results;
 		
 	}
 	
-	//implements error function calculation with precision ~ 10^(-4) 
-	//used for calculation of Gaussian convolution kernel
+	/** implements error function calculation with precision ~ 10^(-4) 
+	  * used for calculation of Gaussian convolution kernel 
+	  * **/
 	float errorfunction (double d)
 	{
 		float t = (float) (1.0/(1.0+Math.abs(d)*0.47047));
@@ -821,6 +1001,75 @@ public class SMLAnalysis {
 	
    		return true;
 	}
+	
+	
+	/** function returns optimal bin number for the image histogram
+	 *  according to the Freedman-Diaconis rule (check wiki) **/
+	int getBinOptimalNumber(ImageProcessor ip)
+	{
+	
+		int width, height;
+		int pixelCount;
+	
+		//first let's calculate median
+		//this part is taken from ImageJ source code
+		//and adapted for the whole image
+		
+		width=ip.getWidth();
+		height=ip.getHeight();
+		pixelCount=width*height;
+		
+
+		float[] pixels2 = new float[pixelCount];
+
+		System.arraycopy((float[])ip.getPixels(),0,pixels2,0,pixelCount);
+	
+		Arrays.sort(pixels2);
+		//int middle = pixels2.length/2;
+		int qi25 = Math.round(pixelCount*0.25f);
+		int qi75 = Math.round(pixelCount*0.75f);
+
+		float IQR = pixels2[qi75]-pixels2[qi25];
+		double h= 2*IQR*Math.pow((double)pixelCount, -1.0/3.0);
+		
+		return (int)Math.round((pixels2[pixelCount-1]-pixels2[0])/h);
+			
+	}
+
+	/** 
+	 * function thresholds FloatProcessor and returns byte version
+	 */
+	ByteProcessor thresholdFloat(FloatProcessor ip, float dThreshold)
+	{
+		int width=ip.getWidth();
+		int height= ip.getHeight();
+		int i;
+		ByteProcessor bp = new ByteProcessor(width, height);
+		float[] flPixels = (float[])ip.getPixels();
+//		byte[] btPixels = (byte[])bp.getPixels();
+		
+		for (int y=0; y<height; y++) 
+		{
+			i = y*width;
+			for (int x=0; x<width; x++) 
+			{
+				if(flPixels[i]>=dThreshold)
+				{
+					//btPixels[i]=(byte)255;
+					bp.set(x, y, 255);
+				}
+				else
+				{
+					//btPixels[i]=(byte)0;
+					bp.set(x, y, 0);
+				}				
+				i++;
+			}
+		}
+				
+		return bp;
+	}
+	
 	
 	float SMLgetPixel(int x, int y, float[] pixels, int width, int height) {
 		if (x<=0) x = 0;
