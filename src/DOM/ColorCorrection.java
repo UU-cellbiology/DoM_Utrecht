@@ -1358,7 +1358,7 @@ public class ColorCorrection implements PlugIn
 		IJ.log("Calibration grid size: "+Integer.toString(dimX)+"x"+Integer.toString(dimY)+"x2");
 		
 		dPxtoNmTable =  sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
-		if(Math.abs(dPxtoNmTable-dPxtoNm)>0.01)
+		if(Math.abs(dPxtoNmTable-dPxtoNm)>0.1)
 		{
 			IJ.error("Pixel size of calibration " +Double.toString(dPxtoNm)+" nm is not equal to Results table pixel of "+Double.toString(dPxtoNmTable)+" nm");
 			return;

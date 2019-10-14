@@ -55,8 +55,11 @@ public class Reconstruct_Image implements PlugIn{
 		
 		xlocavg=0; ylocavg = 0;
 		dPatCount=0;
-		double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
 		
+		double pxSizeinNm= sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0);
+		pxSizeinNm=Math.round(pxSizeinNm);
+		//double pxsize =  sml.ptable.getValueAsDouble(DOMConstants.Col_X, 0)/sml.ptable.getValueAsDouble(DOMConstants.Col_Xnm, 0);
+		double pxsize = 1/pxSizeinNm;
 		for (i=0; i<sz; i++)
 		{
 			//check if localization precision is less than 1 pixels

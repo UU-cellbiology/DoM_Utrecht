@@ -33,6 +33,7 @@ public class LoadLargeRT implements PlugIn {
 		long filesize;
 		long nStringCount=0;
 		long progressbytes=0;
+		int nStartCol=1;
 		
 		
 		//get filename
@@ -76,6 +77,10 @@ public class LoadLargeRT implements PlugIn {
 		//read header column names
 		headings=myLine.split(separator);
 		progressbytes+=myLine.getBytes().length;
+		if(headings[1].compareTo("X_(px)")==0)
+			nStartCol=1;
+		else
+			nStartCol=0;
 		
 
 		//reduce the size of the table by putting less precision
@@ -92,7 +97,7 @@ public class LoadLargeRT implements PlugIn {
 		    values = myLine.split(separator);
 		    ptable.incrementCounter();									
 			
-		    for(i=1;i<ncols;i++)
+		    for(i=nStartCol;i<ncols;i++)
 		    {
 		    	ptable.addValue(headings[i], Double.parseDouble(values[i]));
 		    }

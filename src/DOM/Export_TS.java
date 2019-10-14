@@ -16,6 +16,8 @@ import ij.plugin.PlugIn;
 public class Export_TS implements PlugIn 
 {
 	SMLAnalysis sml = new SMLAnalysis();
+	/** source of results 0=Thunderstorm 1=DoM **/
+	int nDataType=0;
 	/** Photoelectrons per A/D count **/
 	double dTSExportADU;
 	/** Base level (A/D count) **/
@@ -34,7 +36,7 @@ public class Export_TS implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
-		DecimalFormat df2 = new DecimalFormat ("#.##");
+		DecimalFormat df2 = new DecimalFormat ("#.####");
 
 		/** whether z values are calculated **/
 		boolean zValsPresent=false;
@@ -47,8 +49,11 @@ public class Export_TS implements PlugIn
 			IJ.error("Not able to detect a valid 'Particles Table' for export, please load one.");
 					return;
 		}
-		
+		String [] sDataType = new String [] {
+				"ThunderSTORM","DoM"};
 		GenericDialog dgExportTS = new GenericDialog("Export to ThunderSTORM format");
+		dgExportTS.addChoice("Results table comes from:", sDataType, Prefs.get("SiMoLoc.TSExportRes", "ThunderSTORM"));
+		dgExportTS.addMessage("Parameters below are applied only for DoM performed analysis");
 		dgExportTS.addNumericField("Photoelectrons per A/D count: ",Prefs.get("SiMoLoc.TSExportADU", 0.5),2,5," ");
 		dgExportTS.addNumericField("Base level: ",Prefs.get("SiMoLoc.TSExportBase", 20),2,5,"A/D count");
 		dgExportTS.addCheckbox("EMGain", Prefs.get("SiMoLoc.TSExportEMGain", false));
@@ -56,6 +61,9 @@ public class Export_TS implements PlugIn
 		dgExportTS.showDialog();
 		if (dgExportTS.wasCanceled())
             return;
+		
+		nDataType = dgExportTS.getNextChoiceIndex();
+		Prefs.set("SiMoLoc.TSExportRes", sDataType[nDataType]);
 		
 		dTSExportADU =  dgExportTS.getNextNumber();
 		Prefs.set("SiMoLoc.TSExportADU", dTSExportADU);
@@ -87,19 +95,26 @@ public class Export_TS implements PlugIn
 		}
 		IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
 		IJ.log("Export to ThunderSTORM format " + filename);
-		IJ.log("Photoelectrons per A/D count: "+ String.format("%.2f",dTSExportADU));
-		IJ.log("Base level (A/D count): "+ String.format("%.2f",dTSExportBase));
-		if(bEMGain)
+		if(nDataType==1)
 		{
-			IJ.log("EMGain: on");
-			IJ.log("EMGain value:"+ String.format("%.2f",dEMGainValue));
-		}
+			IJ.log("Detection/fitting performed in DoM");
+			IJ.log("Photoelectrons per A/D count: "+ String.format("%.2f",dTSExportADU));
+			IJ.log("Base level (A/D count): "+ String.format("%.2f",dTSExportBase));
+			if(bEMGain)
+			{
+				IJ.log("EMGain: on");
+				IJ.log("EMGain value:"+ String.format("%.2f",dEMGainValue));
+			}
+			else
+			{
+				IJ.log("EMGain: off");
+				dEMGainValue=1.0;
+			}
+		}	
 		else
 		{
-			IJ.log("EMGain: off");
-			dEMGainValue=1.0;
+			IJ.log("Detection/fitting performed in ThunderSTORM (imported).");
 		}
-		
 		
 		double [] x_ =		sml.ptable.getColumnAsDoubles(DOMConstants.Col_Xnm);
 		double [] y_ =		sml.ptable.getColumnAsDoubles(DOMConstants.Col_Ynm);
@@ -110,6 +125,7 @@ public class Export_TS implements PlugIn
 		double [] sdx_ =	sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_X);
 		double [] sdy_ =	sml.ptable.getColumnAsDoubles(DOMConstants.Col_SD_Y);
 		double [] bg =	 	sml.ptable.getColumnAsDoubles(DOMConstants.Col_BGfit);
+		double [] bgstd =	sml.ptable.getColumnAsDoubles(DOMConstants.Col_BGfit_error);
 		double [] intInt = 	sml.ptable.getColumnAsDoubles(DOMConstants.Col_IntegrInt);
 		double [] chi = 	sml.ptable.getColumnAsDoubles(DOMConstants.Col_chi);
 		double [] snr = 	sml.ptable.getColumnAsDoubles(DOMConstants.Col_SNR);
@@ -118,33 +134,39 @@ public class Export_TS implements PlugIn
 
 		nPatNumber = amp.length;
 		
-		double [] bkgstd = new double[nPatNumber];
+		//double [] bkgstd = new double[nPatNumber];
 		double [] averSD = new double[nPatNumber];
 		
 		if(Math.abs(z_[0])>0.0)
 			zValsPresent=true;
 		
+		//for case of DoM
+		if(nDataType==1)
+		{
 
-		//recalculating values to photons
-        for (i=0;i<nPatNumber;i++)
-        {
-        	//already background subtracted
-        	intInt[i]=intInt[i]*dTSExportADU/dEMGainValue;
-        	//correct for the offset
-        	bg[i]=(bg[i]-dTSExportBase)*dTSExportADU/dEMGainValue;
-        	//estimate background noise from SNR
-        	if(snr[i]>0.0)
-        		bkgstd[i] = (amp[i]/snr[i])*dTSExportADU/dEMGainValue;
-        	else
-        		bkgstd[i]=0;
-        	//recalculating uncertainty (as SD sum of both values) to one value and store it at xerr
-        	xerr[i]= Math.sqrt(xerr[i]*xerr[i]+yerr[i]*yerr[i]);
-        }
+			//recalculating values to photons
+	        for (i=0;i<nPatNumber;i++)
+	        {
+	        	//already background subtracted
+	        	intInt[i]=intInt[i]*dTSExportADU/dEMGainValue;
+	        	//correct for the offset
+	        	bg[i]=(bg[i]-dTSExportBase)*dTSExportADU/dEMGainValue;
+	        	//estimate background noise from SNR
+	        	if(snr[i]>0.0)
+	        		bgstd[i] = (amp[i]/snr[i])*dTSExportADU/dEMGainValue;
+	        	else
+	        		bgstd[i]=0;
+	        	//recalculating uncertainty (as SD sum of both values) to one value and store it at xerr
+	        	xerr[i]= Math.sqrt(xerr[i]*xerr[i]+yerr[i]*yerr[i]);
+	        }
+
+		}
         if(!zValsPresent)
         {
         	for (i=0;i<nPatNumber;i++)
         		averSD[i]=0.5*(sdx_[i]+sdy_[i]);
-        }
+        }		
+		
         
     	//exporting 		
         try {        	
@@ -175,7 +197,7 @@ public class Export_TS implements PlugIn
 				}
 				//intensity, offset, bkgstd, chi2, xy uncertainty
 				//sFileWrite=sFileWrite+String.format("%.1f,%.1f,%.1f,%.1f,%.1f",intInt[i],bg[i],bkgstd[i],chi[i],xerr[i]);
-				sFileWrite=sFileWrite+df2.format(intInt[i])+","+df2.format(bg[i])+","+df2.format(bkgstd[i])+","+df2.format(chi[i])+","+df2.format(xerr[i]);
+				sFileWrite=sFileWrite+df2.format(intInt[i])+","+df2.format(bg[i])+","+df2.format(bgstd[i])+","+df2.format(chi[i])+","+df2.format(xerr[i]);
 				if(zValsPresent)
 					sFileWrite=sFileWrite+","+df2.format(zerr[i]);
 					//sFileWrite=sFileWrite+String.format(",%.1f",zerr[i]);
