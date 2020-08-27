@@ -3,10 +3,10 @@ package fiji.plugin.DOM;
 // Java
 import java.util.Arrays;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.IOException;
+//import java.io.InputStream;
+//import java.io.InputStreamReader;
+//import java.io.BufferedReader;
+//import java.io.IOException;
 
 // ImageJ
 import ij.IJ;
@@ -16,11 +16,11 @@ import ij.gui.Roi;
 import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
 
-import ij.gui.YesNoCancelDialog; // There is no Yes/No dialog?
+//import ij.gui.YesNoCancelDialog; // There is no Yes/No dialog?
 
 // OpenCL
 //import static org.jocl.CL.*;
-import org.jocl.*;
+//import org.jocl.*;
 
 /**
  *
@@ -266,7 +266,7 @@ public class Detect_Molecules implements PlugIn {
 			/* GPU Fitting from here */
 			/*************************/
 			
-			if(dlg.bUseGPUAcceleration)
+			/*if(dlg.bUseGPUAcceleration)
 			{
 				// Fixed parameters for now
 				boolean GPU_USE_DOUBLE_PRECISION = false; // NOTE: double precision not supported
@@ -386,7 +386,7 @@ public class Detect_Molecules implements PlugIn {
 					// particles(_) is subset of detected_particles for current frame nFrame
 				}
 			}
-			
+			*/
 			/**************************************************/
 			/* GPU fitting till here, CPU fitting starts here */
 			/**************************************************/
