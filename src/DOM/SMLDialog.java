@@ -1,15 +1,23 @@
 package DOM;
 
 
+import java.awt.AWTEvent;
 import java.text.DecimalFormat;
 
 import ij.IJ;
+import ij.ImagePlus;
 import ij.Prefs;
+import ij.gui.DialogListener;
 import ij.gui.GenericDialog;
+import ij.gui.Overlay;
+import ij.gui.Roi;
+import ij.process.ImageProcessor;
 import ij.util.Tools;
 
-public class SMLDialog {
-
+public class SMLDialog implements DialogListener 
+{
+	/** original open image **/
+	public ImagePlus imp;
 	/** image width of original image */
 	int nWidth;  
 	/** image height of original image */ 
@@ -17,11 +25,18 @@ public class SMLDialog {
 	/** number of slices */
 	int nSlices; 
 	
+	/** Detection dialog window **/
+	GenericDialog fpDial;
+	
+	public Overlay savedOverlay;
+	
 	//finding particles
 	/** task to perform: finding particles, finding and fitting or fitting */
 	int nDetectionType;
 	/** standard deviation of PSF approximated by Gaussian */
 	double dPSFsigma;
+	/** approximate minimal SNR of detected particles **/
+	double dSNR;
 	/** size of Gaussian kernel for particles detection */
 	int nKernelSize; 
 	/** size of pixel in nm of original image */
@@ -167,6 +182,8 @@ public class SMLDialog {
 	/** add detected particles to overlay after linking*/
 	boolean bShowParticlesLink;
 	
+	SMLAnalysis smlpreview;
+	
 	/** Dialog showing options for z axis calibration 
 	 * 		
 	 * @return
@@ -210,40 +227,55 @@ public class SMLDialog {
 		
 		String [] DetectionType = new String [] {
 				"Detect molecules (no fitting)","Detect molecules and fit", "Fit detected molecules"};
-		GenericDialog fpDial = new GenericDialog("Find Particles");
+		
+		
+		fpDial = new GenericDialog("Find Particles");
 		fpDial.addChoice("Task:", DetectionType, Prefs.get("SiMoLoc.DetectionType", "Detect molecules and fit"));
-		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 1.7), 2,4," pixels");
+		fpDial.addNumericField("PSF standard devation", Prefs.get("SiMoLoc.dPSFsigma", 1.7), 2,5," pixels");
+		fpDial.addNumericField("Intensity threshold", Prefs.get("SiMoLoc.dSNR", 3.0), 2,5," approx SNR, around 2-30");
 		//fpDial.addNumericField("Gaussial kernel size, \nodd number from 7(fast) till 13 (slow)  ", Prefs.get("SiMoLoc.nKernelSize", 7), 0);		
 		fpDial.addNumericField("Pixel size", Prefs.get("SiMoLoc.dPixelSize", 66), 2, 4, "nm");		
 		fpDial.addNumericField("Parallel threads number", Prefs.get("SiMoLoc.nThreads", 500), 0,6," max="+Long.toString(nMaxThreadsN));
 		fpDial.addNumericField("Fitting iterations number", Prefs.get("SiMoLoc.nIterations", 3), 0);
 		fpDial.addCheckbox("Mark detected particles in overlay?", Prefs.get("SiMoLoc.bShowParticles", false));
 		fpDial.addCheckbox("Ignore false positives?", Prefs.get("SiMoLoc.bIgnoreFP", false));
-		
+		fpDial.addMessage("~~~~~~~~");
+		fpDial.addPreviewCheckbox(null,"Preview detection..");
 		fpDial.setInsets(15, 20, 0); // extra space on top
 		
 		//*GPU part -> rewrite to new format of table
 		//fpDial.addCheckbox("Accelerate using GPU", Prefs.get("SiMoLoc.bUseGPUAcceleration", false));
 		//fpDial.addNumericField("Batch size", Prefs.get("SiMoLoc.nBatchSize", 4096), 0);//, 6, "Max : "); //TODO: get maximum value of the GPU
-		//fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU
-		
-		
+		//fpDial.addNumericField("Group size", Prefs.get("SiMoLoc.nGroupSize", 128), 0);//, 6, "Max : ");  //TODO: get maximum value of the GPU				
 		//!!! TODO fpDial.addCheckbox("Use log MLE instead of Chi^2", Prefs.get("SiMoLoc.bUseMLE", false));
 		
+		savedOverlay=imp.getOverlay();
+		
 		fpDial.setResizable(false);
+		fpDial.addDialogListener(this);
 		fpDial.showDialog();
+		
+		imp.setOverlay(savedOverlay);
+		imp.updateAndRepaintWindow();
+		imp.show();
+		
 		if (fpDial.wasCanceled())
             return false;
+		
 		
 		nDetectionType = fpDial.getNextChoiceIndex();
 		Prefs.set("SiMoLoc.DetectionType", DetectionType[nDetectionType]);
 		dPSFsigma = fpDial.getNextNumber();
 		Prefs.set("SiMoLoc.dPSFsigma", dPSFsigma);
+
 		
 		//calculate Gaussian kernel dimensions in pixels for spot detection
 		nKernelSize = (int) Math.ceil(3.0*dPSFsigma);
 		if(nKernelSize%2 == 0)
 			 nKernelSize++;
+
+		dSNR = fpDial.getNextNumber();
+		Prefs.set("SiMoLoc.dSNR", dSNR);
 
 		dPixelSize = fpDial.getNextNumber();
 		Prefs.set("SiMoLoc.dPixelSize", dPixelSize);
@@ -268,6 +300,75 @@ public class SMLDialog {
 		
 		return true;
 	}
+	
+	@Override
+	/** preview detection **/
+	public boolean dialogItemChanged(GenericDialog gd, AWTEvent e) {
+		// TODO Auto-generated method stub
+		ImageProcessor ip;
+		Roi RoiSelected;
+		boolean bValuesOk;
+		bValuesOk=getValues();
+		if(!bValuesOk)
+			return false;
+		
+		if(gd.wasOKed())
+		{
+			return true;
+		}
+		
+		if(gd.isPreviewActive())
+		{
+			gd.previewRunning(true);
+			smlpreview = new SMLAnalysis();
+			smlpreview.initConvKernel(this);
+			ip = imp.getProcessor().duplicate();
+			RoiSelected= imp.getRoi();
+			smlpreview.PreviewOverlay_=new Overlay();
+			smlpreview.detectParticles(ip, this, 1, null, RoiSelected);
+			imp.setOverlay(smlpreview.PreviewOverlay_);
+			imp.updateAndRepaintWindow();
+			imp.show();
+			gd.previewRunning(false);
+		}
+		else
+		{
+			imp.setOverlay(savedOverlay);
+			imp.updateAndRepaintWindow();
+			imp.show();
+		}
+		return true;
+	}
+	
+	/** function reads parameters values from the dialog **/
+	public boolean getValues()
+	{
+		nDetectionType = fpDial.getNextChoiceIndex();
+		dPSFsigma = fpDial.getNextNumber();
+		if(Double.isNaN(dPSFsigma))
+			return false;
+		
+		//calculate Gaussian kernel dimensions in pixels for spot detection
+		nKernelSize = (int) Math.ceil(3.0*dPSFsigma);
+		if(nKernelSize%2 == 0)
+			 nKernelSize++;
+
+		dSNR = fpDial.getNextNumber();
+		if(Double.isNaN(dSNR))
+			return false;
+		dPixelSize = fpDial.getNextNumber();
+		
+		nThreads = (int) fpDial.getNextNumber();
+		nIterations = (int)fpDial.getNextNumber();
+		bShowParticles = fpDial.getNextBoolean();
+		bIgnoreFP = fpDial.getNextBoolean();
+		
+		return true;
+	}
+
+	
+	
+	
 	/** Dialog showing options for reconstruction image
 	 * 
 	 * @param xlocavg_ average localization precision x
@@ -602,6 +703,8 @@ public class SMLDialog {
 		Prefs.set("SiMoLoc.bShowParticlesLink", bShowParticlesLink);
 		return true;		
 	}
+
+
 
 
 }

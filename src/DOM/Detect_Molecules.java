@@ -88,6 +88,7 @@ public class Detect_Molecules implements PlugIn {
 		nOneFrameSize+=imp.getWidth()*imp.getHeight(); //thresholded version
 		
 		
+		dlg.imp=imp;
 		
 		if (!dlg.findParticles(nOneFrameSize)) return;
 		

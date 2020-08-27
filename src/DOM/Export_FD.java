@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 
 import ij.IJ;
 import ij.io.SaveDialog;
@@ -19,7 +20,9 @@ public class Export_FD implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
-		DecimalFormat df2 = new DecimalFormat ("#.##");
+		DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+		symbols.setDecimalSeparator('.');
+		DecimalFormat df2 = new DecimalFormat ("#.##",symbols);
 		IJ.register(Export_FD.class);
 		//check that the table is present
 		if (sml.ptable.getCounter()==0 || !sml.ptable.getHeadings()[0].equals("X_(px)"))

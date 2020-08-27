@@ -6,7 +6,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
-
+import java.text.DecimalFormatSymbols;
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -22,8 +22,10 @@ public class Export_MTrackJ implements PlugIn {
 	@Override
 	public void run(String arg) {
 		
-		DecimalFormat df3 = new DecimalFormat ("#.###");
-		DecimalFormat df1 = new DecimalFormat ("#.0");
+		DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+		symbols.setDecimalSeparator('.');
+		DecimalFormat df3 = new DecimalFormat ("#.###", symbols);
+		DecimalFormat df1 = new DecimalFormat ("#.0", symbols);
 		String filename;
 		String sFileWrite;
 		int i, nCurrTrack, nAbsTracksNumber;

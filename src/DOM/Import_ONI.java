@@ -142,7 +142,7 @@ public class Import_ONI implements PlugIn {
 		    if (nFileChannel==nChannel)
 		    {		    
 			    //assign corresponding values
-			    DoMvalues[DOMConstants.Col_FrameN]=Double.parseDouble(values[iFrame]);
+			    DoMvalues[DOMConstants.Col_FrameN]=Double.parseDouble(values[iFrame])+1;
 			    DoMvalues[DOMConstants.Col_Xnm]=Double.parseDouble(values[iXnm]);
 			    DoMvalues[DOMConstants.Col_Ynm]=Double.parseDouble(values[iYnm]);
 			    DoMvalues[DOMConstants.Col_Znm]=Double.parseDouble(values[iZnm]);

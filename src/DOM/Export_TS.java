@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 
 /** Export to ThunderSTORM format 
  * **/
@@ -36,7 +37,10 @@ public class Export_TS implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
-		DecimalFormat df2 = new DecimalFormat ("#.####");
+		DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+		symbols.setDecimalSeparator('.');
+		DecimalFormat df2 = new DecimalFormat ("#.####",symbols);
+		
 
 		/** whether z values are calculated **/
 		boolean zValsPresent=false;

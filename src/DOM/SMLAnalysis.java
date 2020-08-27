@@ -51,6 +51,8 @@ public class SMLAnalysis {
 	/** table with results of detection and fitting */
 	ResultsTable ptable;// = ResultsTable.getResultsTable();
 	
+	public Overlay PreviewOverlay_;
+	
 	java.util.concurrent.locks.Lock ptable_lock = new java.util.concurrent.locks.ReentrantLock();
 
     final static int[] DIR_X_OFFSET = new int[] {  0,  1,  1,  1,  0, -1, -1, -1 };
@@ -62,6 +64,7 @@ public class SMLAnalysis {
 	{
 		ptable = ResultsTable.getResultsTable();
 		ptable.setPrecision(2);
+		PreviewOverlay_=null;
 		
 	}
 	
@@ -117,7 +120,7 @@ public class SMLAnalysis {
 		//dushort.threshold(nThreshold);
 		//convert to byte
 		//dubyte  = (ByteProcessor) dushort.convertToByte(false);
-		dubyte  =thresholdFloat(dupip,(float)(nThreshold[0]+3.0*nThreshold[1]));
+		dubyte  =thresholdFloat(dupip,(float)(nThreshold[0]+fdg.dSNR*nThreshold[1]));
 		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], nThreshold[0], MaximumFinder.SEGMENTED, true, false);
 		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], ImageProcessor.NO_THRESHOLD, MaximumFinder.SEGMENTED, false, false);
 		//dubyteWS= maxF.findMaxima(dupip, 3.0*nThreshold[1], MaximumFinder.SEGMENTED, false);
@@ -301,32 +304,44 @@ public class SMLAnalysis {
 							}
 							if(bInRoi)
 							{
-								//find minimum value around peak position
-								dIMin = 1000000;
-								//nCount = 0;
-								for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
-									for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
+								/** normal detection **/
+								if(PreviewOverlay_==null)
+								{
+									//find minimum value around peak position
+									dIMin = 1000000;
+									//nCount = 0;
+									for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
+										for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
+										{
+											dVal = ipRaw.getPixel(i,j);
+											if (dVal<dIMin)
+												dIMin = dVal;																	
+										}
+									
+									ptable_lock.lock();
+									ptable.incrementCounter();
+									ptable.addValue("Frame Number", nFrame+1);
+									ptable.addValue("X_centroid_(px)",xCentroid);	
+									ptable.addValue("Y_centroid_(px)",yCentroid);
+									ptable.addValue("MaxInt",dIMax);
+									ptable.addValue("MinInt",dIMin);
+											
+									ptable_lock.unlock();
+									if(dlg.bShowParticles)
 									{
-										dVal = ipRaw.getPixel(i,j);
-										if (dVal<dIMin)
-											dIMin = dVal;																	
+										spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
+										spotROI.setStrokeColor(Color.yellow);	
+										spotROI.setPosition(nFrame+1);
+										SpotsPositions__.add(spotROI);										
 									}
-								
-								ptable_lock.lock();
-								ptable.incrementCounter();
-								ptable.addValue("Frame Number", nFrame+1);
-								ptable.addValue("X_centroid_(px)",xCentroid);	
-								ptable.addValue("Y_centroid_(px)",yCentroid);
-								ptable.addValue("MaxInt",dIMax);
-								ptable.addValue("MinInt",dIMin);
-										
-								ptable_lock.unlock();
-								if(dlg.bShowParticles)
+								}
+								/** preview **/
+								else
 								{
 									spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
 									spotROI.setStrokeColor(Color.yellow);	
-									spotROI.setPosition(nFrame+1);
-									SpotsPositions__.add(spotROI);										
+									//spotROI.setPosition(nFrame+1);
+									PreviewOverlay_.add(spotROI);																			
 								}
 							}
 
@@ -381,32 +396,44 @@ public class SMLAnalysis {
 								}
 								if(bInRoi)
 								{
-									//find minimum value around peak position
-									dIMin = 1000000;
-									//nCount = 0;
-									for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
-										for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
+									/** normal detection **/
+									if(PreviewOverlay_==null)
+									{
+										//find minimum value around peak position
+										dIMin = 1000000;
+										//nCount = 0;
+										for(i = (int) (Math.round(xCentroid)- dBorder); i <= Math.round(xCentroid)+ dBorder; i++)
+											for(j = (int) (Math.round(yCentroid)- dBorder); j <= Math.round(yCentroid)+ dBorder; j++)
+											{
+												dVal = ipRaw.getPixel(i,j);
+												if (dVal<dIMin)
+													dIMin = dVal;																	
+											}
+										
+										ptable_lock.lock();
+										ptable.incrementCounter();
+										ptable.addValue("Frame Number", nFrame+1);
+										ptable.addValue("X_centroid_(px)",xCentroid);	
+										ptable.addValue("Y_centroid_(px)",yCentroid);
+										ptable.addValue("MaxInt",dIMax);
+										ptable.addValue("MinInt",dIMin);
+												
+										ptable_lock.unlock();
+										if(dlg.bShowParticles)
 										{
-											dVal = ipRaw.getPixel(i,j);
-											if (dVal<dIMin)
-												dIMin = dVal;																	
+											spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
+											spotROI.setStrokeColor(Color.yellow);	
+											spotROI.setPosition(nFrame+1);
+											SpotsPositions__.add(spotROI);										
 										}
-									
-									ptable_lock.lock();
-									ptable.incrementCounter();
-									ptable.addValue("Frame Number", nFrame+1);
-									ptable.addValue("X_centroid_(px)",xCentroid);	
-									ptable.addValue("Y_centroid_(px)",yCentroid);
-									ptable.addValue("MaxInt",dIMax);
-									ptable.addValue("MinInt",dIMin);
-											
-									ptable_lock.unlock();
-									if(dlg.bShowParticles)
+									}
+									/** preview **/
+									else
 									{
 										spotROI = new OvalRoi(0.5+xCentroid-2*dlg.dPSFsigma,0.5+yCentroid-2*dlg.dPSFsigma,4.0*dlg.dPSFsigma,4.0*dlg.dPSFsigma);
 										spotROI.setStrokeColor(Color.yellow);	
-										spotROI.setPosition(nFrame+1);
-										SpotsPositions__.add(spotROI);										
+										//spotROI.setPosition(nFrame+1);
+										PreviewOverlay_.add(spotROI);											
 									}
 								}
 							}

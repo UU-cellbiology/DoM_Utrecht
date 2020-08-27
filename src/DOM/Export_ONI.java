@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 
 import ij.IJ;
 import ij.Prefs;
@@ -25,7 +26,9 @@ public class Export_ONI implements PlugIn
 		String filename;
 		int i;
 		String sFileWrite;
-		DecimalFormat df2 = new DecimalFormat ("#.#####");
+		DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+		symbols.setDecimalSeparator('.');
+		DecimalFormat df2 = new DecimalFormat ("#.#####", symbols);
 		
 		IJ.register(Export_ONI.class);
 		
@@ -85,6 +88,12 @@ public class Export_ONI implements PlugIn
 		double [] channel = 	sml.ptable.getColumnAsDoubles(DOMConstants.Col_BGfit_error);
 		
 		nPatNumber = bg.length;
+		// take into account that in ONI numbering of frames starts from zero,
+		// while in DoM from 1
+		for( i=0;i<nPatNumber;i++)
+		{
+			frame[i]=frame[i]-1;
+		}
 		
 		double [] xprpx = new double[nPatNumber];
 		double [] yprpx = new double[nPatNumber];
