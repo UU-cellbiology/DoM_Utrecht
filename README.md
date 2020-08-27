@@ -7,6 +7,9 @@ DoM_Utrecht
 <br />
 <br />
 For description and manual refer to <a href="https://github.com/ekatrukha/DoM_Utrecht/wiki"><strong>Wiki page</strong></a>. 
+Main topics:
+* [How to install plugin](https://github.com/ekatrukha/DoM_Utrecht/wiki/How-to-install-plugin)
+* [How to use plugin](https://github.com/ekatrukha/DoM_Utrecht/wiki/How-to-use-plugin-%28Main-menu%29)
 <br />
 <br />
 <br />
