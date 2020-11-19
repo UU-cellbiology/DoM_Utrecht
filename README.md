@@ -12,6 +12,7 @@ For description and manual refer to <a href="https://github.com/ekatrukha/DoM_Ut
 Main topics:
 * [How to install plugin](https://github.com/ekatrukha/DoM_Utrecht/wiki/How-to-install-plugin)
 * [How to use plugin](https://github.com/ekatrukha/DoM_Utrecht/wiki/How-to-use-plugin-%28Main-menu%29)
+* [How to cite plugin](https://github.com/ekatrukha/DoM_Utrecht/wiki/How-to-cite-plugin%3F)
 <br />
 <br />
 <br />
