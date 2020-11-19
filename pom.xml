@@ -14,7 +14,7 @@
  
     <groupId>sc.fiji</groupId>
     <artifactId>DoM_</artifactId>
-    <version>1.2.0</version>
+    <version>1.2.1</version>
  
     <name>DoM_Utrecht</name>
     <description>Detection of Molecules plugin for ImageJ</description>

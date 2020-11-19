@@ -34,7 +34,7 @@ public class Import_TS implements PlugIn
 		int nDoMcolsN;
 		long nStringCount=0;
 		long progressbytes=0;
-		int iFrame=1000,iXnm=1000,iYnm=1000,iZnm=1000,iSigma=1000, iSigmaX=1000,iSigmaY=1000,iPhotons=1000,iBG=1000,iBGSD=1000,iErrXY=1000,iErrZ=1000, iChi=1000;
+		int iFrame=1000,iXnm=1000,iYnm=1000,iZnm=1000,iSigma=1000, iSigmaX=1000,iSigmaY=1000,iPhotons=1000,iBG=1000,iBGSD=1000,iErrXY=1000, iErrXY_Z=1000,iErrZ=1000, iChi=1000;
 		
 		IJ.register(Import_TS.class);
 		
@@ -94,34 +94,37 @@ public class Import_TS implements PlugIn
 		headings=myLine.split(separator);
 		progressbytes+=myLine.getBytes().length;
 		//find corresponding column titles (in case it is in random order)
-		for (i=0;i<headings.length;i++)
+		//y[nm] can be confused with uncertainty [nm], therefore reverse order
+		for (i=(headings.length-1);i>=0;i--)
 		{
 
-			if(headings[i].compareTo("\"frame\"")==0)
+			if(headings[i].contains("frame"))
 				iFrame=i;
-			if(headings[i].compareTo("\"x [nm]\"")==0)
+			if(headings[i].contains("x [nm]"))
 				iXnm=i;
-			if(headings[i].compareTo("\"y [nm]\"")==0)
+			if(headings[i].contains("y [nm]"))
 				iYnm=i;
-			if(headings[i].compareTo("\"z [nm]\"")==0)
+			if(headings[i].contains("z [nm]"))
 				iZnm=i;
-			if(headings[i].compareTo("\"sigma [nm]\"")==0)
+			if(headings[i].contains("sigma [nm]"))
 				iSigma=i;
-			if(headings[i].compareTo("\"sigma1 [nm]\"")==0)
+			if(headings[i].contains("sigma1 [nm]"))
 				iSigmaX=i;
-			if(headings[i].compareTo("\"sigma2 [nm]\"")==0)
+			if(headings[i].contains("sigma2 [nm]"))
 				iSigmaY=i;
-			if(headings[i].compareTo("\"intensity [photon]\"")==0)
+			if(headings[i].contains("intensity [photon]"))
 				iPhotons=i;
-			if(headings[i].compareTo("\"offset [photon]\"")==0)
+			if(headings[i].contains("offset [photon]"))
 				iBG=i;
-			if(headings[i].compareTo("\"bkgstd [photon]\"")==0)
+			if(headings[i].contains("bkgstd [photon]"))
 				iBGSD=i;
-			if(headings[i].compareTo("\"chi2\"")==0)
+			if(headings[i].contains("chi2"))
 				iChi=i;
-			if(headings[i].compareTo("\"uncertainty_xy [nm]\"")==0)
+			if(headings[i].contains("uncertainty_xy [nm]"))
+				iErrXY_Z=i;
+			if(headings[i].contains("uncertainty [nm]"))
 				iErrXY=i;
-			if(headings[i].compareTo("\"uncertainty_z [nm]\"")==0)
+			if(headings[i].contains("uncertainty_z [nm]"))
 				iErrZ=i;
 			
 		}				
@@ -129,6 +132,7 @@ public class Import_TS implements PlugIn
 		if(iZnm<100)
 		{
 			zValsPresent=true;
+			iErrXY=iErrXY_Z;
 		}
 		
 		String [] headingsDoM={"X_(px)","Y_(px)","Frame_Number","X_(nm)","X_loc_error(nm)","Y_(nm)", "Y_loc_error(nm)", 
@@ -142,12 +146,17 @@ public class Import_TS implements PlugIn
 		ptable.reset(); // erase Results table
 		ptable_lock.lock();
 		double [] DoMvalues = new double [nDoMcolsN];
+
 		while ( scanner.hasNext())
 		{    
-			
+
 			myLine=scanner.nextLine();
 			//read a line from TS file
 		    values = myLine.split(separator);
+		    if(values.length==0)
+		    	break;
+		    
+		    //IJ.log(myLine);
 		    
 		    //assign corresponding values
 		    DoMvalues[DOMConstants.Col_FrameN]=Double.parseDouble(values[iFrame]);

@@ -160,11 +160,13 @@ public class SMLDialog implements DialogListener
 	/** SNR threshold for particles used for color calibration
 	 * */
 	double dCCSNR;
-	/**  Show distortion map */
+	/** color calibration: perform images pre-registration **/
+	boolean bCCPreReg;
+	/** color calibration: Show distortion map */
 	boolean bCCShowMap;
-	/**  Show points used for calibration */
+	/**  color calibration: Show points used for calibration */
 	boolean bCCShowPoints;
-	/**  Put coordinates of points used for calibration to table */
+	/**  color calibration: Put coordinates of points used for calibration to table */
 	boolean bCCShowResults;
 	
 		
@@ -516,6 +518,7 @@ public class SMLDialog implements DialogListener
 		GenericDialog ccDial = new GenericDialog("Color Calibration parameters");
 		ccDial.addNumericField("Max distance between particle images in both channels:",Prefs.get("SiMoLoc.dCCDist", 10),0,3," original pixels");
 		ccDial.addNumericField("SNR threshold filter:",Prefs.get("SiMoLoc.dCCSNR", 10),1,4," ");
+		ccDial.addCheckbox("Perform pre-registration based on images", Prefs.get("SiMoLoc.bCCPreReg", true));
 		ccDial.addCheckbox("Show points used for calibration", Prefs.get("SiMoLoc.bCCShowPoints", true));
 		ccDial.addCheckbox("Show final distortion map", Prefs.get("SiMoLoc.bCCShowMap", true));
 		ccDial.addCheckbox("Provide reference points coordinates in Results", Prefs.get("SiMoLoc.bCCShowResults", true));
@@ -528,12 +531,14 @@ public class SMLDialog implements DialogListener
 		Prefs.set("SiMoLoc.dCCDist", dCCDist);
 		dCCSNR =  ccDial.getNextNumber();
 		Prefs.set("SiMoLoc.dCCSNR", dCCSNR);
+		bCCPreReg = ccDial.getNextBoolean();
+		Prefs.set("SiMoLoc.bCCPreReg", bCCPreReg);
 		bCCShowPoints = ccDial.getNextBoolean();
-		Prefs.set("SiMoLoc.bCCShowMap", bCCShowPoints);
+		Prefs.set("SiMoLoc.bCCShowPoints", bCCShowPoints);
 		bCCShowMap = ccDial.getNextBoolean();
 		Prefs.set("SiMoLoc.bCCShowMap", bCCShowMap);
 		bCCShowResults = ccDial.getNextBoolean();
-		Prefs.set("SiMoLoc.bCCShowMap", bCCShowResults);
+		Prefs.set("SiMoLoc.bCCShowResults", bCCShowResults);
 		return true;
 	
 	}

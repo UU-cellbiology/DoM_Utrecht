@@ -270,9 +270,18 @@ public class ColorCorrection implements PlugIn
 		IJ.log("Aligning maximum projection pictures...");
 		
 		AdjustDimensions();
+		
+		dXYShift=new double[2];
 		ImCrossCorrelation imCrCorr = new ImCrossCorrelation();
-		//dXYShift = imCrCorr.calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
-		dXYShift = imCrCorr.calcShiftFFTCorrelationDouble(imp_refMax.getProcessor(),imp_warpMax.getProcessor(),1);
+		if (dlg.bCCPreReg)
+		{
+			//dXYShift = imCrCorr.calcShiftFFTCorrelation(imp_refMax.getProcessor(),imp_warpMax.getProcessor());
+			dXYShift = imCrCorr.calcShiftFFTCorrelationDouble(imp_refMax.getProcessor(),imp_warpMax.getProcessor(),1);
+		}
+		else
+		{
+			IJ.log("Image pre-registration is off.");
+		}
 				
 		IJ.showProgress(1.0);
 		
