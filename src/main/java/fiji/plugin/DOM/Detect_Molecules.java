@@ -120,6 +120,7 @@ public class Detect_Molecules implements PlugIn {
 		IJ.log("Image title: \"" + imp.getTitle() + "\"");
 		IJ.log("Image pixel size: " + String.format("%.2f",dlg.dPixelSize) + " nm");
 		IJ.log("Detection SD of PSF: " + String.format("%.2f",dlg.dPSFsigma) + " pixels ("+String.format("%.2f",dlg.dPSFsigma*dlg.dPixelSize)+" nm)");
+		IJ.log("Intensity threshold: " + String.format("%.1f",dlg.dSNR) + " (estimated SNR)");		
 		IJ.log("Kernel size: (detection) " + String.format("%d",dlg.nKernelSize) + " pixels, (fitting) "+String.format("%d",(2*(int)(3.0*dlg.dPSFsigma))+1)+" pixels");
 		nFreeThread = -1;
 		nSlice = 0;

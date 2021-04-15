@@ -1488,7 +1488,7 @@ public class ColorCorrection implements PlugIn
 		//ipn = (FloatProcessor) ip.convertToFloat();
 		
 		//account for translation		
-		xyOrig=new double[2][trImWidth*trImWidth]; 
+		xyOrig=new double[2][trImWidth*trImHeight]; 
 		for (i=0;i<trImWidth;i++)
 			for (j=0;j<trImHeight;j++)
 			{

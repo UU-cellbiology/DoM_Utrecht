@@ -5,6 +5,8 @@ import java.awt.Color;
 import java.awt.Frame;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+
 import ij.IJ;
 import ij.ImagePlus;
 import ij.ImageStack;
@@ -500,7 +502,9 @@ public class SMLReconstruct {
 	
 		int [] newrgb = new int[3];
 		//generate final RGB image
-		double intMax = ipf[0].getMax();
+		//double intMax = ipf[0].getMax();
+		float intMax = getIntensityPercentile(ipf[0],0.99f);
+		float valInt;
 		for(i=0;i<new_width;i++)
 			for(j=0;j<new_height;j++)
 			{
@@ -508,7 +512,10 @@ public class SMLReconstruct {
 				{
 					
 					zInd = (int)Math.round(ipf[1].getf(i, j));
-					c = Color.getHSBColor(zLUT[zInd][0], zLUT[zInd][1], (float)(ipf[0].getf(i, j)/intMax));
+					valInt=(float)(ipf[0].getf(i, j)/intMax);
+					if (valInt>1.0)
+						valInt=1.0f;
+					c = Color.getHSBColor(zLUT[zInd][0], zLUT[zInd][1], valInt);
 					newrgb[0]=c.getRed();
 					newrgb[1]=c.getGreen();
 					newrgb[2]=c.getBlue();
@@ -635,6 +642,36 @@ public class SMLReconstruct {
 		//driftstack.addSlice(null, ipf.convertToShort(true));
 		driftstack.addSlice(null, ipf);
 		
+	}
+	
+	/** function returns percentile intensity value **/
+	public float getIntensityPercentile(FloatProcessor ip, float percentile)
+	{
+		//int nBinSize;
+		int width, height;
+		int pixelCount;
+
+		
+		width=ip.getWidth();
+		height=ip.getHeight();
+		pixelCount=width*height;
+		
+
+		float[] pixels2 = new float[pixelCount];
+		//float[] pixels2;
+		System.arraycopy((float[])ip.getPixels(),0,pixels2,0,pixelCount);
+	
+		Arrays.sort(pixels2);
+		//int middle = pixels2.length/2;
+		int perc = Math.round(pixelCount*percentile);
+		return pixels2[perc];
+		//int qi75 = Math.round(pixelCount*0.75f);
+	
+		//float IQR = pixels2[qi75]-pixels2[qi25];
+		//double h= 2*IQR*Math.pow((double)pixelCount, -1.0/3.0);
+		
+		//return (int)Math.round((pixels2[pixelCount-1]-pixels2[0])/h);
+			
 	}
 	
 	/** Main function performing correlation based drift correction  */

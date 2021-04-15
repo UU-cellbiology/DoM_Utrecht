@@ -10,7 +10,6 @@ import java.util.Stack;
 
 
 import ij.IJ;
-import ij.ImagePlus;
 import ij.gui.OvalRoi;
 import ij.gui.Overlay;
 import ij.gui.Roi;
