@@ -363,15 +363,19 @@ public class SMLAnalysis {
 						yCentroid = dVal*m;
 						dInt = dVal;						
 						bIsLocMax=true;
-						
+						int nEqual = 0;
+						//"soft" maximum
 						for (int d=0; d<8; d++) 
 						{   							
 							vNeighbor = ipRaw.getPixel(k+DIR_X_OFFSET[d], m+DIR_Y_OFFSET[d]);
+							//if (vNeighbor < dVal) 
 							if (vNeighbor <= dVal) 
 							{
 								xCentroid += vNeighbor*(k+DIR_X_OFFSET[d]);
 								yCentroid += vNeighbor*(m+DIR_Y_OFFSET[d]);
 								dInt+=vNeighbor;
+								if(vNeighbor == dVal)
+									nEqual++;
 	                        }
 							else
 							{
@@ -379,6 +383,12 @@ public class SMLAnalysis {
 								stackPost.remove(0);
 								break;
 							}
+						}
+						
+						if(nEqual>4&&bIsLocMax)
+						{
+							bIsLocMax=false;
+							stackPost.remove(0);							
 						}
 						if(bIsLocMax)
 						{
