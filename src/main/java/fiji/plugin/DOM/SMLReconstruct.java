@@ -166,7 +166,15 @@ public class SMLReconstruct {
 		}
 		if(dlg_.b3D)
 		{
-			getZmaxmin();
+			if(dlg_.bZRange)
+			{
+				zmin = dlg_.dZMin;
+				zmax = dlg_.dZMax;
+			}
+			else
+			{
+				getZmaxmin();
+			}
 		}
 	
 	}

@@ -2,7 +2,7 @@ package fiji.plugin.DOM;
 
 public interface DOMConstants {
 	
-	public static final String DOMversion="1.2.3";
+	public static final String DOMversion="1.2.4";
 	
 	public static final double FITRADIUS=3.0;
 	

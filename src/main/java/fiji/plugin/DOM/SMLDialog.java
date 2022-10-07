@@ -151,6 +151,9 @@ public class SMLDialog implements DialogListener
 	boolean bDynamicZscale;
 	/** name of LUT for colorcoded reconstruction of Z*/
 	String sZLUTName;
+	boolean bZRange;
+	double dZMin;
+	double dZMax;
 	boolean bZCalWobbling;
 	
 	//color calibration parameters
@@ -434,7 +437,9 @@ public class SMLDialog implements DialogListener
 		dgReconstruct.addNumericField("Z-distance between slices (Z-stack):", Prefs.get("SiMoLoc.distZSlices", 100), 0,4," (nm)");
 		dgReconstruct.addCheckboxGroup(1,2,sLabelsCheckbox,sLabelsDefault);
 		dgReconstruct.addChoice("LUT for colorcode render:",luts,Prefs.get("SiMoLoc.zLutChoice","Fire"));
-		
+		dgReconstruct.addCheckbox("Use Z-range", Prefs.get("SiMoLoc.Zrange", false));
+		dgReconstruct.addNumericField("Z min:", Prefs.get("SiMoLoc.zMin", 0), 2,6, "nm");
+		dgReconstruct.addNumericField("Z max:", Prefs.get("SiMoLoc.zMax", 0), 2,6, "nm");
 		//dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
 		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		
@@ -505,6 +510,15 @@ public class SMLDialog implements DialogListener
 		LutChoice = dgReconstruct.getNextChoiceIndex();
 		Prefs.set("SiMoLoc.zLutChoice", luts[LutChoice]);
 		sZLUTName = luts[LutChoice];
+		
+		bZRange = dgReconstruct.getNextBoolean();
+		Prefs.set("SiMoLoc.Zrange", bZRange);
+		dZMin =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.zMin", dZMin);
+		dZMax =  dgReconstruct.getNextNumber();
+		Prefs.set("SiMoLoc.zMax", dZMax);
+
+		
 		
 		return true;
 	}
