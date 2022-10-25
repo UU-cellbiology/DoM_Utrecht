@@ -28,6 +28,7 @@ public class Reconstruct_Image implements PlugIn{
 		double [] yloc;
 		double [] xnm;
 		double [] ynm;
+		double [] znm;
 		double [] falsepos;
 		double [] frames;
 		double xmax, ymax;
@@ -64,7 +65,7 @@ public class Reconstruct_Image implements PlugIn{
 		{
 			//check if localization precision is less than 1 pixels
 			//old: if(falsepos[i]<0.2)
-			if(xloc[i]*pxsize<1 && yloc[i]*pxsize<1)
+			if(Math.abs(xloc[i]*pxsize)<1.0 && Math.abs(yloc[i]*pxsize)<1.0 && Double.isFinite(xloc[i]) && Double.isFinite(yloc[i]))
 			{
 				xlocavg+=xloc[i];
 				ylocavg+=yloc[i];
@@ -98,10 +99,12 @@ public class Reconstruct_Image implements PlugIn{
 					ymax=ynm[i];
 			}
 		}
+		//calculate z-range
+		znm = sml.ptable.getColumnAsDoubles(DOMConstants.Col_Znm);
 		
 		//show dialog with options
 		//here we provide xmax and ymax in original pixels
-		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax*pxsize, ymax*pxsize)) return;
+		if (!dlg.ReconstructImage(xlocavg,ylocavg,fminframe,fmaxframe, xmax*pxsize, ymax*pxsize,SMLReconstruct.getZmaxmin(znm))) return;
 		//and here we transform values of rectangle back
 		dlg.nRecWidth=dlg.nRecWidth/pxsize;
 		dlg.nRecHeight=dlg.nRecHeight/pxsize;

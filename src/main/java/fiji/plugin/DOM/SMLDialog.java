@@ -387,7 +387,7 @@ public class SMLDialog implements DialogListener
 	 * @return user choice
 	 */
 	
-	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, double xmax, double ymax) 		
+	public boolean ReconstructImage(double xlocavg_, double ylocavg_, double fminframe, double fmaxframe, double xmax, double ymax, double [] zRange) 		
 	{
 		int LutChoice;
 		GenericDialog dgReconstruct = new GenericDialog("Reconstruct Dataset");
@@ -438,8 +438,8 @@ public class SMLDialog implements DialogListener
 		dgReconstruct.addCheckboxGroup(1,2,sLabelsCheckbox,sLabelsDefault);
 		dgReconstruct.addChoice("LUT for colorcode render:",luts,Prefs.get("SiMoLoc.zLutChoice","Fire"));
 		dgReconstruct.addCheckbox("Use Z-range", Prefs.get("SiMoLoc.Zrange", false));
-		dgReconstruct.addNumericField("Z min:", Prefs.get("SiMoLoc.zMin", 0), 2,6, "nm");
-		dgReconstruct.addNumericField("Z max:", Prefs.get("SiMoLoc.zMax", 0), 2,6, "nm");
+		dgReconstruct.addNumericField("Z min:", zRange[0], 2,6, "nm");
+		dgReconstruct.addNumericField("Z max:", zRange[1], 2,6, "nm");
 		//dgReconstruct.addCheckbox("Calculate z-values based on calibration", Prefs.get("SiMoLoc.recalZvalues", false));
 		//dgReconstruct.addMessage("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
 		

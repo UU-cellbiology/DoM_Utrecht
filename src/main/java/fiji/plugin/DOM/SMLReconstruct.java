@@ -57,10 +57,9 @@ public class SMLReconstruct {
 	/** linearly interpolated drift x coordinates for each frame */
 	double [] approxy;
 	
-	/** max Z value*/
-	double zmax;
-	/** min Z value*/
-	double zmin;
+	/** min max Z value*/
+	double [] zRange = new double [2];
+
 
 	double max=0;
 	double min=9999999;
@@ -168,12 +167,12 @@ public class SMLReconstruct {
 		{
 			if(dlg_.bZRange)
 			{
-				zmin = dlg_.dZMin;
-				zmax = dlg_.dZMax;
+				zRange[0]=dlg_.dZMin;
+				zRange[1] = dlg_.dZMax;
 			}
 			else
 			{
-				getZmaxmin();
+				zRange = getZmaxmin(z);
 			}
 		}
 	
@@ -288,7 +287,7 @@ public class SMLReconstruct {
 		//zmax=Prefs.get("SiMoLOc.ZC_fitRangeMax", 1000);
 	
 		
-		nSlices = (int) Math.ceil((zmax-zmin)/zstep);
+		nSlices = (int) Math.ceil((zRange[1]-zRange[0])/zstep);
 		
 		//in case all z-values are zero still one slice has to be drawn
 		if(nSlices==0)
@@ -309,8 +308,8 @@ public class SMLReconstruct {
 		
 		for (int n=0;n<nParticlesCount;n++)
 		{
-			//if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
-			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zmin && z[n]<zmax)
+		if (Double.isFinite(loc_errx[n])&&Double.isFinite(loc_erry[n])&&Double.isFinite(loc_errz[n]))
+			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zRange[0] && z[n]<zRange[1])
 			{
 				IJ.showProgress(n, nParticlesCount);
 				xmag=(int) Math.round(x[n]*settings.dMagnification);
@@ -353,7 +352,7 @@ public class SMLReconstruct {
 							{							
 								if((i<new_width) && (j<new_height)&&(i>0)&&(j>0))
 								{
-									sliceNumber = (int)Math.round(k-(zmin/zstep));
+									sliceNumber = (int)Math.round(k-(zRange[0]/zstep));
 									if(sliceNumber>=0 && sliceNumber<nSlices)
 									{
 										old_i=ipf[sliceNumber].getf(i, j);
@@ -435,7 +434,7 @@ public class SMLReconstruct {
 		for (int n=0;n<nParticlesCount;n++)
 		{
 			//if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold)
-			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zmin && z[n]<zmax)
+			if (f[n]>=fstart && f[n]<=fstop && fp[n]<dFPThreshold && z[n]>zRange[0] && z[n]<zRange[1])
 			{
 				IJ.showProgress(n, nParticlesCount);
 				xmag=(int) Math.round(x[n]*settings.dMagnification);
@@ -472,7 +471,7 @@ public class SMLReconstruct {
 								dErrx = ErrorFunction.erf2((i-xpeak)/loc_errxmag) - ErrorFunction.erf2((1+i-xpeak)/loc_errxmag);
 								dErry = ErrorFunction.erf2((j-ypeak)/loc_errymag) - ErrorFunction.erf2((1+j-ypeak)/loc_errymag);					
 								
-								zhue = (z[n]-zmin)/(zmax-zmin);
+								zhue = (z[n]-zRange[0])/(zRange[1]-zRange[0]);
 							
 								
 								zInd = dZcolorScale[(int)Math.round(zhue*255)];
@@ -551,9 +550,9 @@ public class SMLReconstruct {
 			for(j=25;j<40;j++)
 				imcolcode.putPixel(i, j, newrgb);
 		imcolcode.setJustification(ImageProcessor.LEFT_JUSTIFY);
-		imcolcode.drawString(new DecimalFormat("#").format(zmin)+ " nm",0,40);
+		imcolcode.drawString(new DecimalFormat("#").format(zRange[0])+ " nm",0,40);
 		imcolcode.setJustification(ImageProcessor.RIGHT_JUSTIFY);
-		imcolcode.drawString(new DecimalFormat("#").format(zmax)+ " nm",250,40);		
+		imcolcode.drawString(new DecimalFormat("#").format(zRange[1])+ " nm",250,40);		
 		new ImagePlus("Z colorbar" , imcolcode).show();
 		
 	
@@ -1075,9 +1074,9 @@ public class SMLReconstruct {
 			//build histogram
 			for (i =0; i<nParticlesCount; i++)
 			{
-				if(z[i]>zmin && z[i]<zmax)
+				if(z[i]>zRange[0] && z[i]<zRange[1])
 				{
-					ztemp = (z[i]-zmin)/(zmax-zmin);
+					ztemp = (z[i]-zRange[0])/(zRange[1]-zRange[0]);
 					cumHist[(int)Math.round(ztemp*255)]++;
 				}
 			}
@@ -1607,18 +1606,20 @@ public class SMLReconstruct {
 	}
 	/**function calculating zmin and zmax
 	 * */
-	void getZmaxmin()
+	static double [] getZmaxmin(final double [] z)
 	{
-		zmax=(-1)*Double.MAX_VALUE;
-		zmin=Double.MAX_VALUE;
+		double [] zRange = new double [2];
+		zRange[1]=(-1)*Double.MAX_VALUE;
+		zRange[0]=Double.MAX_VALUE;
 		for (int i=0;i<z.length;i++)
 		{
-			if(z[i]>zmax)
-				zmax=z[i];
-			if(z[i]<zmin)
-				zmin=z[i];
+			if(z[i]>zRange[1])
+				zRange[1]=z[i];
+			if(z[i]<zRange[0])
+				zRange[0]=z[i];
 			
 		}
+		return zRange;
 	}
 
 }
