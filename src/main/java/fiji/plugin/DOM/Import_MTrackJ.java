@@ -15,14 +15,15 @@ public class Import_MTrackJ implements PlugIn {
 
 	double [] trackid;
 	double [] patid;
-	double [] tracklength;
-	long nPatNumber;
+	//double [] tracklength;
+	//long nPatNumber;
 
-	SMLAnalysis sml_import = new SMLAnalysis();
+	SMLAnalysis smlImport = new SMLAnalysis();
 	@Override
 	public void run(String arg) {
 				
 		String filename;
+		long nPatNumber;
 		IJ.register(Import_MTrackJ.class);
 		
 		//if the function is called from macro and filename already provided		
@@ -39,8 +40,9 @@ public class Import_MTrackJ implements PlugIn {
 	        	return;
 	
 	        filename = path+dgLoadMTrackJ.getFileName();
-			
-	        sml_import.ptable.reset();
+	        IJ.log(" --- DoM plugin version " + DOMConstants.DOMversion+ " --- ");
+			IJ.log("Loading MTrackJ file: "+filename);
+	        smlImport.ptable.reset();
 	        nPatNumber = 0;
 	        int nTrackN = 0;
 	        int nParticleN = 0;
@@ -61,15 +63,15 @@ public class Import_MTrackJ implements PlugIn {
 					  {						  
 						  nParticleN++;
 						  nPatNumber++;
-						  sml_import.ptable.incrementCounter();
-						  sml_import.ptable.addValue("Abs_frame", (int)Float.parseFloat(line_array[5]));
-						  sml_import.ptable.addValue("X_(px)", Float.parseFloat(line_array[2]));
-						  sml_import.ptable.addValue("Y_(px)", Float.parseFloat(line_array[3]));
-						  sml_import.ptable.addValue("Channel", (int)Float.parseFloat(line_array[6]));
-						  sml_import.ptable.addValue("Slice", (int)Float.parseFloat(line_array[5]));
-						  sml_import.ptable.addValue("Frame", (int)Float.parseFloat(line_array[5]));
-						  sml_import.ptable.addValue("Track_ID", nTrackN);
-						  sml_import.ptable.addValue("Particle_ID", nParticleN);
+						  smlImport.ptable.incrementCounter();
+						  smlImport.ptable.addValue("Abs_frame", (int)Float.parseFloat(line_array[5]));
+						  smlImport.ptable.addValue("X_(px)", Float.parseFloat(line_array[2]));
+						  smlImport.ptable.addValue("Y_(px)", Float.parseFloat(line_array[3]));
+						  smlImport.ptable.addValue("Channel", (int)Float.parseFloat(line_array[6]));
+						  smlImport.ptable.addValue("Slice", (int)Float.parseFloat(line_array[5]));
+						  smlImport.ptable.addValue("Frame", (int)Float.parseFloat(line_array[5]));
+						  smlImport.ptable.addValue("Track_ID", nTrackN);
+						  smlImport.ptable.addValue("Particle_ID", nParticleN);
 					  }
 					}
 	
@@ -84,25 +86,29 @@ public class Import_MTrackJ implements PlugIn {
 			}	        
 			
 			
-			calculate_Tracks_Lengths();
-			add_Tracks_Lengths();	
-			sml_import.showTable();
-	        
+			//calculate_Tracks_Lengths();
+			add_Tracks_Lengths(smlImport,calculate_Tracks_Lengths(smlImport));	
+			smlImport.showTable();
+			IJ.log("Done loading "+Long.toString(nPatNumber)+" particles.");
 		}
 
 	}
 
 
 	//function calculating the number of detected particles per track
-	void calculate_Tracks_Lengths()
+	public static double [] calculate_Tracks_Lengths(final SMLAnalysis sml_import)
 	{
 		int nCount,i;
 		int nCurrTrack, nMaxVal, nIniPosition;
+		long nPatNumber;
 		
-		tracklength = new double [(int) nPatNumber];
+		double [] trackid   = sml_import.ptable.getColumnAsDoubles(6);		
+		double [] patid     = sml_import.ptable.getColumnAsDoubles(7);
+		nPatNumber = patid.length;
 		
-		trackid   = sml_import.ptable.getColumnAsDoubles(6);		
-		patid     = sml_import.ptable.getColumnAsDoubles(7);
+		double [] tracklength = new double [(int) nPatNumber];
+		
+
 		nMaxVal = 0;
 		nCurrTrack = (int) trackid[0];
 		nIniPosition = 0;
@@ -134,16 +140,19 @@ public class Import_MTrackJ implements PlugIn {
 			}
 			
 		}
-		
+		return tracklength;
 	
 	}
 	//function adding the number of detected particles per track to results table
-	void add_Tracks_Lengths()
+	public static void add_Tracks_Lengths(final SMLAnalysis sml_import, final double [] tracklength)
 	{
 		int nCount;
 		//adding to final table
+		//init new column
 		sml_import.ptable.setValue("Track_Length", 0, tracklength[0]);
-		for(nCount = 1; nCount<nPatNumber; nCount++)
+		
+		//add all stuff
+		for(nCount = 1; nCount<tracklength.length; nCount++)
 			sml_import.ptable.setValue(8, nCount, tracklength[nCount]);
 		
 	}

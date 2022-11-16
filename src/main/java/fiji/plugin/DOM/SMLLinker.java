@@ -29,7 +29,7 @@ public class SMLLinker {
 	ArrayList<double[]> TrackCoords;
 	
 	//initializing Linker when no linking was performed
-	SMLLinker( SMLAnalysis sml_, SMLDialog dlg_, Overlay ovTracks_, ImagePlus imp_)
+	SMLLinker( final SMLAnalysis sml_, final SMLDialog dlg_, final Overlay ovTracks_, final ImagePlus imp_)
 	{
 		settings = dlg_;
 		smllink = sml_;
@@ -68,7 +68,7 @@ public class SMLLinker {
 		
 	}
 	//initializing Linker when linking was already performed 
-	SMLLinker(SMLAnalysis sml_)
+	SMLLinker(final SMLAnalysis sml_)
 	{
 		smllink = sml_;
 		
@@ -89,6 +89,24 @@ public class SMLLinker {
 		nPatNumber = f.length;	
 	}
 	
+	//initialize for ShowTracks function only
+	SMLLinker( final SMLAnalysis sml_,final Overlay ovTracks_, final int indX, final int indY, final int indFrame, final int indTrack, final int indTrLength)
+	{
+		smllink = sml_;
+		ovTracks = ovTracks_;
+		//coordinates
+		x   = smllink.ptable.getColumnAsDoubles(indX);		
+		y   = smllink.ptable.getColumnAsDoubles(indY);
+		//frame number
+		f   = smllink.ptable.getColumnAsDoubles(indFrame);
+		//tracks ID
+		trackid = smllink.ptable.getColumnAsDoubles(indTrack);
+		//tracks length
+		tracklength = smllink.ptable.getColumnAsDoubles(indTrLength);
+		//total particles number
+		nPatNumber = f.length;
+		TrackCoords = new ArrayList<double[]>();
+	}
 	void Link_Closest()
 	{
 		
@@ -534,22 +552,24 @@ public class SMLLinker {
 	}
 	
 	//adds all tracks from Results table to the overlay
-	void addTracksToOverlay()
+	void addTracksToOverlay(boolean bUpdateVals)
 	{
 		int nCount=0;
 		int i, nPrevFrame, nCurrFrame;
 		int nTrackCount=0;
 		int nTrackLength, nTrackNumber;
-		
-		//table was sorted by track number
-		//so let's update values
-		//coordinates
-		x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
-		y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
-		//frame number
-		f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
-		trackid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
-		
+		if(bUpdateVals)
+		{
+			//if table was sorted by track number
+			//let's update values
+			//coordinates
+			x   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_X);		
+			y   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_Y);
+			//frame number
+			f   = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_FrameN);
+			trackid = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackID);
+			tracklength = smllink.ptable.getColumnAsDoubles(DOMConstants.Col_TrackLength);
+		}
 		//go through all table
 		while (nCount<nPatNumber)
 		{

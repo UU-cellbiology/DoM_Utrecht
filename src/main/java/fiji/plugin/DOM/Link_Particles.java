@@ -89,7 +89,7 @@ public class Link_Particles implements PlugIn {
 		//adding tracks to overlay
 		if(dlg.bShowTracks)
 		{
-			smlLink.addTracksToOverlay();
+			smlLink.addTracksToOverlay(true);
 		}
 		//adding particles to overlay
 		if(dlg.bShowParticlesLink)
